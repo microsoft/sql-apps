@@ -26,10 +26,17 @@ Other Azure resources may charge for usage beyond their allowances. Budget alert
 
 ## Grow when the app needs it
 
-Popularity is a good reason to review capacity. Public visitor-session creation has no app-level admission throttle or active-session cap. Existing per-session data and mutation limits still apply.
+Start with visibility, not an upgrade. After sharing an app on Azure SQL, you can use **Database Hub in Microsoft Fabric (preview)** to monitor it in place. The experience is available with a Fabric Free license; no Fabric capacity or separate Database Hub license is required to get started, and enabling its SQL performance monitoring has no extra cost. Your Azure resources still have their normal charges.
 
-Consider paid capacity when people rely on the app, allowance exhaustion interrupts use, or response times and recovery needs justify it. Automated traffic consumes resources too.
+Follow [Monitor usage and decide when to grow](../reference/monitor-growth.md) to connect your database, check free-tier headroom, and investigate resource pressure with read-only SQL queries.
 
-The owner chooses and approves paid growth. SQL Apps does not automatically upgrade the application, change SQL billing behavior or configure usage monitoring.
+1. **Observe:** check remaining SQL free allowance, performance during a real app action, and subscription-wide costs.
+2. **Improve:** investigate expensive queries, repeated polling or background work before adding capacity.
+3. **Decide:** consider paid capacity when measured limits, unacceptable delays or availability/recovery needs justify it.
+4. **Verify:** repeat the same app action after an approved change and compare performance and cost.
+
+Popularity is a reason to review usage, not a user-count threshold for upgrading. Public visitor-session creation has no app-level admission throttle or active-session cap; existing per-session data and mutation limits still apply. Automated traffic consumes resources too.
+
+You choose whether and when to pay for more capacity. SQL Apps does not change billing or upgrade automatically. Monitoring is a separate opt-in setup using Database Hub or the Azure portal, not something the SQL Apps commands configure for you.
 
 For current allowance figures, template settings and monitoring steps, use the [cost reference](../reference/demo-cost.md). For deployment choices, read [Sharing your app](sharing.md).

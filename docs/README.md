@@ -18,6 +18,7 @@ To try something already implemented, use the [Todo reference app](../examples/t
 - [Copilot plugin](reference/copilot-plugin.md): installation, binding and troubleshooting.
 - [Guide command](reference/guide.md): saved brief and checkpoint format.
 - [Demo cost review](reference/demo-cost.md): offline cost command and SQL billing settings.
+- [Monitor usage and growth](reference/monitor-growth.md): free Database Hub preview setup, read-only SQL diagnostics and capacity decisions.
 - [Public-demo preparation](reference/demo-deployment.md): diagnostics and template contracts; deployment workflow is incomplete.
 - [Authenticated Azure deployment](reference/deployment.md): full infrastructure deployment commands.
 

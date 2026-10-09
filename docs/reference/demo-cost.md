@@ -94,6 +94,8 @@ Neither `demo-cost`, `demo-preflight` nor the saved guide checkpoint queries act
 
 Before cloud writes, review region/currency/account pricing and available grants. After separately approved deployment:
 
+Use [Monitor usage and decide when to grow](monitor-growth.md) for an end-to-end workflow with the free Database Hub preview, SQL resource queries, and before/after verification. Monitoring requires separate opt-in setup; these SQL Apps commands do not enable it.
+
 1. Check SQL's **Free monthly vCore amount** / **Free amount remaining** in the portal. The free-tier guidance describes a remaining-compute alert before exhaustion.
 2. Review Container Apps consumption across the subscription. Avoid claiming this app has the whole shared grant.
 3. Inspect actual and forecast costs in both the app resource group and the Container Apps managed infrastructure resource group.
