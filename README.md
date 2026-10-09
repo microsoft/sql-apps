@@ -35,7 +35,7 @@ The check explains missing prerequisites without installing anything. The guides
 
 ## What to expect
 
-**Local first.** No Azure subscription is needed to run locally. You need Node 22 or 24, a .NET SDK, Docker with Linux containers, and access to the Azure SQL Database container. Initial package and image downloads require internet. Docker and your chosen AI provider have their own licensing/access conditions.
+**Local first.** No Azure subscription is needed to run locally. You need Node 22 or 24, a .NET SDK, Docker with Linux containers, and access to the Azure SQL Database container. The container is in **private preview**; see its [documentation and signup instructions](https://microsoft.github.io/azure-sql-database-container/) to request access. Initial package and image downloads require internet. Docker and your chosen AI provider have their own licensing/access conditions.
 
 **Your application.** Work with your AI assistant to implement and test its screens and SQL behavior using the existing foundation. This is not a one-command generator. The default foundation has no Todo screen or sample data; examples are selected explicitly.
 
