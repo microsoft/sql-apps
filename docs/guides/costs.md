@@ -16,7 +16,7 @@ Azure SQL and Container Apps have free allowances, but the current demo template
 
 If zero Azure spending is a requirement, stay local until you have reviewed a hosting design that meets it. SQL Apps does not currently provide a guaranteed zero-cost deployment.
 
-Before creating resources, review the target region, subscription eligibility, fixed charges, expected usage and cleanup plan. The [offline demo cost command](../reference/demo-cost.md) identifies known charges without contacting Azure; it is not a price quote or a spending cap.
+Before creating resources, select the approved capability/access profile, then review the target region, subscription eligibility, fixed charges, expected usage and cleanup plan. The [offline demo cost command](../reference/demo-cost.md) identifies known demo charges without contacting Azure; it is demo-only, not an authenticated app cost model, price quote or spending cap. Role-authorized data-only apps use the matching [role-based-cost review](../reference/role-based-data.md#profile-specific-azure-preparation); do not price an older stack or substitute the full foundation as though it were the agreed app.
 
 ## What happens when an allowance runs out?
 

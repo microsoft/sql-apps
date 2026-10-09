@@ -1,10 +1,11 @@
-import { mkdir, readFile, writeFile, rename, open, unlink } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename, open, unlink, realpath } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { deploymentSchema, environmentKey, type DeploymentConfig } from './config.js';
 import { type Run } from './process.js';
-import { imageDigest, imageFields } from './artifacts.js';
+import { imageDigest, deploymentImageFields } from './artifacts.js';
+import { validateRoleBasedCloudDab, roleBasedProcedureGrants, roleBasedSchemaFingerprint } from './role-based-profile.js';
 
 const outputSchema = z.object({
   sqlServer: z.string().regex(/^[a-z0-9-]+\.database\.windows\.net$/),
@@ -21,12 +22,14 @@ const outputSchema = z.object({
 export type DeploymentOutputs = z.infer<typeof outputSchema>;
 export const functionRoleId = '15d91b1c-83c7-4cb6-b349-d7b8fd4b1425';
 export const delegatedScopeId = '6bb296dd-f397-4dcc-a69b-d37dfce3c555';
+export const applicationRoleId = '530d74b7-cf30-41f4-a44c-9f594cba7c63';
 
 export interface DeploymentState {
   environmentKey: string;
   configHash: string;
   stage: 'infrastructure' | 'schema' | 'runtime' | 'ready';
   outputs: DeploymentOutputs;
+  applicationHome?: string | undefined;
 }
 
 export const deploymentStateSchema = z.strictObject({
@@ -34,17 +37,29 @@ export const deploymentStateSchema = z.strictObject({
   configHash: z.string(),
   stage: z.enum(['infrastructure', 'schema', 'runtime', 'ready']),
   outputs: outputSchema,
+  applicationHome: z.string().optional(),
 });
 
 export async function readState(config: DeploymentConfig): Promise<DeploymentState> {
   const state = deploymentStateSchema.parse(JSON.parse(await readFile(statePath(config), 'utf8')));
   if (state.environmentKey !== environmentKey(config)) throw new Error('Deployment state belongs to a different environment');
+  if (config.profile === 'role-based-data' && state.applicationHome !== await realpath('.')) {
+    throw new Error('Role-based deployment state belongs to a different application checkout; discovery or copied state is not reuse approval');
+  }
   return state;
 }
 
+export async function deploymentConfigHash(config: DeploymentConfig): Promise<string> {
+  const hash = createHash('sha256').update(JSON.stringify(config));
+  if (config.profile === 'role-based-data') hash.update(await realpath('.')).update(await roleBasedSchemaFingerprint());
+  return hash.digest('hex');
+}
+
 export function armParameters(config: DeploymentConfig, deployGateway: boolean) {
-  const { subscriptionId: _subscription, resourceGroup: _group, ...parameters } = config;
-  return { parameters: Object.fromEntries(Object.entries({ ...parameters, deployGateway }).map(([key, value]) => [key, { value }])) };
+  const { subscriptionId: _subscription, resourceGroup: _group, readinessPath: _readiness, ...parameters } = config;
+  return { parameters: Object.fromEntries(Object.entries({ ...parameters,
+    ...(config.profile === 'role-based-data' ? { readinessPath: config.readinessPath } : {}), deployGateway })
+    .filter(([, value]) => value !== undefined).map(([key, value]) => [key, { value }])) };
 }
 
 export function parseOutputs(text: string): DeploymentOutputs {
@@ -100,24 +115,47 @@ export async function preflight(config: DeploymentConfig, run: Run, checkImages 
       requestedAccessTokenVersion: z.literal(2),
       oauth2PermissionScopes: z.array(z.object({ value: z.string(), isEnabled: z.boolean() })),
     }),
-    appRoles: z.array(z.object({ id: z.string(), value: z.string(), isEnabled: z.boolean() })),
+    appRoles: z.array(z.object({ id: z.string(), value: z.string(), isEnabled: z.boolean(),
+      allowedMemberTypes: z.array(z.string()).optional() })),
   }).parse(JSON.parse(await run('az', ['ad', 'app', 'show', '--id', config.apiClientId, '-o', 'json'])));
   if (!identity.api.oauth2PermissionScopes.some(scope => scope.value === 'access_as_user' && scope.isEnabled) ||
-      !identity.appRoles.some(role => role.id === functionRoleId && role.value === 'Function.Invoke' && role.isEnabled)) {
-    throw new Error('App registration must expose access_as_user and the documented Function.Invoke role');
+      !identity.appRoles.some(role => config.profile === 'role-based-data' ?
+        role.value === config.requiredRole && role.isEnabled && role.allowedMemberTypes?.includes('User') :
+        role.id === functionRoleId && role.value === 'Function.Invoke' && role.isEnabled)) {
+    throw new Error(config.profile === 'role-based-data' ?
+      'App registration must expose access_as_user and the enabled human application role' :
+      'App registration must expose access_as_user and the documented Function.Invoke role');
   }
   await run('az', ['acr', 'show', '--name', config.registryServer.split('.')[0]!, '--resource-group', config.resourceGroup, '--subscription', config.subscriptionId, '-o', 'none']);
   if (checkImages) {
-    for (const field of imageFields) await imageDigest(config[field], config, run);
+    for (const field of deploymentImageFields(config)) await imageDigest(config[field], config, run);
   }
-  for (const namespace of ['Microsoft.App', 'Microsoft.Sql', 'Microsoft.Storage', 'Microsoft.Web', 'Microsoft.Network', 'Microsoft.KeyVault', 'Microsoft.ManagedIdentity', 'Microsoft.OperationalInsights', 'Microsoft.Insights', 'Microsoft.Authorization']) {
+  if (config.profile === 'role-based-data') validateRoleBasedCloudDab(JSON.parse(await readFile('dab/dab-config.json', 'utf8')), {
+    profile: 'role-based-data', requiredRole: config.requiredRole!, readinessPath: config.readinessPath!,
+  });
+  const providers = ['Microsoft.App', 'Microsoft.Sql', 'Microsoft.Network', 'Microsoft.ManagedIdentity',
+    'Microsoft.OperationalInsights', 'Microsoft.Authorization'];
+  if (config.profile !== 'role-based-data') providers.push('Microsoft.Storage', 'Microsoft.Web', 'Microsoft.KeyVault', 'Microsoft.Insights');
+  for (const namespace of providers) {
     const status = (await run('az', ['provider', 'show', '--namespace', namespace, '--subscription', config.subscriptionId, '--query', 'registrationState', '-o', 'tsv'])).trim();
     if (status !== 'Registered') throw new Error(`Register resource provider ${namespace} before deploying`);
   }
 }
 
 export async function provision(config: DeploymentConfig, run: Run): Promise<DeploymentState> {
+  const configHash = await deploymentConfigHash(config);
   await preflight(config, run);
+  if (config.profile === 'role-based-data') {
+    let previous: DeploymentState | undefined;
+    try { previous = await readState(config); }
+    catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error; }
+    if (previous) {
+      if (previous.configHash !== configHash) {
+        throw new Error('Role-based configuration or SQL/DAB source changed; provisioning cannot overwrite the saved deployment subject');
+      }
+      return previous;
+    }
+  }
   const outputs = parseOutputs(await run('az', [
     'deployment', 'group', 'create', '--subscription', config.subscriptionId, '--resource-group', config.resourceGroup,
     '--name', `${config.name}-${config.environment}-infrastructure`, '--template-file', 'infra/main.bicep',
@@ -125,9 +163,10 @@ export async function provision(config: DeploymentConfig, run: Run): Promise<Dep
   ]));
   return {
     environmentKey: environmentKey(config),
-    configHash: createHash('sha256').update(JSON.stringify(config)).digest('hex'),
+    configHash,
     stage: 'infrastructure',
     outputs,
+    ...(config.profile === 'role-based-data' ? { applicationHome: await realpath('.') } : {}),
   };
 }
 
@@ -139,6 +178,10 @@ export async function parametersFile(config: DeploymentConfig, enabled: boolean)
 }
 
 export async function publishSchema(config: DeploymentConfig, outputs: DeploymentOutputs, run: Run) {
+  const roleBasedGrants = config.profile === 'role-based-data' ? roleBasedProcedureGrants(
+    JSON.parse(await readFile('dab/dab-config.json', 'utf8')),
+    { profile: 'role-based-data', requiredRole: config.requiredRole!, readinessPath: config.readinessPath! }, 'sql_apps_dab',
+  ) : '';
   await run('dotnet', ['build', 'sql/database.sqlproj', '--output', 'dist/sql']);
   const { accessToken } = z.object({ accessToken: z.string().min(1) }).parse(JSON.parse(await run('az', [
     'account', 'get-access-token', '--subscription', config.subscriptionId, '--resource', 'https://database.windows.net/', '-o', 'json',
@@ -148,6 +191,7 @@ export async function publishSchema(config: DeploymentConfig, outputs: Deploymen
     `/TargetConnectionString:Server=tcp:${outputs.sqlServer},1433;Database=app;Encrypt=True;TrustServerCertificate=False;`,
     `/AccessToken:${accessToken}`,
     `/v:DabPrincipalId=${outputs.dabPrincipalId}`,
+    ...(config.profile === 'role-based-data' ? [`/v:RoleBasedProcedureGrants=${roleBasedGrants}`] : []),
     '/p:BlockOnPossibleDataLoss=True', '/p:DropObjectsNotInSource=False',
   ]);
 }
@@ -157,16 +201,33 @@ export async function deploy(
   persist: (state: DeploymentState) => Promise<void> = state => saveState(statePath(config), state),
 ): Promise<DeploymentState> {
   await preflight(config, run);
-  const configHash = createHash('sha256').update(JSON.stringify(config)).digest('hex');
+  const configHash = await deploymentConfigHash(config);
   const deployResources = async (enabled: boolean) => parseOutputs(await run('az', [
     'deployment', 'group', 'create', '--subscription', config.subscriptionId, '--resource-group', config.resourceGroup,
     '--name', `${config.name}-${config.environment}-${enabled ? 'runtime' : 'infrastructure'}`,
     '--template-file', 'infra/main.bicep', '--parameters', `@${await parametersFile(config, enabled)}`,
     '--query', 'properties.outputs', '-o', 'json',
   ]));
-  let state: DeploymentState = { environmentKey: environmentKey(config), configHash, stage: 'infrastructure', outputs: await deployResources(false) };
+  let previous: DeploymentState | undefined;
+  if (config.profile === 'role-based-data') {
+    try { previous = await readState(config); }
+    catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error; }
+    if (previous && previous.configHash !== configHash) throw new Error('Role-based deployment configuration or SQL/DAB source changed; review the prior deployment before resuming');
+  }
+  let state: DeploymentState = previous ?? { environmentKey: environmentKey(config), configHash, stage: 'infrastructure',
+    outputs: await deployResources(false), ...(config.profile === 'role-based-data' ? { applicationHome: await realpath('.') } : {}) };
   await persist(state);
-  await publishSchema(config, state.outputs, run);
+  if (!previous || previous.stage === 'infrastructure') await publishSchema(config, state.outputs, run);
+  if (config.profile === 'role-based-data') {
+    if (!previous || ['infrastructure', 'schema'].includes(previous.stage)) {
+      state = { ...state, stage: 'schema' };
+      await persist(state);
+      state = { ...state, stage: 'runtime', outputs: await deployResources(true) };
+      await persist(state);
+    }
+    await configureRedirect(config, state.outputs.gatewayUrl, run);
+    return await waitForReadiness(config, state, fetcher, persist);
+  }
   state = { ...state, stage: 'schema' };
   await persist(state);
   const apiServicePrincipal = z.string().uuid().parse(
@@ -214,6 +275,27 @@ export async function deploy(
     if (attempt < 29) await new Promise(done => setTimeout(done, 10_000));
   }
   throw new Error('Runtime deployed but readiness failed. Deployment state remains at runtime; inspect Container Apps logs.');
+}
+
+export async function waitForReadiness(
+  config: DeploymentConfig, state: DeploymentState, fetcher: typeof fetch,
+  persist: (state: DeploymentState) => Promise<void>,
+): Promise<DeploymentState> {
+  for (let attempt = 0; attempt < 30; attempt++) {
+    try {
+      const response = await fetcher(new URL('/health/ready', state.outputs.gatewayUrl),
+        { signal: AbortSignal.timeout(5_000), redirect: 'error' });
+      if (response.ok) {
+        const ready = { ...state, stage: 'ready' as const };
+        await persist(ready);
+        return ready;
+      }
+    } catch (error) {
+      console.error(`Role-based-data readiness attempt ${attempt + 1} failed: ${error instanceof Error ? error.name : 'UnknownError'}`);
+    }
+    if (attempt < 29) await new Promise(done => setTimeout(done, 10_000));
+  }
+  throw new Error(`Role-based-data runtime deployed but not ready for ${environmentKey(config)}; state retained, authenticated procedure acceptance still required`);
 }
 
 export async function configureRedirect(config: DeploymentConfig, origin: string, run: Run) {

@@ -78,7 +78,7 @@ export async function status(fetcher = fetch, origins = { app: 'http://127.0.0.1
     scope: 'HTTP liveness/data readiness only; not worker, storage, SQL authorization or cloud acceptance' };
 }
 
-const commands = new Set(['app', 'serve', 'serve-sql', 'services', 'stop-services', 'maintain',
+const commands = new Set(['app', 'serve', 'serve-sql', 'role-based-app', 'role-based-serve', 'services', 'stop-services', 'maintain',
   'start-sql', 'verify', 'init', 'test', 'data', 'api-test', 'app-test', 'app-check', 'services-test', 'stop',
   'workspace-plan', 'workspace-init', 'recover-sql', 'selected-app', 'selected-serve', 'selected-stop', 'selected-test']);
 
@@ -87,10 +87,10 @@ export async function main(args = process.argv.slice(2)) {
   if (args.length > 2) throw new Error('Expected a command and its optional selection');
   if (command === 'help') {
     console.log('SQL Apps local plugin: home | workspace-check | guide | guide-save <absolute-brief.json> | status | setup-check [existing-sql-container] | ' + [...commands].join(' | '));
-    console.log('Local commands use the configured checkout; no cloud deployment command is exposed.');
+    console.log('role-based-setup-check [existing-sql-container] checks only role-based-data service ports before build. Local commands use the configured checkout; no cloud deployment command is exposed.');
     return;
   }
-  if (!['home', 'workspace-check', 'guide', 'guide-save', 'status', 'setup-check'].includes(command) && !commands.has(command)) throw new Error(`Unsupported plugin command: ${command}`);
+  if (!['home', 'workspace-check', 'guide', 'guide-save', 'status', 'setup-check', 'role-based-setup-check'].includes(command) && !commands.has(command)) throw new Error(`Unsupported plugin command: ${command}`);
   if (command === 'guide-save') {
     if (args.length !== 2 || !isAbsolute(container)) throw new Error('Provide an absolute project brief JSON path');
   } else if (command === 'guide') {
@@ -120,19 +120,21 @@ export async function main(args = process.argv.slice(2)) {
     return;
   }
   const guided = command === 'guide' || command === 'guide-save';
+  const setup = command === 'setup-check' || command === 'role-based-setup-check';
   const cli = guided ? join(home, 'scripts', 'guide.mjs') :
-    command === 'setup-check' ? join(home, 'scripts', 'setup-check.mjs') : join(home, 'dist', 'src', 'local-cli.js');
+    setup ? join(home, 'scripts', 'setup-check.mjs') : join(home, 'dist', 'src', 'local-cli.js');
   try { await access(cli); }
   catch (error) {
     throw new Error(guided ? 'Guide missing from the bound checkout; obtain the updated project.' :
-      command === 'setup-check' ? 'Setup diagnostic missing from the bound checkout; obtain the updated project.' :
+      setup ? 'Setup diagnostic missing from the bound checkout; obtain the updated project.' :
       'Local CLI not built. Run npm run build in the configured checkout', { cause: error });
   }
-  if (!guided && command !== 'setup-check' && !workspace.bound.build.ready) {
+  if (!guided && !setup && !workspace.bound.build.ready) {
     throw new Error(`Runtime build is not verified: ${workspace.bound.build.code}. ${workspace.bound.build.nextAction}`);
   }
   const childArgs = guided ? [cli, ...(command === 'guide-save' ? ['--save', container] : []), '--json'] :
-    command === 'setup-check' ? [cli, '--json', ...(args.length === 2 ? ['--container', container] : [])] :
+    setup ? [cli, '--json', ...(command === 'role-based-setup-check' ? ['--profile', 'role-based-data'] : []),
+      ...(args.length === 2 ? ['--container', container] : [])] :
     [cli, command, ...(args.length === 2 ? [container] : [])];
   await new Promise((done, reject) => {
     const child = spawn(process.execPath, childArgs, { cwd: home, shell: false, stdio: 'inherit' });

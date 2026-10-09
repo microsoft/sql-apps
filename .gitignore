@@ -12,3 +12,4 @@ sql/bin/
 sql/obj/
 examples/**/obj/
 examples/**/bin/
+/docs/superpowers/

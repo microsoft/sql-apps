@@ -4,6 +4,14 @@ The local inner loop uses the Azure SQL Database container (Private Preview, **E
 
 For the shortest startup path, use [Run locally](../guides/run-locally.md). This reference covers individual services, workspace ownership, file processing and recovery. If you have a pre-rebrand checkout, read [migration notes](../maintainers/naming-transition.md).
 
+## Capability-scoped startup
+
+The foundation `app` command starts SQL/DAB/storage/Functions/browser; saved brief capabilities do not turn services off. A role-authorized data application uses the [role-based-data profile](role-based-data.md), `role-based-app` and `role-based-serve` with the same explicit workspace/container selection. This stages SQL/schema/DAB/browser startup without storage/Functions and checks the configured procedure before listening.
+
+`serve-sql` remains an advanced SQL-only gateway, not the configured role-based-profile launcher. Implement domain UI/schema/procedures, configure authorized DAB permissions, remove excluded controls, and verify the real SQL procedure/browser save-reload flow. The selected reference path below is anonymous synthetic-only, not a role-based-app substitute. The [role-based-data Azure path](role-based-data.md#identity-artifacts-and-deployment) selects matching resources while preserving private SQL.
+
+Follow [scoped consent and readiness](../guides/run-locally.md#approvals-and-readiness). A proposed origin or successful build is not a running app. Publish the intended origin only after response/readiness probes, then report workflow acceptance separately.
+
 ## Prerequisites
 
 First time installing development tools? Use [guided setup](../guides/getting-started.md) rather than treating this list as instructions. Copilot can offer approved installations, explain access/license conditions, guide restarts and verify each step on Windows, macOS or Linux. `node scripts/setup-check.mjs` runs before npm restore/build and never installs or mutates resources.
@@ -43,7 +51,7 @@ After selection and startup approval:
 npm run local -- app
 ```
 
-Open the URL printed by startup (**http://127.0.0.1:18080** in legacy mode). Choose Development Alice or Development Bob and use file upload/list/download/delete, Function invocation and queued file processing. Switching users revokes the previous local session; each user sees only their own data, files and jobs. Reloading preserves the selected session within the browser tab; SQL rows and Blob files persist independently of browser sessions.
+After the intended server responds and `/health/ready` passes, open the URL printed by startup (**http://127.0.0.1:18080** in legacy mode). For approved foundation file/job scope, choose Development Alice or Development Bob and use file upload/list/download/delete, Function invocation and queued file processing. Switching users revokes the previous local session; each user sees only their own data, files and jobs. Reloading preserves the selected session within the browser tab; SQL rows and Blob files persist independently of browser sessions.
 
 `app` starts/reuses the project-owned SQL container, publishes the schema, runs SQL security checks, recreates local DAB, starts persistent Azurite, builds/starts the local Functions image, and serves the existing frontend and gateway on a single loopback origin. It stays in the foreground. Ctrl+C stops the browser gateway; the service containers continue running. After restarting the browser server, select a user again because local sessions are held only in server memory.
 

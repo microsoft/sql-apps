@@ -49,7 +49,8 @@ export function parseArguments(args) {
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--json' && !options.json) options.json = true;
     else if (args[i] === '--container' && !options.container && containerPattern.test(args[i + 1] ?? '')) options.container = args[++i];
-    else throw new Error('Usage: node scripts/setup-check.mjs [--json] [--container <existing-sql-container>]');
+    else if (args[i] === '--profile' && !options.profile && ['foundation', 'role-based-data'].includes(args[i + 1])) options.profile = args[++i];
+    else throw new Error('Usage: node scripts/setup-check.mjs [--json] [--container <existing-sql-container>] [--profile <foundation|role-based-data>]');
   }
   return options;
 }
@@ -58,6 +59,7 @@ export async function checkSetup(options = {}, injected = {}) {
   const root = resolve(options.root ?? defaultRoot);
   const runtime = runtimeFor(undefined, root);
   if (options.container && !containerPattern.test(options.container)) throw new Error('Invalid SQL container name');
+  if (options.profile && !['foundation', 'role-based-data'].includes(options.profile)) throw new Error('Invalid setup profile');
   const deps = {
     platform: process.platform, architecture: process.arch, nodeVersion: process.versions.node,
     memoryBytes: totalmem(), read: path => readFile(path, 'utf8'), exists, port: portState, fetch,
@@ -173,8 +175,10 @@ export async function checkSetup(options = {}, injected = {}) {
         'Inspect only safe project ownership labels before reusing services.', false);
     }
   }
-  for (const [port, owner] of [[runtime.ports.gateway, null], [runtime.ports.data, 'data'],
-    [runtime.ports.blob, 'storage'], [runtime.ports.queue, 'storage'], [runtime.ports.functions, 'functions']]) {
+  const ports = [[runtime.ports.gateway, null], [runtime.ports.data, 'data'],
+    ...(options.profile === 'role-based-data' ? [] :
+      [[runtime.ports.blob, 'storage'], [runtime.ports.queue, 'storage'], [runtime.ports.functions, 'functions']])];
+  for (const [port, owner] of ports) {
     const state = await deps.port(port);
     if (state === 'free') add(`port-${port}`, 'ready', 'PORT_FREE', `Local port ${port} is free.`, 'Available for application startup.');
     else if (state === 'occupied' && owner && containers.some(value => value.owner === owner &&

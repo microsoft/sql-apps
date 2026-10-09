@@ -1,0 +1,55 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { resolve, join } from 'node:path';
+import { run } from '../dist/src/process.js';
+import { reviewRoleBasedCost } from '../dist/src/role-based-cost.js';
+
+test('compiled authorized profile gates excluded resources and retains private SQL and trusted authorized settings', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'sql-apps-role-based-infra-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const output = join(directory, 'main.json');
+  await run('az', ['bicep', 'build', '--file', resolve('infra', 'main.bicep'), '--outfile', output]);
+  const template = JSON.parse(await readFile(output, 'utf8'));
+  assert.equal(template.parameters.profile.defaultValue, 'foundation');
+  assert.deepEqual(template.parameters.profile.allowedValues, ['foundation', 'role-based-data']);
+  assert.equal(template.variables.fullFoundation, "[equals(parameters('profile'), 'foundation')]");
+  for (const resource of template.resources.filter(resource =>
+    /Microsoft\.(Storage|Web|KeyVault|Insights)\//.test(resource.type))) {
+    assert.equal(resource.condition, "[variables('fullFoundation')]", `Excluded resource ${resource.type} must be gated`);
+  }
+  for (const name of ['vault-endpoint', 'function-endpoint']) {
+    assert.equal(template.resources.find(resource => resource.name === name).condition, "[variables('fullFoundation')]");
+  }
+  const sql = template.resources.find(resource => resource.type === 'Microsoft.Sql/servers');
+  assert.equal(sql.properties.publicNetworkAccess, 'Disabled');
+  assert.equal(sql.properties.administrators.azureADOnlyAuthentication, true);
+  const sqlEndpoint = template.resources.find(resource => resource.name === 'sql-endpoint');
+  assert.equal(sqlEndpoint.condition, undefined);
+  const cost = reviewRoleBasedCost(JSON.parse(await readFile('azure-role-based-cost.example.json', 'utf8')));
+  const database = template.resources.find(resource => resource.type === 'Microsoft.Sql/servers/databases');
+  assert.equal(database.sku.name, cost.resources[0].sku);
+  for (const resource of template.resources.filter(resource => resource.type === 'Microsoft.App/containerApps')) {
+    assert.equal(resource.properties.template.scale.minReplicas, cost.resources[2].minReplicas);
+    assert.equal(resource.properties.template.scale.maxReplicas, cost.resources[2].maxReplicas);
+    assert.equal(resource.properties.template.containers[0].resources.cpu, "[json('0.5')]");
+    assert.equal(resource.properties.template.containers[0].resources.memory, '1Gi');
+    assert.equal(resource.properties.configuration.ingress.allowInsecure, false);
+  }
+  const data = template.resources.find(resource => resource.type === 'Microsoft.App/containerApps' &&
+    resource.properties.template.containers[0].name === 'data');
+  assert.equal(data.properties.configuration.ingress.external, false);
+  const gateway = template.resources.find(resource => resource.type === 'Microsoft.App/containerApps' &&
+    resource.properties.template.containers[0].name === 'gateway');
+  assert.equal(gateway.properties.configuration.ingress.external, true);
+  const env = gateway.properties.template.containers[0].env;
+  assert.match(env, /if\(variables\('fullFoundation'\)/);
+  assert.match(env, /SQL_APPS_PROFILE.*SQL_APPS_REQUIRED_ROLE.*SQL_APPS_READINESS_PATH/);
+  const pulls = template.resources.find(resource => resource.copy?.name === 'pullRoles');
+  assert.match(pulls.copy.count, /if\(variables\('fullFoundation'\), 3, 2\)/);
+  const storageRoles = template.resources.find(resource => resource.copy?.name === 'hostStorageRoles');
+  assert.match(storageRoles.copy.count, /if\(variables\('fullFoundation'\).*createArray\(\)/);
+  const storageEndpoints = template.resources.find(resource => resource.copy?.name === 'storageEndpoints');
+  assert.match(storageEndpoints.copy.count, /if\(variables\('fullFoundation'\).*createArray\(\)/);
+});

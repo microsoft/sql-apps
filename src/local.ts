@@ -9,6 +9,7 @@ import { localJobData } from './local-job-data.js';
 import { runtimeFor } from './workspace.mjs';
 import { verifyContainerWorkspace } from './local-ownership.js';
 import { pinnedDabImage } from './artifacts.js';
+import { type RoleBasedProfile, validateRoleBasedDab, roleBasedProcedureGrants } from './role-based-profile.js';
 
 const database = runtimeFor().database;
 const login = runtimeFor().login;
@@ -259,7 +260,7 @@ export async function publishLocalSchema(container: string, target: {
   { redact: [adminPassword, adminPassword.replaceAll('"', '""')] });
 }
 
-export async function initLocal(container: string, run: Run): Promise<void> {
+export async function initLocal(container: string, run: Run, authorized?: RoleBasedProfile): Promise<void> {
   const { stateFile } = localPaths(container);
   await withDeploymentLock(stateFile, async () => {
     await verifyLocal(container, run);
@@ -275,16 +276,19 @@ IF DB_ID(N'${database}') IS NULL CREATE DATABASE [${database}];
 IF SUSER_ID(N'${login}') IS NULL CREATE LOGIN [${login}] WITH PASSWORD = N'${state.password}';
 `, run, [state.password]);
     await publishLocalSchema(container, { database, project: join('sql', 'database.sqlproj'), output: join('dist', 'sql') }, run);
+    const grants = authorized ? roleBasedProcedureGrants(
+      JSON.parse(await readFile('dab/dab-config.json', 'utf8')), authorized, login,
+    ) : `GRANT SELECT, INSERT, UPDATE, DELETE ON dbo.FileJobs TO [${login}];
+GRANT VIEW DEFINITION ON dbo.FileJobs TO [${login}];`;
     try {
       await databaseQuery(state, `
 IF DATABASE_PRINCIPAL_ID(N'${login}') IS NULL CREATE USER [${login}] FOR LOGIN [${login}];
-GRANT SELECT, INSERT, UPDATE, DELETE ON dbo.FileJobs TO [${login}];
-GRANT VIEW DEFINITION ON dbo.FileJobs TO [${login}];
+${grants}
 `, run, true);
     } catch (error) {
       throw new Error('Local app-user setup failed. Older preview images may reject login mapping; use start-sql with a new container name and the current azure-sql/db-dev image. Runtime will not fall back to sa.', { cause: error });
     }
-    await testLocalSql(state, run);
+    if (!authorized) await testLocalSql(state, run);
   });
 }
 
@@ -311,9 +315,11 @@ export function localPrincipal(oid: string, scope = 'access_as_user', role = 'au
   })).toString('base64');
 }
 
-export async function localDabConfig(): Promise<unknown> {
+export async function localDabConfig(authorized?: RoleBasedProfile): Promise<unknown> {
   const config = JSON.parse(await readFile('dab/dab-config.json', 'utf8'));
+  if (authorized) validateRoleBasedDab(config, authorized);
   config.runtime.host = { mode: 'development', authentication: { provider: 'AppService' } };
+  if (authorized) return config;
   config.entities.FileJob = {
     source: { object: 'dbo.FileJobs', type: 'table' }, rest: { enabled: true }, graphql: { enabled: true },
     permissions: [
@@ -325,12 +331,16 @@ export async function localDabConfig(): Promise<unknown> {
   return config;
 }
 
-export async function startLocalData(container: string, run: Run): Promise<void> {
+export async function startLocalData(container: string, run: Run, authorized?: RoleBasedProfile): Promise<void> {
   const runtime = runtimeFor(container);
   const state = await readLocal(container);
   const { dataContainer, configFile: path } = localPaths(container);
-  await testLocalSql(state, run);
-  await saveJson(path, await localDabConfig());
+  const config = await localDabConfig(authorized);
+  if (authorized) {
+    await verifyLocal(container, run);
+    await databaseQuery(state, roleBasedProcedureGrants(config, authorized, login), run, true);
+  } else await testLocalSql(state, run);
+  await saveJson(path, config);
   const networks = z.record(z.string(), z.object({ IPAddress: z.ipv4() }))
     .parse(JSON.parse(await run('docker', ['inspect', container, '--format', '{{json .NetworkSettings.Networks}}'])));
   const network = Object.entries(networks)[0];
@@ -459,17 +469,17 @@ async function assertLocalDenied(action: () => Promise<unknown>): Promise<void> 
   throw new Error('Forbidden local DAB mutation succeeded');
 }
 
-export async function localCommand(command: string, container: string, run: Run): Promise<void> {
+export async function localCommand(command: string, container: string, run: Run, authorized?: RoleBasedProfile): Promise<void> {
   if (command === 'start-sql') await startLocalSql(container, run);
   else if (command === 'recover-sql') await recoverLocalSql(container, run);
   else if (command === 'verify') await verifyLocal(container, run);
-  else if (command === 'init') await initLocal(container, run);
+  else if (command === 'init') await initLocal(container, run, authorized);
   else if (command === 'test') await testLocalSql(await readLocal(container), run);
   else if (command === 'app-check') {
     const result = await databaseQuery(await readLocal(container), await readFile('sql/local/application-acceptance.sql', 'utf8'), run, true);
     if (!result.includes('CLEAN APPLICATION DATABASE PASSED')) throw new Error('Clean application database acceptance did not report success');
   }
-  else if (command === 'data') await startLocalData(container, run);
+  else if (command === 'data') await startLocalData(container, run, authorized);
   else if (command === 'api-test') await testLocalData();
   else if (command === 'stop') {
     const data = localPaths(container).dataContainer;

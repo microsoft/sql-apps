@@ -31,6 +31,7 @@ export async function deployStatic(
 export async function updateImage(
   target: 'gateway' | 'functions', config: DeploymentConfig, state: DeploymentState, run: Run,
 ): Promise<void> {
+  if (target === 'functions' && config.profile === 'role-based-data') throw new Error('Functions excluded by role-based-data profile');
   if (!state.outputs.gatewayUrl) throw new Error('Complete a full deployment before image-only updates');
   if (target === 'gateway') {
     await run('az', ['containerapp', 'update', '--name', state.outputs.gatewayName, '--resource-group', config.resourceGroup,
@@ -45,6 +46,7 @@ export async function updateImage(
 export async function setSecret(
   name: string, value: string, config: DeploymentConfig, state: DeploymentState, run: Run,
 ): Promise<void> {
+  if (config.profile === 'role-based-data') throw new Error('Key Vault excluded by role-based-data profile');
   if (!/^[a-zA-Z0-9-]{1,127}$/.test(name)) throw new Error('Invalid Key Vault secret name');
   if (!value) throw new Error('Secret value must not be empty');
   await run('az', ['keyvault', 'secret', 'set', '--vault-name', state.outputs.vaultName,

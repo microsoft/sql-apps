@@ -5,7 +5,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const checkout = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const plugin = join(checkout, 'plugins', 'sql-apps');
-export const skillNames = ['sql-apps-local', 'sql-apps-diagnostics', 'sql-apps-validation', 'sql-apps-cloud-preview', 'sql-apps-application'];
+export const skillNames = ['sql-apps-local', 'sql-apps-diagnostics', 'sql-apps-validation', 'sql-apps-cloud-preview', 'sql-apps-application', 'sql-apps-frontend-design'];
+const runtimeSkillNames = ['sql-apps-local', 'sql-apps-diagnostics', 'sql-apps-validation', 'sql-apps-cloud-preview', 'sql-apps-application'];
 
 export async function checkPlugin() {
   const manifest = JSON.parse(await readFile(join(plugin, 'plugin.json'), 'utf8'));
@@ -29,7 +30,11 @@ export async function checkPlugin() {
   for (const name of skillNames) {
     const content = await readFile(join(plugin, 'skills', name, 'SKILL.md'), 'utf8');
     assert.match(content, new RegExp(`^---\\r?\\nname: ${name}\\r?\\ndescription: "[^\\r\\n]+"\\r?\\n---`));
-    assert.match(content, /\.\.\/\.\.\/scripts\/sql-apps\.mjs/);
+    if (runtimeSkillNames.includes(name)) {
+      assert.match(content, /\.\.\/\.\.\/scripts\/sql-apps\.mjs/);
+    } else {
+      assert.match(content, /sql-apps-application.*authoritative|authoritative.*sql-apps-application/i, 'Design guidance defers SQL Apps setup and project authority to the application skill');
+    }
     assert.match(content, /absolute/i);
     assert.ok(content.length < 12000, 'Keep skills focused and discoverable');
   }
@@ -48,8 +53,8 @@ export async function checkPlugin() {
   }
   assert.deepEqual((await readdir(plugin)).sort(), ['plugin.json', 'scripts', 'skills']);
   await inspect(plugin);
-  assert.equal(files.length, 7, 'Bundle contains only manifest, launcher and five skills');
-  console.log('Local plugin packaging passed: five skills, portable manifest, clean isolated bundle and matching marketplaces.');
+  assert.equal(files.length, 8, 'Bundle contains only manifest, launcher and six skills');
+  console.log('Local plugin packaging passed: six skills, portable manifest, clean isolated bundle and matching marketplaces.');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

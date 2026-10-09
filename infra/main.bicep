@@ -9,15 +9,20 @@ param environment string
 param location string = resourceGroup().location
 param tenantId string
 param apiClientId string
+@allowed(['foundation', 'role-based-data'])
+param profile string = 'foundation'
+param requiredRole string = ''
+param readinessPath string = ''
 param sqlAdminObjectId string
 param sqlAdminName string
 param gatewayImage string
 param dabImage string
-param functionsImage string
+param functionsImage string = ''
 param registryServer string
 param deployGateway bool = true
 
 var prefix = '${name}-${environment}'
+var fullFoundation = profile == 'foundation'
 var suffix = uniqueString(resourceGroup().id, prefix)
 var sqlName = '${prefix}-${suffix}'
 var storageName = 'sqlapps${suffix}'
@@ -40,7 +45,7 @@ resource dabIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-3
   location: location
   tags: tags
 }
-resource functionIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+resource functionIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = if (fullFoundation) {
   name: '${prefix}-functions'
   location: location
   tags: tags
@@ -48,12 +53,12 @@ resource functionIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023
 resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: split(registryServer, '.')[0]
 }
-resource pullRoles 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for index in range(0, 3): {
+resource pullRoles 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for index in range(0, fullFoundation ? 3 : 2): {
   name: guid(registry.id, ['gateway', 'data', 'functions'][index], prefix, acrPull)
   scope: registry
   properties: {
     roleDefinitionId: acrPull
-    principalId: [gatewayIdentity.properties.principalId, dabIdentity.properties.principalId, functionIdentity.properties.principalId][index]
+    principalId: index == 0 ? gatewayIdentity.properties.principalId : index == 1 ? dabIdentity.properties.principalId : functionIdentity!.properties.principalId
     principalType: 'ServicePrincipal'
   }
 }]
@@ -72,13 +77,13 @@ resource network 'Microsoft.Network/virtualNetworks@2024-05-01' = {
           delegations: [{ name: 'containers', properties: { serviceName: 'Microsoft.App/environments' } }]
         }
       }
-      {
+      ...(fullFoundation ? [{
         name: 'functions'
         properties: {
           addressPrefix: '10.42.2.0/24'
           delegations: [{ name: 'functions', properties: { serviceName: 'Microsoft.Web/serverFarms' } }]
         }
-      }
+      }] : [])
       { name: 'endpoints', properties: { addressPrefix: '10.42.3.0/24', privateEndpointNetworkPolicies: 'Disabled' } }
     ]
   }
@@ -89,7 +94,7 @@ resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   tags: tags
   properties: { sku: { name: 'PerGB2018' }, retentionInDays: 30 }
 }
-resource insights 'Microsoft.Insights/components@2020-02-02' = {
+resource insights 'Microsoft.Insights/components@2020-02-02' = if (fullFoundation) {
   name: '${prefix}-insights'
   location: location
   kind: 'web'
@@ -134,7 +139,7 @@ resource database 'Microsoft.Sql/servers/databases@2023-08-01' = {
   sku: { name: 'S0', tier: 'Standard', capacity: 10 }
   properties: { collation: 'SQL_Latin1_General_CP1_CI_AS', zoneRedundant: false }
 }
-resource files 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+resource files 'Microsoft.Storage/storageAccounts@2023-05-01' = if (fullFoundation) {
   name: storageName
   location: location
   tags: tags
@@ -149,32 +154,32 @@ resource files 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     networkAcls: { defaultAction: 'Deny', bypass: 'None' }
   }
 }
-resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = if (fullFoundation) {
   parent: files
   name: 'default'
   properties: { deleteRetentionPolicy: { enabled: true, days: 7 }, containerDeleteRetentionPolicy: { enabled: true, days: 7 } }
 }
-resource fileContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+resource fileContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = if (fullFoundation) {
   parent: blobService
   name: 'files'
   properties: { publicAccess: 'None' }
 }
-resource hostContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+resource hostContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = if (fullFoundation) {
   parent: blobService
   name: 'azure-webjobs-hosts'
   properties: { publicAccess: 'None' }
 }
-resource gatewayStorageRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource gatewayStorageRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (fullFoundation) {
   name: guid(fileContainer.id, gatewayIdentity.id, blobContributor)
   scope: fileContainer
   properties: { roleDefinitionId: blobContributor, principalId: gatewayIdentity.properties.principalId, principalType: 'ServicePrincipal' }
 }
-resource hostStorageRoles 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for role in [blobOwner, queueContributor, tableContributor]: {
+resource hostStorageRoles 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for role in (fullFoundation ? [blobOwner, queueContributor, tableContributor] : []): {
   name: guid(files.id, functionIdentity.id, role)
   scope: files
-  properties: { roleDefinitionId: role, principalId: functionIdentity.properties.principalId, principalType: 'ServicePrincipal' }
+  properties: { roleDefinitionId: role, principalId: functionIdentity!.properties.principalId, principalType: 'ServicePrincipal' }
 }]
-resource vault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+resource vault 'Microsoft.KeyVault/vaults@2023-07-01' = if (fullFoundation) {
   name: vaultName
   location: location
   tags: tags
@@ -189,16 +194,16 @@ resource vault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     networkAcls: { defaultAction: 'Deny', bypass: 'None' }
   }
 }
-resource functionSecretsRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource functionSecretsRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (fullFoundation) {
   name: guid(vault.id, functionIdentity.id, 'secrets-user')
   scope: vault
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
-    principalId: functionIdentity.properties.principalId
+    principalId: functionIdentity!.properties.principalId
     principalType: 'ServicePrincipal'
   }
 }
-resource functionPlan 'Microsoft.Web/serverfarms@2023-12-01' = {
+resource functionPlan 'Microsoft.Web/serverfarms@2023-12-01' = if (fullFoundation) {
   name: '${prefix}-functions-plan'
   location: location
   tags: tags
@@ -206,7 +211,7 @@ resource functionPlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   sku: { name: 'EP1', tier: 'ElasticPremium', capacity: 1 }
   properties: { reserved: true }
 }
-resource functions 'Microsoft.Web/sites@2023-12-01' = {
+resource functions 'Microsoft.Web/sites@2023-12-01' = if (fullFoundation) {
   name: functionName
   location: location
   tags: tags
@@ -222,7 +227,7 @@ resource functions 'Microsoft.Web/sites@2023-12-01' = {
     siteConfig: {
       linuxFxVersion: 'DOCKER|${functionsImage}'
       acrUseManagedIdentityCreds: true
-      acrUserManagedIdentityID: functionIdentity.properties.clientId
+      acrUserManagedIdentityID: functionIdentity!.properties.clientId
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
       appSettings: [
@@ -232,12 +237,12 @@ resource functions 'Microsoft.Web/sites@2023-12-01' = {
         { name: 'AZURE_TENANT_ID', value: tenantId }
         { name: 'API_CLIENT_ID', value: apiClientId }
         { name: 'GATEWAY_PRINCIPAL_ID', value: gatewayIdentity.properties.principalId }
-        { name: 'FUNCTIONS_IDENTITY_CLIENT_ID', value: functionIdentity.properties.clientId }
-        { name: 'KEY_VAULT_URL', value: vault.properties.vaultUri }
+        { name: 'FUNCTIONS_IDENTITY_CLIENT_ID', value: functionIdentity!.properties.clientId }
+        { name: 'KEY_VAULT_URL', value: vault!.properties.vaultUri }
         { name: 'AzureWebJobsStorage__accountName', value: files.name }
         { name: 'AzureWebJobsStorage__credential', value: 'managedidentity' }
-        { name: 'AzureWebJobsStorage__clientId', value: functionIdentity.properties.clientId }
-        { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: insights.properties.ConnectionString }
+        { name: 'AzureWebJobsStorage__clientId', value: functionIdentity!.properties.clientId }
+        { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: insights!.properties.ConnectionString }
       ]
     }
   }
@@ -248,15 +253,15 @@ module sqlEndpoint 'private-endpoint.bicep' = {
   name: 'sql-endpoint'
   params: { name: '${prefix}-sql', location: location, networkId: network.id, targetId: sql.id, groupId: 'sqlServer', dnsZone: 'privatelink${az.environment().suffixes.sqlServerHostname}' }
 }
-module storageEndpoints 'private-endpoint.bicep' = [for kind in ['blob', 'queue', 'table']: {
+module storageEndpoints 'private-endpoint.bicep' = [for kind in (fullFoundation ? ['blob', 'queue', 'table'] : []): {
   name: '${kind}-endpoint'
   params: { name: '${prefix}-${kind}', location: location, networkId: network.id, targetId: files.id, groupId: kind, dnsZone: 'privatelink.${kind}.core.windows.net' }
 }]
-module vaultEndpoint 'private-endpoint.bicep' = {
+module vaultEndpoint 'private-endpoint.bicep' = if (fullFoundation) {
   name: 'vault-endpoint'
   params: { name: '${prefix}-vault', location: location, networkId: network.id, targetId: vault.id, groupId: 'vault', dnsZone: 'privatelink.vaultcore.azure.net' }
 }
-module functionEndpoint 'private-endpoint.bicep' = {
+module functionEndpoint 'private-endpoint.bicep' = if (fullFoundation) {
   name: 'function-endpoint'
   params: { name: '${prefix}-function', location: location, networkId: network.id, targetId: functions.id, groupId: 'sites', dnsZone: 'privatelink.azurewebsites.net' }
 }
@@ -318,9 +323,15 @@ resource gateway 'Microsoft.App/containerApps@2024-03-01' = if (deployGateway) {
           { name: 'AZURE_TENANT_ID', value: tenantId }
           { name: 'API_CLIENT_ID', value: apiClientId }
           { name: 'DAB_URL', value: 'https://${dataApp!.properties.configuration.ingress.fqdn}' }
-          { name: 'BLOB_ACCOUNT_URL', value: files.properties.primaryEndpoints.blob }
-          { name: 'BLOB_CONTAINER', value: fileContainer.name }
-          { name: 'FUNCTIONS_URL', value: 'https://${functions.properties.defaultHostName}' }
+          ...(fullFoundation ? [
+            { name: 'BLOB_ACCOUNT_URL', value: files!.properties.primaryEndpoints.blob }
+            { name: 'BLOB_CONTAINER', value: fileContainer!.name }
+            { name: 'FUNCTIONS_URL', value: 'https://${functions!.properties.defaultHostName}' }
+          ] : [
+            { name: 'SQL_APPS_PROFILE', value: profile }
+            { name: 'SQL_APPS_REQUIRED_ROLE', value: requiredRole }
+            { name: 'SQL_APPS_READINESS_PATH', value: readinessPath }
+          ])
         ]
         probes: [
           { type: 'Liveness', httpGet: { path: '/health/live', port: 8080 }, initialDelaySeconds: 10, periodSeconds: 30 }
@@ -338,7 +349,7 @@ output databaseName string = database.name
 output dabPrincipalId string = dabIdentity.properties.principalId
 output gatewayPrincipalId string = gatewayIdentity.properties.principalId
 output gatewayName string = '${prefix}-gateway'
-output functionsName string = functions.name
+output functionsName string = fullFoundation ? functions!.name : ''
 output networkId string = network.id
-output storageAccount string = files.name
-output vaultName string = vault.name
+output storageAccount string = fullFoundation ? files!.name : ''
+output vaultName string = fullFoundation ? vault!.name : ''

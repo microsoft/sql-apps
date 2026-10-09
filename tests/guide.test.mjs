@@ -20,7 +20,7 @@ test('SQL Apps entry points explicitly scope standalone work while preserving ot
   const paths = [
     'content/start.md',
     'skills/sql-apps-getting-started/SKILL.md',
-    ...['application', 'local', 'diagnostics', 'validation', 'cloud-preview']
+    ...['application', 'local', 'diagnostics', 'validation', 'cloud-preview', 'frontend-design']
       .map(name => `plugins/sql-apps/skills/sql-apps-${name}/SKILL.md`),
   ];
   for (const path of paths) {

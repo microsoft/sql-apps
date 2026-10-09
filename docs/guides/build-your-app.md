@@ -33,6 +33,10 @@ Complete [Get started](getting-started.md) before downloading dependencies or la
 
 Your AI assistant can help write your frontend, API and schema; SQL Apps does not generate a complete domain app automatically. Review its changes and use the startup path for your application in [Run locally](run-locally.md). Trying the Todo reference is optional, not a prerequisite.
 
+For substantial new screens or a visual redesign, ask your assistant to use the `sql-apps-frontend-design` skill for an app-appropriate visual direction and browser review of the rendered interface.
+
+Check capability/access support early: the [role-based-data profile](../reference/role-based-data.md) provides SQL/DAB/browser startup with trusted application-role forwarding and a matching paid private-SQL Azure path. Domain screens, procedures and actual workflow acceptance still need implementation. The full foundation retains files/jobs; do not add excluded services or switch to anonymous access just to fit a template.
+
 In the browser, create a test record and reload the page. Check that it is still there. Try a missing required field and, if the app has different users, check who can see or edit the record. Use synthetic data while developing.
 
 ## 3. Make one useful change
@@ -51,7 +55,7 @@ Keep a short description of the agreed app and next change. You can ask your AI 
 npm run guide
 ```
 
-This shows saved decisions and a suggested next step. Saved check results are historical; it does not start the app or check that running services are healthy. After a code change, run the affected workflow again. See the [guide command reference](../reference/guide.md) if you want to manage the saved brief yourself.
+This shows saved decisions and a suggested next step. Saved check results are historical; it does not start the app or check that running services are healthy. Record launch evidence under `run-locally`, not `describe`, and update an already completed `nextChange` rather than repeating it. Distinguish completed setup, running services and outstanding browser acceptance. After a code change, run the affected workflow again. See the [guide command reference](../reference/guide.md).
 
 ## 4. Share when it is useful
 

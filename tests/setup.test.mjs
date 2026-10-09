@@ -48,6 +48,18 @@ test('read-only pre-build diagnostics work on Windows, macOS and Linux without d
   }
 });
 
+test('role-based-data setup checks only selected service ports and remains read-only', async () => {
+  assert.equal(parseArguments(['--profile', 'role-based-data']).profile, 'role-based-data');
+  assert.throws(() => parseArguments(['--profile', 'unknown']));
+  const checked = [];
+  const report = await checkSetup({ profile: 'role-based-data' }, fixture({
+    port: async port => { checked.push(port); return 'free'; },
+  }));
+  const runtime = runtimeFor();
+  assert.equal(report.ready, true);
+  assert.deepEqual(checked, [runtime.ports.gateway, runtime.ports.data]);
+});
+
 test('missing prerequisites, engine modes and malformed results fail safely without raw secrets', async () => {
   for (const [command, code] of [['npm', 'NPM_UNAVAILABLE'], ['dotnet', 'SDK_UNAVAILABLE'], ['docker', 'DOCKER_UNAVAILABLE']]) {
     const deps = fixture();

@@ -15,6 +15,7 @@ To try something already implemented, use the [Todo reference app](../examples/t
 ## Command and configuration reference
 
 - [Local runtime](reference/local-development.md): services, workspace settings, diagnostics and recovery.
+- [Role-based-data profile](reference/role-based-data.md): SQL/DAB/browser startup, application-role authorization, matching costs and private SQL Azure deployment.
 - [Copilot plugin](reference/copilot-plugin.md): installation, binding and troubleshooting.
 - [Guide command](reference/guide.md): saved brief and checkpoint format.
 - [Demo cost review](reference/demo-cost.md): offline cost command and SQL billing settings.

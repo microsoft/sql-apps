@@ -13,5 +13,11 @@ END
 ELSE IF (SELECT sid FROM sys.database_principals WHERE name = N'sql_apps_dab') <> @sid
     THROW 50002, 'Existing DAB user belongs to a different identity; review before changing permissions.', 1;
 
-GRANT SELECT ON dbo.FileJobs TO [sql_apps_dab];
-GRANT VIEW DEFINITION ON dbo.FileJobs TO [sql_apps_dab];
+DECLARE @roleBasedGrants nvarchar(max) = N'$(RoleBasedProcedureGrants)';
+IF LEN(@roleBasedGrants) > 0
+    EXEC sys.sp_executesql @roleBasedGrants;
+ELSE
+BEGIN
+    GRANT SELECT ON dbo.FileJobs TO [sql_apps_dab];
+    GRANT VIEW DEFINITION ON dbo.FileJobs TO [sql_apps_dab];
+END

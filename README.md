@@ -39,9 +39,9 @@ The check explains missing prerequisites without installing anything. The guides
 
 **Your application.** Work with your AI assistant to implement and test its screens and SQL behavior using the existing foundation. This is not a one-command generator. The default foundation has no Todo screen or sample data; examples are selected explicitly.
 
-**A useful first result.** Run the app, create a record, reload it, and make a change such as adding a field or filter. [Run locally](docs/guides/run-locally.md) explains the available startup paths and how to keep your data between sessions.
+**A useful first result.** Run the app, create a record, reload it, and make a change such as adding a field or filter. Implemented, built, running and workflow-verified are separate milestones; a launch URL is usable only after the intended server responds. [Run locally](docs/guides/run-locally.md) explains startup paths, scoped approvals and how to keep your data between sessions.
 
-**Sharing is optional.** Azure is the cloud target. Free tier means recurring allowances, not trial credits or unlimited usage. The current templates also include paid resources, and the minimal public-demo deployment workflow is not yet complete. Read [Sharing your app](docs/guides/sharing.md) and [Costs and growth](docs/guides/costs.md) before choosing a cloud path.
+**Sharing is optional.** Azure is the cloud target. Free tier means recurring allowances, not trial credits or unlimited usage. The explicit [role-based-data profile](docs/reference/role-based-data.md) starts SQL/DAB/browser locally and selects matching authenticated Azure resources without file/job services. Its private-network SQL deployment is paid and still needs live acceptance; the full foundation retains its existing services. The minimal public-demo workflow is incomplete, and its cost review is demo-only. Read [Sharing your app](docs/guides/sharing.md) and [Costs and growth](docs/guides/costs.md) before choosing a cloud path. Existing Azure resources are collision information, not permission to replace your new app with an older deployment.
 
 ## Find your next step
 

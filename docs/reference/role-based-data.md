@@ -1,0 +1,112 @@
+# Role-based data-only applications
+
+Use the explicit `role-based-data` profile for an implemented domain application that needs SQL/DAB/browser access restricted to users assigned the required role, without files or background jobs. It is a runtime/deployment path, not an application generator. Keep the original foundation and unrelated databases unchanged; use the intended application checkout.
+
+This is application role-based access control: Entra authenticates users, the gateway requires the configured application role, and DAB enforces procedure permissions. It is not Azure resource-management RBAC and does not automatically provide row-level security (RLS). Implement row/owner restrictions separately where the application requires them. `AppUser` is an example role; choose a role appropriate to your application.
+
+## Application contract
+
+Keep `application.json` named for your app with `selectedExamples: []`. Implement its domain screens and SQL procedures. Copy `role-based-data.example.json` to `role-based-data.json` in that checkout and choose:
+
+- `requiredRole`: a dedicated human role such as `AppUser`; reserved foundation/anonymous roles are rejected.
+- `readinessPath`: one `/api/<entity>` REST endpoint backed by an approved read-only procedure with no required request parameters. It must check the domain schema/access needed to operate, not substitute a success-shaped response for real readiness.
+
+Configure `dab/dab-config.json` with explicit stored-procedure entities and role-authorized `execute` permissions. Autoentities, foundation FileJob entities and anonymous/processor permissions are rejected. Source objects use `schema.procedure` identifiers. A readiness entity looks like:
+
+```json
+"AppReady": {
+  "source": { "object": "dbo.AppReady", "type": "stored-procedure" },
+  "rest": { "enabled": true, "methods": ["get"] },
+  "graphql": false,
+  "permissions": [{ "role": "AppUser", "actions": ["execute"] }]
+}
+```
+
+Implement the procedure in the app's SQL project before startup. Other authorized procedures can expose approved GET/POST operations. DAB defaults procedures to POST, so explicitly enable GET on the read-only readiness procedure. Permission grants are generated only for the validated procedures (`EXECUTE` and object-scoped `VIEW DEFINITION` for DAB metadata); no schema-wide execute or database-owner grant is added.
+
+For cloud delivery, preserve production `AzureAD` DAB authentication, `/api` REST routing, and JWT settings `@env('API_CLIENT_ID')` / `@env('ENTRA_ISSUER')`. The local launcher generates a separately saved AppService simulation configuration; never deploy that configuration. Hide excluded UI controls; the authorized gateway does not register file/job/function routes.
+
+## Local startup and acceptance
+
+Follow [scoped consent](../guides/run-locally.md#approvals-and-readiness). Dependency restore, build, workspace selection, SQL terms/downloads/schema/startup and synthetic acceptance are distinct approval scopes.
+
+Before build, `node scripts/setup-check.mjs --profile role-based-data` checks prerequisites and only selected gateway/DAB ports; the installed launcher exposes the same diagnostic as `role-based-setup-check`. It does not install tools or start services.
+
+After an approved build and explicit workspace selection:
+
+```powershell
+npm run local -- role-based-app
+```
+
+An optional second argument selects an explicitly approved existing SQL container. Startup runs SQL, schema publishing and DAB, then checks the actual readiness procedure before listening on the loopback gateway. It does not start Azurite or Functions or run foundation file/job acceptance. Port ownership checks include only selected services. It preserves data and reports the failed stage rather than resetting volumes.
+
+Development Alice is clearly labeled a simulated user with the required role; Development Bob is a simulated user without it. Sessions are server-issued; caller role/principal headers cannot grant access. The gateway forwards the configured DAB role only for verified authorized sessions. This proves local routing, not real Entra assignment.
+
+Open only the responding workspace origin after readiness passes. Verify an agreed browser action, SQL persistence/reload, invalid input and applicable owner rules, plus Bob's denial. These are separate from startup readiness. Ctrl+C stops the gateway; SQL/DAB data remain. Resume with:
+
+```powershell
+npm run local -- role-based-serve
+```
+
+Use the existing approved `stop` command to stop only the owned DAB container when needed; never use `stop-services` for this profile or delete SQL volumes to resume.
+
+## Profile-specific Azure preparation
+
+Copy `azure-role-based.example.json` to an application-specific configuration, fill the exact tenant/subscription/target and immutable version image choices, and retain `profile`, `requiredRole` and `readinessPath` consistent with the local app. No Functions image is accepted. Placeholder identifiers in the example are not valid deployment targets.
+
+Review costs offline:
+
+```powershell
+npm run azure -- role-based-cost azure-role-based-cost.example.json
+```
+
+The zero-spend example exits **2** because this path uses paid provisioned S0 SQL and private infrastructure. To review paid costs, explicitly choose `review-paid-costs` and acknowledge fixed charges in a separate cost configuration. The report is not a quote, eligibility check, spending cap or deployment approval. It describes the actual profile: two Consumption apps with minimum one replica each, S0 SQL, the configured registry, SQL private endpoint/DNS, managed networking and Log Analytics. Registry tier and regional prices require review. `demo-cost` is not this profile's cost model.
+
+With separate target/read-only authorization, validate the app/configuration and review what-if. No command silently selects discovered older resources; treat them as collisions unless reuse is explicitly requested.
+
+## Identity, artifacts and deployment
+
+After explicit approval for each relevant cloud-write scope:
+
+```powershell
+npm run azure -- identity azure-role-based.json
+```
+
+This creates a new single-tenant registration/service principal with delegated `access_as_user` and the configured human application role (allowed member type `User`), not `Function.Invoke`. Set `apiClientId` to its printed identifier. Existing registrations need an enabled equivalent application role; creation does not patch unrelated registrations.
+
+Assign only approved authorized users/groups by object ID:
+
+```powershell
+npm run azure -- role-based-assign azure-role-based.json <user-or-group-object-id>
+```
+
+This verifies the configured tenant, role and assignment, and avoids duplicating an existing assignment. Directory permissions/consent are separate from Azure RBAC. Acquire a fresh delegated API access token after assignment.
+
+The existing orchestration now selects resources by profile:
+
+```powershell
+npm run azure -- validate azure-role-based.json
+npm run azure -- artifacts azure-role-based.json
+npm run azure -- plan azure-role-based.json
+npm run azure -- provision azure-role-based.json
+npm run azure -- deploy azure-role-based.json
+npm run azure -- status azure-role-based.json
+```
+
+`validate` is offline. `artifacts` builds/publishes exactly gateway and DAB images from this checkout and saves digests only after both succeed. `plan` uses Azure/Graph reads and ARM what-if; obtain separate authorization. `provision`/`deploy` create paid resources. ACR must already exist at the explicitly selected target; creating it is a separate approved operation.
+
+SQL remains Entra-only with its public endpoint disabled. The deployment operator needs private runner connectivity and database publishing authorization. The template retains SQL private endpoint/DNS but excludes Functions, storage, Key Vault, their identities/grants/endpoints and the Functions subnet. Schema publishing is non-destructive and grants the DAB managed identity only approved procedure permissions.
+
+Role-based deployment persists infrastructure/schema/runtime/readiness stages and resumes an unchanged configuration from the saved stage. State is bound to the canonical application checkout and SQL/DAB source fingerprint. Changed configuration/source, copied or malformed state fails rather than resetting state or transferring deployment to an older app. Runtime HTTP readiness is not authorization acceptance or a production-release claim.
+
+## Live cloud acceptance
+
+In a trusted process, set `SQL_APPS_USER_TOKEN` to an authorized delegated API token and `SQL_APPS_SECOND_USER_TOKEN` to a valid delegated token without the required role for the same tenant/API. Never paste tokens into chat or commit them.
+
+```powershell
+npm run azure -- role-based-smoke azure-role-based.json
+```
+
+This checks real authorized procedure execution, denial for valid users without the required role and anonymous denial, including caller-forged role headers. It does not create domain records. Then verify real browser sign-in, the agreed order/record save and reload, owner rules, validation and persistence in Azure. Report implemented, built, running and workflow-verified separately; retain actual commands/results and outstanding acceptance gaps.
+
+Compiled templates, mocked Azure calls and local simulation do not prove live Entra, private-network SQL, image startup or domain workflows. No live deployment is implicit in implementation or documentation updates.

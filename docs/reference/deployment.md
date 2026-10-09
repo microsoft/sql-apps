@@ -2,6 +2,12 @@
 
 Use this reference when deploying an authenticated application with the full Azure infrastructure template. Start with [sharing your app](../guides/sharing.md) to choose the appropriate path. For an existing pre-rebrand deployment, review [migration notes](../maintainers/naming-transition.md) first.
 
+## Profile and deployment subject
+
+The default authenticated foundation path includes Functions, storage, Key Vault and private networking. The explicit [role-based-data profile](role-based-data.md) uses the same orchestration with two images, human application roles and private SQL, excluding file/job services. Do not add excluded services or use an anonymous demo without an agreed scope change. `demo-cost` remains demo-only; use `role-based-cost` for role-based-data and review actual regional/account prices separately.
+
+Keep the confirmed new application checkout/configuration/artifacts as the deployment subject. With read-only Azure authorization, discovered older resources are potential collisions, not permission to reuse or modify them. Reuse requires an explicit request and a separate compatibility/migration/cost review; existing data remains untouched.
+
 ## Supported tools
 
 The project uses Azure CLI/Bicep for infrastructure and Microsoft.Build.Sql/SqlPackage for schema publishing. No custom Azure control-plane client or SQL migration engine is implemented.
@@ -58,6 +64,10 @@ npm run azure -- identity sql-apps.json
 ```
 
 This is an explicit create operation, not an idempotent lookup by display name. It creates one single-tenant SPA/API registration, a delegated `access_as_user` scope, a `Function.Invoke` application role, and a service principal. Replace `apiClientId` in your real configuration with the printed ID.
+
+For a `role-based-data` configuration, `identity` instead creates the configured human role such as `AppUser` with allowed member type `User`; `role-based-assign` explicitly assigns approved users/groups. Verify API access-token role claims, trusted gateway-selected DAB role, entity/procedure permissions and SQL grants end to end with `role-based-smoke` and browser acceptance. Local simulation and app-side role enforcement alone do not prove Entra/cloud authorization.
+
+An account email address is not a tenant ID. Confirm the intended directory's tenant ID, or retrieve it with an authorized read-only account query, before tenant-specific sign-in. Do not change subscription defaults or repeat generic login instructions to resolve that mismatch.
 
 The registration requests v2 access tokens. The same registration is used by the browser and API. Initial local redirect: `http://localhost:8080`. Deployment adds its HTTPS origin without removing existing redirects. An Entra administrator may need to grant consent under your tenant's policy.
 

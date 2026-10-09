@@ -77,7 +77,7 @@ The Azure SQL Database container is in **private preview**. [Request access](htt
 
 If a usable image is cached, you do not need to download it again just to refresh it. Startup verifies the actual SQL engine. If preview access is not available yet, keep your completed setup and resume when it is; do not substitute a different database.
 
-SQL startup accepts the container EULA using `ACCEPT_EULA=Y`. Review the preview's terms before starting it.
+Startup passes `ACCEPT_EULA=Y`; there is no chat dialog. Review the [container documentation/access instructions](https://aka.ms/azuresqldb-container) and applicable terms supplied with your preview registry access before approving SQL startup under those terms. If those terms are unavailable, pause rather than assume acceptance. This approval does not cover other licenses or later operations.
 
 ## 5. Choose your next step
 

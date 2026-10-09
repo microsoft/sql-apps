@@ -3,6 +3,7 @@ import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey, type JWTPayload } 
 export interface UserIdentity {
   oid: string;
   tenantId: string;
+  roles?: string[];
 }
 
 export type VerifyUser = (token: string) => Promise<UserIdentity>;
@@ -31,7 +32,10 @@ export function userFromClaims(payload: JWTPayload, tenantId: string): UserIdent
       typeof payload.scp !== 'string' || !payload.scp.split(' ').includes('access_as_user')) {
     throw new Error('A delegated access_as_user token from the configured tenant is required');
   }
-  return { oid: payload.oid, tenantId };
+  if (payload.roles !== undefined && (!Array.isArray(payload.roles) || !payload.roles.every(role => typeof role === 'string'))) {
+    throw new Error('Token roles must be an array of strings');
+  }
+  return { oid: payload.oid, tenantId, ...(payload.roles === undefined ? {} : { roles: payload.roles }) };
 }
 
 export function bearerToken(header: string | undefined): string | undefined {

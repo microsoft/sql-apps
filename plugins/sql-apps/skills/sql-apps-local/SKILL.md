@@ -10,67 +10,78 @@ Confirm the intended SQL Apps application directory before edits. Do not infer a
 
 ## A useful local app is the goal
 
-Follow **Describe -> Run locally -> Make it yours -> Share optionally** from `docs/guides/build-your-app.md` in the intended checkout. SQL knowledge is welcome, not required. Ask about users, information and actions one question at a time, not frameworks or Azure services. Check setup/private-preview access early and summarize a small agreed scope before application edits.
+Follow **Describe -> Run locally -> Make it yours -> Share optionally** from `docs/guides/build-your-app.md`. Ask about users, information and actions, not frameworks or Azure services. Check preview access and agree on scope before edits.
 
-After resolving the home and checking its binding below, run `node "<absolute-script-path>" guide` to recover decisions before choosing a startup path. It works before restore/build and does not start/probe services. Treat saved checkpoints as historical reports; recheck the intended runtime and real app action. With agreement, use `guide-save "<absolute-brief.json>"` to save scope, next change and exact verification evidence; never include secrets or actual records.
+Run the resolved launcher's `guide` before selecting startup; it works before build and does not probe services. Checkpoints are historical. With agreement, use `guide-save "<absolute-brief.json>"` for scope, next change and evidence; exclude secrets/actual records.
 
-Do not start the full file/job demonstration for every request. Explicit reference selection uses the smaller selected-app path below. A new domain app uses the application skill and clean boundary, not an implicit example copy. Capability choices in the brief describe scope, not runtime switches; the full foundation command still starts its documented services.
+Select startup from approved capabilities, not the foundation demonstration. Role-authorized data apps use `docs/reference/role-based-data.md`: configure the role/procedure contract, then approved `role-based-app` and `role-based-serve`. They start SQL/DAB/browser only, probe actual procedure readiness and label Alice with/Bob without the required role simulations. `serve-sql` remains an advanced SQL-only path. Never run `app`/`services` or demonstrate excluded files/jobs. The brief is not a runtime switch; the selected reference is synthetic-only.
 
-After actual local verification, help the user make one useful change and verify browser validation, SQL save/reload and existing behavior. A working local app is success; Azure sharing is a separate, optional decision.
+After local acceptance, make one agreed useful change and repeat browser validation, SQL save/reload and regression checks. Azure sharing is separately approved and optional.
 
-Introduce only brief cost awareness during local setup: no Azure usage bill, but tool/access/licensing conditions remain. When adding capabilities, explain relevant future costs from `docs/reference/demo-cost.md` without a cloud pricing questionnaire. The guide defaults to zero-spend guidance; saved cost preferences are not spending consent. Lead with free tier for recurring monthly allowances, not trial credits. Detailed free-tier/fixed-charge review belongs to optional sharing, not local startup.
+Keep cost awareness brief locally: no Azure usage bill, but tool/access/licensing conditions remain. Saved cost preferences are not spending consent. Profile-specific cost review belongs to optional sharing, not startup.
 
 ## Beginner onboarding and consent
 
-Do not leave a beginner with a prerequisite list. Guide one step at a time, explain the expected result and stay at the failed step until resolved. Follow `docs/guides/getting-started.md` in the intended checkout for Windows, macOS and Linux. Use the exact distribution/version's official installation page for Linux, not guessed package commands.
+Guide one step at a time; stay at a failed step until resolved. Follow `docs/guides/getting-started.md` for Windows, macOS and Linux; use official OS/version-specific installers.
 
-If Node is missing, the launcher cannot run. Confirm OS/CPU and the intended checkout using host tools; guide the official Node 22/24 installer first, preserving existing version managers. Do not require Git: the guide includes ZIP download and VS Code terminal instructions. Plugin installation is optional and Copilot still needs its own account/access.
+If Node is missing, confirm OS/CPU and checkout; guide the official Node 22/24 installer, preserving version managers. Git is optional (ZIP works); Copilot has separate access requirements.
 
-Before EACH tool installation, ask explicit approval with its name, official source, network/disk implications and privileges. Prefer existing package managers/dedicated installation tools. Never replace an existing compatible installation, change global version-manager selection, run unreviewed remote scripts, automatically accept licenses, elevate, reboot, change Docker groups/socket permissions or disable TLS/firewalls.
+Before EACH tool installation, ask explicit approval with its name, official source, downloads/disk effects and privileges. Prefer native installers. Never replace compatible tools, change global version managers, run unreviewed scripts, accept licenses automatically, elevate, reboot, change Docker permissions or disable TLS/firewalls.
 
 Pause for human-only GUI/license/restart/credential actions; tell the user how to resume. After installs, reopen the terminal/host as needed and recheck actual versions/PATH rather than repeating installations.
 
-State access/cost facts BEFORE downloads: no Azure subscription or Azure usage charges, but SQL is private preview requiring registry access unless cached or an existing usable container is selected. Docker Desktop license eligibility varies. Never call acquisition universally account-free or free for every organization. Direct the user to official preview signup; credentials are entered in their own terminal, never pasted into chat or repository files.
+State access/cost facts BEFORE downloads: SQL is private preview requiring registry access unless cached or an existing usable container is selected. Docker Desktop licensing varies; acquisition is not universally account-free. Use official preview signup; credentials are entered in their own terminal, never in chat or repository files.
+
+Explain stages before the first approval prompt: needed installs, restore, build, workspace initialization, downloads/builds and SQL terms/schema/startup, then acceptance writes. Name each scope, target/effects and remaining stages. Track approved operations; repeat only if scope changes. `npm ci` approval excludes build; workspace approval excludes launch. Bare "I approve" covers only the preceding explicit scope.
+
+After the first approval-tool response "user unavailable" (or invisible controls), stop retrying. Explain that no approval was captured. Offer one precise ordinary chat statement with actual values: "I approve <operations> in <checkout>, including <effects>; this excludes <remaining operations>." Wait for explicit consent; tool failure is not approval. Ask one scoped question at a time.
+
+Before SQL acceptance, say: "Startup passes `ACCEPT_EULA=Y`; there is no chat dialog." Link the [container documentation and preview access instructions](https://aka.ms/azuresqldb-container) and the applicable terms supplied with the user's preview access; if unavailable, pause for them. Explain that explicit approval to start SQL under those terms authorizes the launcher to pass that value, not blanket acceptance of other licenses.
 
 ## Locate the application
 
 Resolve `../../scripts/sql-apps.mjs` relative to **this installed SKILL.md**, not the session working directory. Use the absolute script path in every invocation and quote paths with spaces.
 
-Run `node "<absolute-script-path>" home`. It selects `SQL_APPS_HOME`, then the installer-created binding in `COPILOT_HOME` (default `~/.copilot`), then an application checkout in the current directory or its ancestors. The binding contains only a checkout path, not credentials.
+Record three separate paths: loaded skill source, installed launcher resolved from it, and application checkout selected by `home`. `SQL_APPS_HOME` changes the runtime checkout, not the loaded skills. Exported skill-copy edits do not update the installed plugin; follow `docs/reference/copilot-plugin.md` and reload a fresh session from the verified source.
 
-Run `node "<absolute-script-path>" workspace-check` before execution. Compare the active checkout/worktree with the bound home, source fingerprint, runtime contract and build provenance. If they differ, require the user's explicit runtime home via `SQL_APPS_HOME`; never change the global binding or copy uncommitted foundation files implicitly. Equal package versions or commits do not certify equal source. A missing/stale build needs an approved build in that selected checkout.
+Run `node "<absolute-script-path>" home`: `SQL_APPS_HOME`, then `COPILOT_HOME` binding (default `~/.copilot`), then cwd/ancestors. The binding stores only a path.
 
-Do not run the application from a plugin cache or assume the user's active project is SQL Apps. If resolution fails, report the error and ask for the checkout path; instruct the user to run `npm run plugin:install` in that checkout or set `SQL_APPS_HOME`. Never silently select another project.
+Run `node "<absolute-script-path>" workspace-check` before execution. Compare checkout, binding, fingerprint, runtime contract and build provenance. Differences require explicit `SQL_APPS_HOME`; never silently rebind or copy uncommitted source. Equal commits/versions do not certify source. Missing/stale builds need approval in that checkout.
+
+Do not run from a plugin cache. On resolution failure, report it and ask for the checkout path; use approved `plugin:install` or `SQL_APPS_HOME`, never another project silently.
 
 ## Start or reuse
 
 1. Read `README.md`, `docs/guides/getting-started.md` and `docs/reference/local-development.md` **in the resolved checkout**.
-2. Run `node "<absolute-script-path>" setup-check` (or `setup-check <selected-existing-sql-container>`) before restore/build. It prints structured prerequisite/action reports using Node alone. Nonzero means action needed, including existing ports whose ownership needs confirmation, not permission to kill anything. Run `node "<absolute-script-path>" status` to assess existing HTTP services; it does not certify worker/storage correctness.
-3. If healthy and confirmed to be the intended application, reuse `http://127.0.0.1:18080/`. Do not launch another gateway on the same port.
-   Use the app/DAB origins reported by workspace-check for isolated workspaces; the URL above is legacy-only. Confirm `/local/workspace` when the running version exposes it, without treating HTTP health alone as ownership.
-4. If startup is needed, resolve missing prerequisites using the guide and approved native installers. Ask separately before `npm ci`/build and explain internet use for first npm/NuGet/image downloads. Install dependencies only if missing or validation identifies them; build in the resolved checkout when compiled code is missing/source changed. A cached SQL image alone is not complete offline readiness.
+2. Run `setup-check [selected-existing-sql-container]` before restore/build. Nonzero means action needed, not permission to kill occupied ports. `status` checks HTTP services, not worker/storage correctness.
+3. Reuse only a responding service confirmed as the intended application. Use its workspace-reported origin; port 18080 is legacy-only. Confirm `/local/workspace` when available; HTTP health alone is not ownership. Proposed ports/URLs are unavailable until startup and probes succeed.
+4. Resolve prerequisites with approved installers. Ask separately before `npm ci`/build; explain first npm/NuGet/image downloads. Restore only for missing dependencies; build missing/stale code in the selected checkout. Cached SQL alone is not offline readiness.
 5. Before `app`, get informed approval for container downloads/builds, SQL EULA acceptance (`ACCEPT_EULA=Y`) and application schema initialization. Explain the local resources/data effects; choose a new owned SQL container unless the user explicitly selected reuse. Run `node "<absolute-script-path>" app` as an attached task using host tools. It publishes a non-destructive schema and starts actual services. Report named startup stages; on failure preserve completed work/data and follow targeted resume guidance. Never silently reset volumes/credentials or substitute another SQL engine.
    Before first startup, run the built launcher's `workspace-plan`; ask explicitly for a new isolated port block or `workspace-init legacy` to preserve an existing stack. Explain that initialization records only the descriptor, does not migrate data, and does not authorize subsequent downloads/schema changes. A copied descriptor is an error, not permission to overwrite it.
-6. Open the browser and explain Development Alice/Bob, files, processing, retries and traces. Local identities are simulations, never production authentication. The Todo reference example is isolated outside application delivery; do not copy it into a user's application.
+6. Open only the verified origin and explain the approved app's users/actions. Demonstrate files/jobs only when selected. Local identities are simulations, never production authentication. Do not copy the Todo reference into application delivery.
 
-For an already running alternate SQL container, validate the user-selected name and run `verify` before approved `init`, `data`, `services`, then `serve` with that name. These commands execute in the bound checkout. Do not replace, delete or stop unrelated/user-owned containers.
+For an existing alternate SQL container, validate its selected name and run `verify` before approved `init`/`data` with that name. Use `serve-sql` for data-only scope; `services`/`serve` are for approved file/job scope. Do not replace, delete or stop unrelated/user-owned containers.
 
 `serve` reuses running services. `stop-services` stops the project worker/storage and preserves data. Stopping the attached gateway process does not erase SQL/Blob volumes.
 
-No Azure subscription or Entra registration is required for local operation. First-time downloads need internet; do not claim everything is offline before prerequisites are cached. Do not deploy cloud resources, install unverified platform packages, or scaffold another runtime.
+No Azure subscription or Entra registration is required locally. First downloads need internet. Do not deploy cloud resources, install unverified platform packages, or scaffold another runtime.
 
 ## Explicitly selected synthetic application
 
-Only when the user explicitly chooses the reference application, read its `examples/todo/README.md` in the bound checkout. Keep the root `selectedExamples: []` and other applications sample-free. Ask for isolated workspace selection and the same download/EULA/schema consent as above; never reuse a legacy descriptor or change the global binding implicitly.
+Only with explicit reference selection, read `examples/todo/README.md`. Keep root `selectedExamples: []`. Require isolated workspace selection and download/EULA/schema consent; never overwrite legacy state or rebind implicitly.
 
-Run `npm run app:build -- todo local-simulation` in that bound home, and retain the exact absolute artifact directory printed by the builder. Use `node "<absolute-script-path>" selected-app "<absolute-artifact-directory>"` as an attached task. This starts only the selected SQL database/login and DAB plus browser/API, not storage or Functions. The gateway checks actual selected procedure readiness before reporting its origin.
+Run approved `npm run app:build -- todo local-simulation`; retain its exact absolute artifact directory. Run `selected-app "<absolute-artifact-directory>"` attached via the resolved launcher. It starts SQL/login, DAB and browser/API only, probes procedure readiness, and excludes storage/Functions.
 
-Explain anonymous synthetic sessions and the conspicuous data warning; there are no Alice/Bob or signed-in users in this adapter. With separate approval for synthetic writes, `selected-test "<absolute-artifact-directory>"` runs the reference's real SQL/HTTP limits/ownership suite and removes its own synthetic fixtures. It does not prove browser or restart behavior; check those separately when authorized.
+Explain anonymous synthetic sessions/data warning, not Alice/Bob sign-in. With synthetic-write approval, `selected-test "<absolute-artifact-directory>"` checks SQL/HTTP limits/ownership and cleans its fixtures; browser/restart acceptance remains separate.
 
-Ctrl+C stops only the attached gateway. `selected-serve "<absolute-artifact-directory>"` resumes using verified services and SQL-backed sessions. `selected-stop todo` removes only the selected owned DAB container and preserves SQL data. Do not use foundation `stop`/`stop-services` to clean a selected app or silently replace a mismatched DAB configuration. Public-demo assembly is not authorization or evidence of Azure deployment.
+Ctrl+C stops the gateway. `selected-serve "<absolute-artifact-directory>"` resumes verified services/SQL sessions. `selected-stop todo` removes only owned selected DAB, preserving SQL. Never use foundation stop commands or replace mismatched DAB silently. Assembly is not Azure deployment.
 
 ## Verify and explain completion
 
-Verify `/health/ready` and open the browser. With permission, perform a small test-file processing roundtrip and observe completion/results; HTTP liveness alone is not end-to-end acceptance. Offer cleanup of only that fixture. Full `services-test` briefly restarts owned services and needs separate approval when others may be processing. Report exactly what passed and any unverified capability/platform; do not claim fresh-machine macOS/Linux/ARM acceptance from simulated tests.
+Report four separate states: **implemented** (source), **built** (successful commands), **running** (intended server responds), and **workflow verified** (agreed browser action plus SQL persistence/reload). Publish a launch URL only after the intended server responds at that origin and `/health/ready` passes. A proposed URL is unavailable; a build/test count is not a launch. If launch or requested acceptance is blocked, report blocked, not complete; completion tooling cannot bypass these gates.
 
-Show the browser URL, how to choose the local user, Ctrl+C to stop the gateway, `serve` to resume and safe service-stop commands. Explain that SQL/Blob data persist and local sessions must be reselected after gateway restart. Leave the user with a usable app or an explicit next human action, never a success claim while waiting on access/restart/downloads.
+Verify only selected capabilities with approved synthetic fixtures. HTTP liveness alone is not end-to-end acceptance. For file/job scope, perform a small processing roundtrip and offer cleanup of only that fixture. `services-test` restarts owned services and needs separate approval when others may be processing. Report exact commands/results, agent-verified browser actions and remaining gaps; "I tested it" is user-reported evidence, not agent verification. Do not claim fresh-machine macOS/Linux/ARM acceptance from simulations.
+
+Save launch evidence under the actual `run-locally` stage, and changed-workflow evidence under `make-it-yours`, not `describe`. Update completed `nextChange` with the agreed outstanding change (or explicit no-change status). Guide suggestions are historical, not live readiness: distinguish completed setup, running services and outstanding acceptance.
+
+Show the verified URL, approved local-user flow, Ctrl+C and matching resume/stop commands (`role-based-serve` for role-based-data, `serve-sql` for advanced SQL-only, selected commands for the reference). SQL/Blob data persist; foundation sessions must be reselected after restart. Leave a usable app or a precise next action, never a success claim while startup is blocked.

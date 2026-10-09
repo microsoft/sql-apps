@@ -5,6 +5,7 @@ import { createGateway } from './gateway.js';
 import { localOrigin, localPrincipal } from './local.js';
 import { localFunctionsOrigin, localServiceAdapters } from './local-services.js';
 import { runtimeFor } from './workspace.mjs';
+import type { RoleBasedProfile } from './role-based-profile.js';
 
 type LocalAdapters = Awaited<ReturnType<typeof localServiceAdapters>>;
 
@@ -15,8 +16,9 @@ export const developmentUsers = [
   { id: '22222222-2222-4222-8222-222222222222', name: 'Development Bob' },
 ];
 
-export async function createLocalApp(fetcher: typeof fetch = fetch, services?: LocalAdapters) {
+export async function createLocalApp(fetcher: typeof fetch = fetch, services?: LocalAdapters, authorized?: RoleBasedProfile) {
   if (process.env.NODE_ENV === 'production') throw new Error('Local development server is disabled in production');
+  if (authorized && services) throw new Error('Role-based-data excludes storage and Functions adapters');
   const sessions = new Map<string, { oid: string; expires: number }>();
   const identity = async (token: string) => {
     const session = sessions.get(token);
@@ -24,12 +26,15 @@ export async function createLocalApp(fetcher: typeof fetch = fetch, services?: L
       sessions.delete(token);
       throw new Error('Local session expired; select a development user again');
     }
-    return { oid: session.oid, tenantId };
+    return { oid: session.oid, tenantId, ...(authorized ? {
+      roles: session.oid === developmentUsers[0]!.id ? [authorized.requiredRole] : [],
+    } : {}) };
   };
   const unavailable = async (): Promise<never> => {
     throw Object.assign(new Error('This service is not configured in the local SQL development stack'), { statusCode: 503 });
   };
   const app = await createGateway({
+    ...authorized,
     tenantId, apiClientId: tenantId, dabUrl: localOrigin,
     blobAccountUrl: 'https://unconfigured.invalid', blobContainer: 'files',
     functionsUrl: services ? localFunctionsOrigin : 'https://unconfigured.invalid', publicDirectory: 'public',
@@ -38,7 +43,17 @@ export async function createLocalApp(fetcher: typeof fetch = fetch, services?: L
     files: services?.files ?? { put: unavailable, get: unavailable, delete: unavailable },
     functionToken: services?.functionToken ?? unavailable,
     ...(services ? { processing: services.processing, ...(services.telemetry ? { telemetry: services.telemetry } : {}) } : {}),
-    browserConfig: { mode: 'local', users: developmentUsers, capabilities: {
+    ...(authorized ? { ready: async () => {
+      const response = await fetcher(new URL(authorized.readinessPath, localOrigin), {
+        headers: { 'x-ms-client-principal': localPrincipal(developmentUsers[0]!.id, 'access_as_user', authorized.requiredRole),
+          'x-ms-api-role': authorized.requiredRole },
+        signal: AbortSignal.timeout(5_000), redirect: 'error',
+      });
+      if (!response.ok) throw new Error(`Authorized procedure readiness failed: HTTP ${response.status}`);
+    } } : {}),
+    browserConfig: { mode: 'local', users: authorized ? developmentUsers.map((user, index) => ({
+      ...user, name: `${user.name} (${index === 0 ? 'simulated user with required role' : 'simulated user without required role'})`,
+    })) : developmentUsers, capabilities: {
       files: Boolean(services), functions: Boolean(services), ...(services ? {
         processing: true, jobSubmission: services.settings.processing,
         jobRetry: services.settings.processing && services.settings.jobRetry,
@@ -65,7 +80,8 @@ export async function createLocalApp(fetcher: typeof fetch = fetch, services?: L
       const user = await identity(token);
       headers.delete('authorization');
       headers.delete('x-ms-api-role');
-      headers.set('x-ms-client-principal', localPrincipal(user.oid));
+      headers.set('x-ms-client-principal', localPrincipal(user.oid, 'access_as_user', authorized?.requiredRole ?? 'authenticated'));
+      if (authorized) headers.set('x-ms-api-role', authorized.requiredRole);
       return fetcher(target, { ...options, headers });
     },
   });
@@ -95,9 +111,26 @@ export async function createLocalApp(fetcher: typeof fetch = fetch, services?: L
   return app;
 }
 
-export async function serveLocalApp(container = runtimeFor().defaultSql, sqlOnly = false): Promise<void> {
-  const app = await createLocalApp(fetch, sqlOnly ? undefined : await localServiceAdapters(container));
+export async function serveLocalApp(container = runtimeFor().defaultSql, sqlOnly = false, authorized?: RoleBasedProfile): Promise<void> {
+  const app = await createLocalApp(fetch, sqlOnly ? undefined : await localServiceAdapters(container), authorized);
+  if (authorized) {
+    const ready = await app.inject({ url: '/health/ready', headers: { host: new URL(localAppOrigin).host } });
+    if (ready.statusCode !== 200) {
+      await app.close();
+      throw new Error('Role-based-data SQL procedure readiness failed; gateway was not launched');
+    }
+  }
   await app.listen({ host: '127.0.0.1', port: runtimeFor(container).ports.gateway });
+  if (authorized) {
+    try {
+      const response = await fetch(new URL('/health/ready', localAppOrigin),
+        { signal: AbortSignal.timeout(5_000), redirect: 'error' });
+      if (!response.ok) throw new Error(`Running role-based-data readiness returned HTTP ${response.status}`);
+    } catch (error) {
+      await app.close();
+      throw new Error('Role-based-data gateway did not respond as ready; no launch URL is published', { cause: error });
+    }
+  }
   console.log(`Local browser app ready at ${localAppOrigin}. Development identities are simulated; do not expose remotely.`);
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.once(signal, () => { void app.close(); });

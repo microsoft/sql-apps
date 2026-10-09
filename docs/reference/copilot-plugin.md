@@ -51,6 +51,8 @@ For building an app: **"Help me describe, run and change a useful SQL Apps app l
 
 The local marketplace loads from disk (`source: live` in CLI output). Edit the bundled skills or launcher, run `npm run plugin:check`, then start a fresh session/restart to load changes. No Git push or plugin update is needed for this directory-backed source. After TypeScript runtime changes, separately build/restart the application as documented.
 
+Keep three paths distinct: **loaded skill source** (the actual marketplace/skill location), **installed launcher** (resolved relative to that skill), and **application checkout** (selected by `home`/`SQL_APPS_HOME`). Exported skill copies in another application are not automatically active. Editing them does not change the installed plugin; confirm the loader source with discovery output before editing and reload a fresh session afterward. Changing the runtime home does not change loaded instructions.
+
 If the App does not show the plugin, check the profile used to launch it. `COPILOT_HOME` can select a different configuration directory. Register the local checkout through the App's marketplace controls if available, or launch the App from the same configured CLI/profile (`copilot app`). Do not copy or overwrite the App's settings. Verify discovery with:
 
 ```powershell
@@ -83,7 +85,7 @@ node "C:\git\sql-apps\plugins\sql-apps\scripts\sql-apps.mjs" setup-check
 
 `guide` is also dependency-free and available before the runtime is built. It returns JSON with the four stages, saved brief, suggested next action and explicitly historical progress; it does not probe live services. `guide-save "<absolute-brief.json>"` validates and saves the agreed brief in `.sql-apps/guide.json` in the bound checkout. Both enforce the same runtime-home mismatch checks. Source changes flag saved progress for local re-verification. See [the brief contract](guide.md); do not include credentials or actual data.
 
-The guide also introduces cost awareness progressively; optional saved `costPreference` is not spending approval. The cloud-preview skill uses the offline `demo-cost` review before Azure requests. A zero-spend intent stays blocked while the minimal template has registry/network fixed charges; budgets are alerts, not spending caps. See [costs and paid growth](../guides/costs.md).
+The guide also introduces cost awareness progressively; optional saved `costPreference` is not spending approval. The cloud-preview skill selects the approved application profile first. Offline `demo-cost` is synthetic-demo-only; `role-based-cost` matches the [role-based-data profile](role-based-data.md), whose `role-based-app`/`role-based-serve` commands are also exposed by the launcher. A zero-spend intent stays   blocked while the minimal template has registry/network fixed charges; budgets are alerts, not spending caps. See [costs and paid growth](../guides/costs.md).
 
 If the active checkout differs from the installed binding, runtime execution is refused until you explicitly select the intended home. This also applies when the active worktree lacks the uncommitted foundation. Review the report, then select one checkout for this terminal/session:
 

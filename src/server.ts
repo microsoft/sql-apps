@@ -10,7 +10,11 @@ const credential = new DefaultAzureCredential(
 );
 const app = await createGateway(config, {
   verifyUser: entraVerifier(config.tenantId, config.apiClientId),
-  files: blobStore(config.blobAccountUrl, config.blobContainer, credential),
+  files: config.profile === 'role-based-data' ? {
+    put: async () => { throw new Error('Files excluded by role-based-data profile'); },
+    get: async () => { throw new Error('Files excluded by role-based-data profile'); },
+    delete: async () => { throw new Error('Files excluded by role-based-data profile'); },
+  } : blobStore(config.blobAccountUrl, config.blobContainer, credential),
   fetch,
   async functionToken() {
     const token = await credential.getToken(`api://${config.apiClientId}/.default`);

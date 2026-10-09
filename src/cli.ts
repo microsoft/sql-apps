@@ -7,6 +7,10 @@ import { deployStatic, setSecret, updateImage } from './maintenance.js';
 import { buildArtifacts } from './artifacts.js';
 import { preflightDemo, DemoPreflightError } from './azure-preflight.js';
 import { reviewDemoCost } from './demo-cost.js';
+import { reviewRoleBasedCost } from './role-based-cost.js';
+import { assignApplicationRole, applicationRegistrationRole } from './role-based-identity.js';
+import { roleBasedSmoke } from './role-based-smoke.js';
+import { validateRoleBasedCloudDab } from './role-based-profile.js';
 import {
   configureRedirect, delegatedScopeId, deploy, functionRoleId, parametersFile, preflight,
   publishSchema, readConfig, readState, saveJson, saveState, statePath, withDeploymentLock, provision,
@@ -18,12 +22,13 @@ async function main() {
     console.log('Usage: npm run azure -- <validate|artifacts|identity|plan|provision|deploy|status|schema|static|redirect|smoke|gateway|functions|secret-set> [config.json] [secret-name]\nRun npm run build first. Azure CLI, Bicep, .NET and SqlPackage are used directly.');
     console.log('Public-demo diagnostics: demo-preflight <explicit target configuration>. Read-only cache/tenant/ARM/provider/region/permission evidence; no Graph, app registration, login reset or resource writes. Not deployment readiness.');
     console.log('Public-demo costs: demo-cost <explicit cost configuration>. Offline free-allowance/fixed-charge review; no Azure login, network requests or resource writes. Exit 2 means cost intent is blocked or acknowledgement is missing; exit 1 means invalid input.');
+    console.log('Role-based-data: role-based-cost <cost configuration> is offline and profile-specific. Use validate/artifacts/identity/plan/provision/deploy/status/schema with a role-based-data deployment configuration. role-based-assign <config> <user-or-group-object-id> explicitly assigns its application role; role-based-smoke <config> needs delegated tokens with and without the required role in SQL_APPS_USER_TOKEN / SQL_APPS_SECOND_USER_TOKEN. All cloud writes need operator approval; local simulations never deploy.');
     return;
   }
-  if (command === 'demo-cost') {
-    if (process.argv.length !== 4) throw new Error('Provide an explicit public-demo cost configuration; no billing choice or spending consent is inferred.');
+  if (command === 'demo-cost' || command === 'role-based-cost') {
+    if (process.argv.length !== 4) throw new Error('Provide an explicit matching-profile cost configuration; no billing choice or spending consent is inferred.');
     const input: unknown = JSON.parse(await readFile(resolve(configPath), 'utf8'));
-    const report = reviewDemoCost(input);
+    const report = command === 'role-based-cost' ? reviewRoleBasedCost(input) : reviewDemoCost(input);
     console.log(JSON.stringify(report, null, 2));
     if (!report.review.canProceedToWhatIf) process.exitCode = 2;
     return;
@@ -34,10 +39,19 @@ async function main() {
     console.log(JSON.stringify(await preflightDemo(target, run), null, 2));
     return;
   }
-  if (!['validate', 'artifacts', 'identity', 'plan', 'provision', 'deploy', 'status', 'schema', 'static', 'redirect', 'smoke', 'gateway', 'functions', 'secret-set'].includes(command)) {
+  if (!['validate', 'artifacts', 'identity', 'plan', 'provision', 'deploy', 'status', 'schema', 'static', 'redirect', 'smoke', 'gateway', 'functions', 'secret-set', 'role-based-assign', 'role-based-smoke'].includes(command)) {
     throw new Error(`Unknown command: ${command}`);
   }
   const config = await readConfig(resolve(configPath));
+  if (config.profile === 'role-based-data') validateRoleBasedCloudDab(JSON.parse(await readFile('dab/dab-config.json', 'utf8')), {
+    profile: 'role-based-data', requiredRole: config.requiredRole!, readinessPath: config.readinessPath!,
+  });
+  if (command === 'role-based-assign') {
+    if (!argument || process.argv.length !== 5) throw new Error('Provide exactly one authorized user/group object ID');
+    await assignApplicationRole(config, argument, run);
+    console.log('Application role assignment verified or created; acquire a fresh delegated access token and run role-based-smoke.');
+    return;
+  }
   if (command === 'validate') { console.log('Configuration valid'); return; }
   if (command === 'artifacts') {
     await withDeploymentLock(statePath(config), async () => {
@@ -47,7 +61,7 @@ async function main() {
       }
       await saveJson(resolve(configPath), pinned);
     });
-    console.log('Three images published to ACR; configuration atomically updated to immutable digests.');
+    console.log(`${config.profile === 'role-based-data' ? 'Two' : 'Three'} images published to ACR; configuration atomically updated to immutable digests.`);
     return;
   }
   if (command === 'identity') {
@@ -66,7 +80,7 @@ async function main() {
         userConsentDisplayName: 'Access SQL Apps', userConsentDescription: 'Access your application data.',
       }] },
       spa: { redirectUris: ['http://localhost:8080'] },
-      appRoles: [{
+      appRoles: config.profile === 'role-based-data' ? [applicationRegistrationRole(config)] : [{
         id: functionRoleId, value: 'Function.Invoke', displayName: 'Invoke functions',
         description: 'Allow the gateway to invoke application functions.', allowedMemberTypes: ['Application'], isEnabled: true,
       }],
@@ -94,11 +108,22 @@ async function main() {
     await withDeploymentLock(statePath(config), async () => {
       const state = await provision(config, run);
       await saveState(statePath(config), state);
-      console.log(`Infrastructure provisioned. Configure private runner connectivity to ${state.outputs.networkId}, then run deploy.`);
+      console.log(`Infrastructure available (saved stage: ${state.stage}). Configure private runner connectivity to ${state.outputs.networkId}, then run deploy. Saved stages are historical, not live acceptance.`);
     });
     return;
   }
   const state = await readState(config);
+  if (command === 'role-based-smoke') {
+    const first = process.env.SQL_APPS_USER_TOKEN;
+    const second = process.env.SQL_APPS_SECOND_USER_TOKEN;
+    if (!first || !second) throw new Error('Set delegated authorized and valid tokens without the required role in the trusted process environment; do not paste tokens into chat');
+    await roleBasedSmoke(config, state.outputs.gatewayUrl, first, second);
+    console.log('Live authorized procedure succeeded; requests from valid users without the required role and anonymous callers were denied, including forged role headers. Browser save/reload remains separate acceptance.');
+    return;
+  }
+  if (command === 'smoke' && config.profile === 'role-based-data') {
+    throw new Error('Use role-based-smoke for role-based-data, not the foundation file/job smoke suite');
+  }
   if (command === 'static') {
     await preflight(config, run, false);
     await withDeploymentLock(statePath(config), async () => {

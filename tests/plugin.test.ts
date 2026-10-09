@@ -16,7 +16,7 @@ const probe = async (code: string, env: NodeJS.ProcessEnv = {}) =>
   run(process.execPath, ['--input-type=module', '-e', `import { resolveHome, status, main } from ${JSON.stringify(moduleUrl)}; ${code}`], { env });
 
 test('local plugin bundle validates its manifests, matching skill names and isolated sources', async () => {
-  assert.match(await run(process.execPath, [resolve('scripts', 'check-plugin.mjs')]), /five skills/);
+  assert.match(await run(process.execPath, [resolve('scripts', 'check-plugin.mjs')]), /six skills/);
 });
 
 test('SQL Apps identity is consistent across packages, platform manifests and marketplaces', async () => {
@@ -94,6 +94,60 @@ test('beginner skills preserve per-action consent, pre-build guidance and safe r
   assert.match(diagnostic, /Ask before every installation\/download/);
 });
 
+test('local guidance handles unavailable approval controls and observable launch gates', async () => {
+  const local = await readFile(resolve('plugins', 'sql-apps', 'skills', 'sql-apps-local', 'SKILL.md'), 'utf8');
+  for (const requirement of [
+    /first.*user unavailable/i, /no approval was captured/i, /ordinary chat/i,
+    /before the first approval prompt/i, /approved operations/i,
+    /Startup passes `ACCEPT_EULA=Y`; there is no chat dialog/,
+    /implemented.*built.*running.*workflow verified/is,
+    /Publish.*URL only after.*responds/i, /proposed.*unavailable/i,
+    /blocked, not complete/i, /user-reported/i,
+  ]) assert.match(local, requirement);
+});
+
+test('application guidance preserves data-only scope, custom-role authorization and actual checkpoints', async () => {
+  const application = await readFile(resolve('plugins', 'sql-apps', 'skills', 'sql-apps-application', 'SKILL.md'), 'utf8');
+  for (const requirement of [
+    /data-only/i, /serve-sql/, /role-based-app/, /role-based-serve/, /role-based-data/,
+    /role definition/i, /application role assignment/i, /token claims/i,
+    /gateway-selected DAB role/i, /procedure permissions/i, /custom-role forwarding/i,
+    /Function\.Invoke/, /actual stage/i, /completed.*nextChange/i,
+    /loaded skill source/i, /application checkout/i, /installed launcher/i,
+  ]) assert.match(application, requirement);
+});
+
+test('cloud guidance selects the app profile and keeps discovery from changing deployment subject', async () => {
+  const cloud = await readFile(resolve('plugins', 'sql-apps', 'skills', 'sql-apps-cloud-preview', 'SKILL.md'), 'utf8');
+  for (const requirement of [
+    /profile before.*cost command/i, /demo-only/i,
+    /role-based-cost/, /role-based-assign/, /role-based-smoke/,
+    /Existing-resource discovery must not change the deployment subject/,
+    /potential collisions/i, /reuse.*explicitly requested/i,
+    /loaded skill source/i, /application checkout/i, /installed launcher/i,
+    /tenant ID.*email address/i,
+  ]) assert.match(cloud, requirement);
+});
+
+test('frontend design guidance requires deliberate, accessible visual review', async () => {
+  const frontendDesign = await readFile(resolve('plugins', 'sql-apps', 'skills', 'sql-apps-frontend-design', 'SKILL.md'), 'utf8');
+  assert.match(frontendDesign, /^---\r?\nname: sql-apps-frontend-design\r?\n/m);
+  for (const requirement of [
+    /present\s+two or three app-appropriate visual directions/i,
+    /get approval of the direction before implementation/i,
+    /preserve existing app workflows and agreed capability boundaries/i,
+    /inspect\s+the actual rendered interface in a browser at desktop and narrow[- ]mobile viewports/i,
+    /keyboard.*focus|focus.*keyboard/is,
+    /reduced[- ]motion/i,
+    /if browser preview or a relevant state is unavailable or unsafe to reach,\s*state the limitation and report what you did inspect/i,
+  ]) assert.match(frontendDesign, requirement);
+
+  const application = await readFile(resolve('plugins', 'sql-apps', 'skills', 'sql-apps-application', 'SKILL.md'), 'utf8');
+  assert.match(application, /for substantial new screens, visual redesigns, or UI-focused polish,\s*use `sql-apps-frontend-design` for app-specific visual direction and rendered-browser review/i);
+  const guide = await readFile(resolve('docs', 'guides', 'build-your-app.md'), 'utf8');
+  assert.match(guide, /for substantial new screens or a visual redesign,\s*ask your assistant to use the `sql-apps-frontend-design` skill for an app-appropriate visual direction and browser review of the rendered interface/i);
+});
+
 test('plugin launcher binds the actual checkout independently of plugin cache/session directory', async t => {
   const profile = await mkdtemp(join(tmpdir(), 'sql-apps-plugin-'));
   t.after(() => rm(profile, { recursive: true, force: true }));
@@ -153,6 +207,11 @@ test('plugin dispatch uses checkout cwd, passes literal arguments and preserves 
   const output = JSON.parse(await run(process.execPath, [launcher, 'verify', 'custom-sql'], { env: { SQL_APPS_HOME: home } }));
   assert.equal(output.cwd, home);
   assert.deepEqual(output.args, ['verify', 'custom-sql']);
+  for (const command of ['role-based-app', 'role-based-serve']) {
+    const selected = JSON.parse(await run(process.execPath, [launcher, command, 'custom-sql'], { env: { SQL_APPS_HOME: home } }));
+    assert.equal(selected.cwd, home);
+    assert.deepEqual(selected.args, [command, 'custom-sql']);
+  }
   const artifact = join(home, '.sql-apps', 'selected artifact; literal');
   for (const command of ['selected-app', 'selected-serve', 'selected-test']) {
     const selected = JSON.parse(await run(process.execPath, [launcher, command, artifact], { env: { SQL_APPS_HOME: home } }));
@@ -175,6 +234,8 @@ test('plugin dispatch uses checkout cwd, passes literal arguments and preserves 
   const setup = JSON.parse(await run(process.execPath, [launcher, 'setup-check', 'custom-sql'], { env: { SQL_APPS_HOME: home } }));
   assert.equal(setup.cwd, home);
   assert.deepEqual(setup.args, ['--json', '--container', 'custom-sql']);
+  const roleBasedSetup = JSON.parse(await run(process.execPath, [launcher, 'role-based-setup-check', 'custom-sql'], { env: { SQL_APPS_HOME: home } }));
+  assert.deepEqual(roleBasedSetup.args, ['--json', '--profile', 'role-based-data', '--container', 'custom-sql']);
   await rm(join(home, 'dist'), { recursive: true });
   await writeFile(join(home, 'scripts/guide.mjs'),
     'console.log(JSON.stringify({cwd:process.cwd(),args:process.argv.slice(2)}));');

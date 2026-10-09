@@ -30,9 +30,11 @@ export async function checkWorkspacePorts(container: string, runner: Run, images
   const components: [number | null, string | null, string | null][] = [
     [runtime.ports.gateway, null, null],
     [runtime.ports.data, runtime.names.data, 'data'],
-    [runtime.ports.functions, runtime.names.functions, 'functions'],
-    [runtime.ports.blob, runtime.names.storage, 'storage'],
-    [runtime.ports.queue, runtime.names.storage, 'storage'],
+    ...(images.functions ? [[runtime.ports.functions, runtime.names.functions, 'functions'] as [number, string, string]] : []),
+    ...(images.storage ? [
+      [runtime.ports.blob, runtime.names.storage, 'storage'] as [number, string, string],
+      [runtime.ports.queue, runtime.names.storage, 'storage'] as [number, string, string],
+    ] : []),
   ];
   if (runtime.ownsSqlName) components.push([runtime.ports.sql, container, 'sql']);
   for (const [port, name, role] of components) {

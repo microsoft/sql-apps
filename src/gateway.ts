@@ -27,6 +27,7 @@ export interface GatewayDependencies {
   requestGuard?: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
   processing?: FileProcessing;
   telemetry?: LocalTracing;
+  ready?: () => Promise<void>;
 }
 
 interface AuthenticatedRequest extends FastifyRequest {
@@ -70,6 +71,10 @@ export async function createGateway(config: RuntimeConfig, dependencies: Gateway
   app.get('/health/live', async () => ({ status: 'live' }));
   app.get('/health/ready', async (_request, reply) => {
     try {
+      if (dependencies.ready) {
+        await dependencies.ready();
+        return { status: 'ready' };
+      }
       const response = await dependencies.fetch(new URL('/health', config.dabUrl), { signal: AbortSignal.timeout(5_000) });
       if (!response.ok) return reply.code(503).send({ status: 'not-ready' });
       return { status: 'ready' };
@@ -85,7 +90,7 @@ export async function createGateway(config: RuntimeConfig, dependencies: Gateway
       tenantId: config.tenantId,
       clientId: config.apiClientId,
       scope: `api://${config.apiClientId}/access_as_user`,
-      capabilities: { files: true, functions: true },
+      capabilities: { files: config.profile !== 'role-based-data', functions: config.profile !== 'role-based-data' },
     };
   });
   await app.register(async protectedRoutes => {
@@ -94,6 +99,9 @@ export async function createGateway(config: RuntimeConfig, dependencies: Gateway
       if (!token) return reply.code(401).send({ error: 'Bearer access token required' });
       try {
         const identity = await dependencies.verifyUser(token);
+        if (config.profile === 'role-based-data' && !identity.roles?.includes(config.requiredRole!)) {
+          return reply.code(403).send({ error: 'Authorized role required' });
+        }
         const authenticated = request as AuthenticatedRequest;
         authenticated.identity = identity;
         authenticated.accessToken = token;
@@ -118,6 +126,7 @@ export async function createGateway(config: RuntimeConfig, dependencies: Gateway
       handler: proxyData,
     });
     protectedRoutes.post('/graphql', proxyData);
+    if (config.profile !== 'role-based-data') {
     protectedRoutes.get('/storage', async (request, reply) => {
       if (!dependencies.files.list) return reply.code(503).send({ error: 'File listing unavailable' });
       const identity = (request as AuthenticatedRequest).identity!;
@@ -155,6 +164,7 @@ export async function createGateway(config: RuntimeConfig, dependencies: Gateway
       if (!params.success) return reply.code(400).send({ error: 'Invalid job id' });
       return reply.code(await dependencies.processing.delete((request as AuthenticatedRequest).identity!, params.data.id) ? 204 : 404).send();
     });
+    }
 
     async function proxyData(request: FastifyRequest, reply: import('fastify').FastifyReply) {
       const url = new URL(config.dabUrl);
@@ -163,6 +173,7 @@ export async function createGateway(config: RuntimeConfig, dependencies: Gateway
       url.search = incoming.search;
       const headers = new Headers({ authorization: `Bearer ${(request as AuthenticatedRequest).accessToken}` });
       if (request.headers['if-match'] === '*') headers.set('if-match', '*');
+      if (config.profile === 'role-based-data') headers.set('x-ms-api-role', config.requiredRole!);
       if (request.body !== undefined) headers.set('content-type', 'application/json');
       const response = await dependencies.fetch(url, {
         method: request.method,
@@ -176,6 +187,7 @@ export async function createGateway(config: RuntimeConfig, dependencies: Gateway
       return reply.send(Buffer.from(await response.arrayBuffer()));
     }
 
+    if (config.profile !== 'role-based-data') {
     protectedRoutes.route({
       method: ['PUT', 'GET', 'DELETE'],
       url: '/storage/:name',
@@ -214,6 +226,7 @@ export async function createGateway(config: RuntimeConfig, dependencies: Gateway
       });
       return reply.code(response.status).type('application/json').send(Buffer.from(await response.arrayBuffer()));
     });
+    }
   });
   await app.register(fastifyStatic, { root: resolve(config.publicDirectory), index: ['index.html'] });
   return app;

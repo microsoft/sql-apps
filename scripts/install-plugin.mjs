@@ -61,7 +61,7 @@ async function install() {
   }
   console.log(`SQL Apps installed locally and bound to ${home}.`);
   console.log(`Runtime contract ${source.contract.version}; source fingerprint ${source.fingerprint}. Other worktrees require explicit home selection.`);
-  console.log('All five skills are discovered and enabled by the actual Copilot plugin loader.');
+  console.log(`All ${skillNames.length} skills are discovered and enabled by the actual Copilot plugin loader.`);
   console.log('Restart the Copilot App or create a fresh session. No upstream plugins were changed and no cloud resources were deployed.');
 }
 
