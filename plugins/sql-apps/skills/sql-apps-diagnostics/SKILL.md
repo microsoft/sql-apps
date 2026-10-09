@@ -5,6 +5,9 @@ description: "Use when checking SQL Apps service status, diagnosing local startu
 
 # Diagnose the local SQL Apps application
 
+SQL Apps is a standalone project with its own runtime and workflow. Use only SQL Apps skills and project-owned commands for SQL Apps work. Do not disable or modify other installed plugins.
+Confirm the intended SQL Apps application directory before edits. Do not infer a directory from another plugin, session title or conversation history. If the active project is unrelated or the target is unclear, ask which directory to use; do not convert or overwrite it.
+
 Resolve `../../scripts/sql-apps.mjs` relative to this installed skill and use its absolute path. Run `node "<absolute-script-path>" home` to locate the application, then read its `docs/reference/local-development.md`. Never assume the current project or plugin cache is the runtime checkout. Missing/invalid binding is an error; ask for the checkout path instead of guessing.
 Run read-only `workspace-check` to confirm active/bound home, source/build provenance and selected workspace origins before status or lifecycle commands. A mismatch requires explicit `SQL_APPS_HOME`; never copy uncommitted source or overwrite the binding/descriptor implicitly.
 

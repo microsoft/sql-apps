@@ -1,9 +1,12 @@
 ---
 name: sql-apps-application
-description: "Use when guiding a beginner to describe, build and change a useful SQL Apps application locally, implementing a domain-specific app, or verifying that sample UI, clients, APIs and schema are absent from delivery."
+description: "Use when guiding a beginner to describe, build and change a standalone SQL Apps application locally, implementing a domain-specific app, or verifying that sample UI, clients, APIs and schema are absent from delivery."
 ---
 
 # Build a clean application, not a modified example
+
+SQL Apps is a standalone project with its own runtime and workflow. Use only SQL Apps skills and project-owned commands for SQL Apps work. Do not disable or modify other installed plugins.
+Confirm the intended SQL Apps application directory before edits. Do not infer a directory from another plugin, session title or conversation history. If the active project is unrelated or the target is unclear, ask which directory to use; do not convert or overwrite it.
 
 Resolve `../../scripts/sql-apps.mjs` relative to this installed skill; run its absolute path with `home` to locate the foundation. The session application/worktree may be a different checkout. Confirm the intended application directory before edits. Do not overwrite the foundation or silently use its runtime binding for application-specific commands; set `SQL_APPS_HOME` to the validated application checkout when invoking its launcher.
 

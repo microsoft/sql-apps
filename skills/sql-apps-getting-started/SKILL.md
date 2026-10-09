@@ -1,9 +1,12 @@
 ---
 name: sql-apps-getting-started
-description: Guide beginners through describing, running and changing a useful SQL Apps application locally, with optional separately approved Azure sharing.
+description: Guide beginners through describing, running and changing a standalone SQL Apps application locally, with optional separately approved Azure sharing.
 ---
 
 # SQL Apps
+
+SQL Apps is a standalone project with its own runtime and workflow. Use only SQL Apps skills and project-owned commands for SQL Apps work. Do not disable or modify other installed plugins.
+Confirm the intended SQL Apps application directory before edits. Do not infer a directory from another plugin, session title or conversation history. If the active project is unrelated or the target is unclear, ask which directory to use; do not convert or overwrite it.
 
 Work in the intended application checkout. Follow **Describe -> Run locally -> Make it yours -> Share optionally**. Read `README.md`, `docs/guides/build-your-app.md` and `docs/guides/getting-started.md`. SQL experience is welcome, not required.
 

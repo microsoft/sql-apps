@@ -1,9 +1,12 @@
 ---
 name: sql-apps-local
-description: "Use when starting SQL Apps locally, launching the browser, restarting local services, or setting up subscription-free Azure SQL, DAB, Azurite and Azure Functions."
+description: "Use when starting standalone SQL Apps locally, launching the browser, restarting local services, or setting up subscription-free Azure SQL, DAB, Azurite and Azure Functions."
 ---
 
 # Start SQL Apps locally
+
+SQL Apps is a standalone project with its own runtime and workflow. Use only SQL Apps skills and project-owned commands for SQL Apps work. Do not disable or modify other installed plugins.
+Confirm the intended SQL Apps application directory before edits. Do not infer a directory from another plugin, session title or conversation history. If the active project is unrelated or the target is unclear, ask which directory to use; do not convert or overwrite it.
 
 ## A useful local app is the goal
 

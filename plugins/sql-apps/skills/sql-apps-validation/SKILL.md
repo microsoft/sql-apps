@@ -5,6 +5,9 @@ description: "Use when testing SQL Apps changes, validating the local plugin, ru
 
 # Validate SQL Apps
 
+SQL Apps is a standalone project with its own runtime and workflow. Use only SQL Apps skills and project-owned commands for SQL Apps work. Do not disable or modify other installed plugins.
+Confirm the intended SQL Apps application directory before edits. Do not infer a directory from another plugin, session title or conversation history. If the active project is unrelated or the target is unclear, ask which directory to use; do not convert or overwrite it.
+
 Resolve `../../scripts/sql-apps.mjs` relative to this installed skill; run `node "<absolute-script-path>" home`. Execute repository commands **in that resolved checkout**, not in a plugin cache or unrelated session project.
 
 Read `README.md` and `docs/reference/local-development.md`. Choose checks covering the change:

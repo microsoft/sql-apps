@@ -37,6 +37,14 @@ Restart the App or create a **fresh session** after installation. In **Customize
 
 Invoke a skill explicitly from the App's skill picker/slash completion if natural-language discovery picks another plugin instead. Ask for **SQL Apps** and confirm the **sql-apps-skills** marketplace. The plugin does not embed the browser UI; use the startup-reported origin (`http://127.0.0.1:18080/` in fixed-port mode) for the actual application.
 
+### Keep SQL Apps work scoped to its project
+
+SQL Apps is a standalone project with its own runtime and workflow. Other plugins can remain installed and enabled.
+
+For SQL Apps work, explicitly select `sql-apps-application` or the matching `sql-apps-*` skill and confirm the intended application directory. Use project-owned commands and do not choose a directory from another plugin or old conversation. An unrelated project is not an invitation to convert it into SQL Apps.
+
+Plugin availability is shared within the Copilot profile; these instructions clarify routing, but do not provide host-enforced skill isolation. If a conversation mixes unrelated workflows, start a fresh SQL Apps session with a prompt such as: **"Use sql-apps-application to build a standalone SQL Apps app in my confirmed project folder. Keep unrelated projects and plugins unchanged."** Existing conversations can retain old instructions and names even after a plugin changes.
+
 For beginners: **"Guide me through SQL Apps setup one step at a time. Ask before installing tools, downloading dependencies or changing my system. Do not deploy to Azure."** The local skill reads the OS-specific guide, runs setup checks, offers native approved installs and pauses for human-only license/restart/credential steps. No blanket installation or license approval is implied by enabling the plugin.
 
 For building an app: **"Help me describe, run and change a useful SQL Apps app locally. Ask about its users, information and actions, not cloud architecture. Sharing is optional."** Follow the [build walkthrough](../guides/build-your-app.md). Use `guide` to recover saved decisions and `guide-save <absolute-brief-path>` to save an agreed brief. Historical evidence never replaces live acceptance or authorizes installations/cloud writes.

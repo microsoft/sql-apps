@@ -5,6 +5,9 @@ description: "Use when preparing SQL Apps for Azure deployment, reviewing cloud 
 
 # Prepare a cloud deployment without deploying
 
+SQL Apps is a standalone project with its own runtime and workflow. Use only SQL Apps skills and project-owned commands for SQL Apps work. Do not disable or modify other installed plugins.
+Confirm the intended SQL Apps application directory before edits. Do not infer a directory from another plugin, session title or conversation history. If the active project is unrelated or the target is unclear, ask which directory to use; do not convert or overwrite it.
+
 Sharing is the optional final stage of `docs/guides/build-your-app.md`, not a prerequisite for local success. Do not initiate cloud preparation during beginner onboarding unless the user requests it. Recover the agreed brief with the bound launcher's `guide`; local checkpoints are historical, not deployment consent or cloud readiness.
 
 Read `docs/reference/demo-cost.md`. Lead with free-tier-first: recurring monthly allowances, not time-bound trial credits or a guarantee of zero charges. Use "free offer" only to identify Microsoft's official enrollment/documentation terminology. Before Azure requests, run the offline `npm run azure -- demo-cost <explicit-cost-config>` after the approved build. The zero-spend example intentionally exits 2 because ACR Basic and managed-network infrastructure have fixed charges. Stop at that blocker for a free-only intent; do not provision, weaken SQL access or silently switch to paid resources. A saved `costPreference` is not spending approval.

@@ -16,6 +16,22 @@ const brief = () => ({
   nextChange: 'Add a due-date field',
 });
 
+test('SQL Apps entry points explicitly scope standalone work while preserving other plugins', async () => {
+  const paths = [
+    'content/start.md',
+    'skills/sql-apps-getting-started/SKILL.md',
+    ...['application', 'local', 'diagnostics', 'validation', 'cloud-preview']
+      .map(name => `plugins/sql-apps/skills/sql-apps-${name}/SKILL.md`),
+  ];
+  for (const path of paths) {
+    const content = await readFile(resolve(path), 'utf8');
+    assert.match(content, /SQL Apps is a standalone project with its own runtime and workflow/, path);
+    assert.match(content, /Use only SQL Apps skills and project-owned commands for SQL Apps work/, path);
+    assert.match(content, /Do not disable or modify other installed plugins/, path);
+    assert.match(content, /Do not infer a directory from another plugin, session title or conversation history/, path);
+  }
+});
+
 async function fixture(t) {
   const home = await mkdtemp(join(tmpdir(), 'sql-apps-guide-'));
   t.after(() => rm(home, { recursive: true, force: true }));

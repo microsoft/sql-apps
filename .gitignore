@@ -2,13 +2,11 @@ node_modules/
 dist/
 public/app.js
 .sql-apps/
-.azure-rayfin/
 .env
 .env.*
 !.env.example
 sql-apps.json
 azure-demo-cost.json
-azure-rayfin.json
 functions/local.settings.json
 sql/bin/
 sql/obj/
