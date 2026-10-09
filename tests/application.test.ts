@@ -1,0 +1,131 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { resolve, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { run } from '../src/process.js';
+import { testLocalApp } from '../src/local-app-smoke.js';
+
+const checker = resolve('scripts/check-application.mjs');
+
+test('clean application validation rejects leftovers in each actual delivery surface', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'sql-apps-clean-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  for (const dir of ['src', 'public', 'dab', 'sql', 'dist/src', 'dist/functions', 'functions']) await mkdir(join(root, dir), { recursive: true });
+  await writeFile(join(root, 'application.json'), JSON.stringify({ name: 'test-app', selectedExamples: [] }));
+  await writeFile(join(root, 'public/app.js'), 'console.log("orders");');
+  await mkdir(join(root, 'dist/functions/src'), { recursive: true });
+  for (const file of ['dist/src/client.js', 'dist/src/server.js', 'dist/functions/src/index.js']) {
+    await writeFile(join(root, file), '');
+  }
+  for (const file of ['Dockerfile', 'functions/Dockerfile', 'functions/local.Dockerfile']) {
+    await writeFile(join(root, file), 'COPY --from=build /app/dist/src ./dist/src');
+  }
+  assert.match(await run(process.execPath, [checker, root]), /Clean application passed/);
+  const leftovers: [string, string][] = [
+    ['src/client.ts', 'async listTodos() {}'],
+    ['src/component.mjs', 'async listTodos() {}'],
+    ['src/web.ts', 'const query = "{ todos { items { id } } }";'],
+    ['public/index.html', '<form id="todo-form"></form>'],
+    ['public/todos.css', '#todos { display: none; }'],
+    ['public/app.js', 'function createTodo() {}'],
+    ['dab/config.json', '{"Todo":{"source":"dbo.Todos"}}'],
+    ['sql/table.sql', 'CREATE TABLE dbo.Todos (id int);'],
+    ['dist/src/client.js', 'class TodoExampleClient {}'],
+    ['dist/src/component.mjs', 'class TodoExampleClient {}'],
+    ['dist/functions/worker.js', 'import "../examples/todo/client.js";'],
+  ];
+  for (const [path, content] of leftovers) {
+    await writeFile(join(root, path), content);
+    await assert.rejects(run(process.execPath, [checker, root]), /Unselected Todo example/);
+    await writeFile(join(root, path), '');
+  }
+  await writeFile(join(root, 'model.xml'), '<Element Name="[dbo].[Todos]" />');
+  await assert.rejects(run(process.execPath, [checker, root, join(root, 'model.xml')]), /Unselected Todo example/);
+  await writeFile(join(root, 'model.xml'), '<Element Name="[dbo].[Orders]" />');
+  assert.match(await run(process.execPath, [checker, root, join(root, 'model.xml')]), /Clean application passed/);
+  for (const copy of [
+    'COPY --from=build /app/dist ./dist',
+    'COPY --from=build /app/dist /app/dist',
+    'COPY ./ ./',
+    'COPY ["examples", "/app/examples"]',
+    'COPY --from=build /app/dist/* /app/dist',
+    'COPY --chown=node:node \\\n  tests ./tests',
+  ]) {
+    await writeFile(join(root, 'functions/local.Dockerfile'), copy);
+    await assert.rejects(run(process.execPath, [checker, root]), /whole build/);
+  }
+  await writeFile(join(root, 'functions/local.Dockerfile'), 'COPY --from=build /app/dist/src ./dist/src');
+  await rm(join(root, 'dist/src/server.js'));
+  await assert.rejects(run(process.execPath, [checker, root]), /ENOENT/);
+});
+
+test('API cleanliness requires missing entities, not auth/backend errors, and always cleans its session', async () => {
+  const moduleUrl = pathToFileURL(resolve('scripts/check-application-api.mjs')).href;
+  const { checkApplicationApi } = await import(moduleUrl);
+  const cases = [
+    { rest: 404, graph: 400, body: { errors: [{ message: "Cannot query field 'todos'." }] }, succeeds: true },
+    { rest: 200, graph: 400, body: { errors: [{ message: "Cannot query field 'todos'." }] }, succeeds: false },
+    { rest: 401, graph: 400, body: { errors: [{ message: "Cannot query field 'todos'." }] }, succeeds: false },
+    { rest: 404, graph: 503, body: { errors: [{ message: 'Backend unavailable' }] }, succeeds: false },
+    { rest: 404, graph: 200, body: { errors: [{ message: 'Not authorized for todos' }] }, succeeds: false },
+    { rest: 404, graph: 200, body: { data: { todos: { items: [] } } }, succeeds: false },
+    { rest: 404, graph: 200, body: { errors: [{ message: "Cannot query field 'todos'." }] }, succeeds: false, cleanup: 500 },
+  ];
+  for (const scenario of cases) {
+    let cleaned = false;
+    const fetcher = async (url: string, options: RequestInit) => {
+      const headers = new Headers(options.headers);
+      assert.equal(headers.get('origin'), 'http://127.0.0.1:18080');
+      if (options.method === 'DELETE') {
+        cleaned = true;
+        assert.equal(headers.get('content-type'), null, 'Bodyless cleanup must not claim to be JSON');
+        assert.equal(headers.get('authorization'), 'Bearer test-session');
+        return new Response(null, { status: scenario.cleanup ?? 204 });
+      }
+      if (url.endsWith('/local/session')) return Response.json({ token: 'test-session' });
+      assert.equal(headers.get('authorization'), 'Bearer test-session');
+      if (url.endsWith('/api/Todo')) return new Response('', { status: scenario.rest });
+      return Response.json(scenario.body, { status: scenario.graph });
+    };
+    if (scenario.succeeds) await checkApplicationApi(undefined, fetcher);
+    else await assert.rejects(checkApplicationApi(undefined, fetcher), /Clean application API acceptance failed/);
+    assert.equal(cleaned, true);
+  }
+  let called = false;
+  await assert.rejects(checkApplicationApi('https://example.com', () => { called = true; }), /127.0.0.1/);
+  assert.equal(called, false);
+});
+
+test('foundation gateway acceptance validates raw public job shape before client parsing can hide fields', async () => {
+  for (const exposePrivateKey of [false, true]) {
+    const identities = new Map<string, string>();
+    const cleaned: string[] = [];
+    const fetcher: typeof fetch = async (input, options) => {
+      const url = new URL(String(input));
+      const token = new Headers(options?.headers).get('authorization')?.slice('Bearer '.length);
+      if (url.pathname === '/local/session' && options?.method === 'POST') {
+        const { user } = JSON.parse(String(options.body));
+        const issued = `acceptance-${user}`;
+        identities.set(issued, user);
+        return Response.json({ token: issued });
+      }
+      if (options?.method === 'DELETE') {
+        assert.ok(token);
+        cleaned.push(token);
+        return new Response(null, { status: 204 });
+      }
+      if (url.pathname === '/auth/me') return token ?
+        Response.json({ oid: identities.get(token) }) : new Response(null, { status: 401 });
+      return Response.json({ jobs: [{
+        id: '11111111-1111-4111-8111-111111111111', filename: 'acceptance.txt', status: 'queued',
+        sha256: null, byte_count: null, line_count: null, error: null,
+        ...(exposePrivateKey ? { blob_key: 'must-not-be-public' } : {}),
+      }] });
+    };
+    if (exposePrivateKey) await assert.rejects(testLocalApp(fetcher), /Local gateway acceptance/);
+    else await testLocalApp(fetcher);
+    assert.equal(cleaned.length, exposePrivateKey ? 1 : 2);
+  }
+});

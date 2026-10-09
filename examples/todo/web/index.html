@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SQL Apps - synthetic Todo demo</title>
+  <link rel="stylesheet" href="/app.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Synthetic Todo demo</h1>
+    <aside class="warning">
+      <strong>Synthetic data only. Do not enter personal, confidential or production information.</strong>
+      This anonymous demo is not a signed-in application. Your browser session lasts 60 minutes.
+      It allows 50 items, 200 characters per title, and 30 mutation attempts per minute.
+      Expired data is inaccessible immediately and removed by subsequent requests.
+    </aside>
+    <section id="start-panel">
+      <label><input type="checkbox" id="synthetic"> I will only enter synthetic data.</label>
+      <button id="start" type="button">Start synthetic session</button>
+    </section>
+    <section id="application" hidden>
+      <p id="expiry"></p>
+      <button id="end" type="button">End session and delete my items</button>
+      <form id="todo-form">
+        <label for="title">Synthetic title</label>
+        <input id="title" required maxlength="200" autocomplete="off">
+        <button type="submit">Add item</button>
+      </form>
+      <p id="count"></p>
+      <ul id="todos"></ul>
+    </section>
+    <p id="status" role="status" aria-live="polite"></p>
+  </main>
+</body>
+</html>

@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+.sql-apps
+.azure-rayfin
+.env*
+sql-apps.json
+azure-demo-cost.json
+azure-rayfin.json
+functions/local.settings.json

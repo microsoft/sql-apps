@@ -1,0 +1,16 @@
+GRANT EXECUTE ON dbo.DemoCreateSession TO [$(ApplicationUser)];
+GRANT EXECUTE ON dbo.DemoGetSession TO [$(ApplicationUser)];
+GRANT EXECUTE ON dbo.DemoDeleteSession TO [$(ApplicationUser)];
+GRANT EXECUTE ON dbo.DemoReadiness TO [$(ApplicationUser)];
+GRANT EXECUTE ON dbo.DemoTodoList TO [$(ApplicationUser)];
+GRANT EXECUTE ON dbo.DemoTodoCreate TO [$(ApplicationUser)];
+GRANT EXECUTE ON dbo.DemoTodoUpdate TO [$(ApplicationUser)];
+GRANT EXECUTE ON dbo.DemoTodoDelete TO [$(ApplicationUser)];
+GRANT VIEW DEFINITION ON dbo.DemoCreateSession TO [$(ApplicationUser)];
+GRANT VIEW DEFINITION ON dbo.DemoGetSession TO [$(ApplicationUser)];
+GRANT VIEW DEFINITION ON dbo.DemoDeleteSession TO [$(ApplicationUser)];
+GRANT VIEW DEFINITION ON dbo.DemoReadiness TO [$(ApplicationUser)];
+GRANT VIEW DEFINITION ON dbo.DemoTodoList TO [$(ApplicationUser)];
+GRANT VIEW DEFINITION ON dbo.DemoTodoCreate TO [$(ApplicationUser)];
+GRANT VIEW DEFINITION ON dbo.DemoTodoUpdate TO [$(ApplicationUser)];
+GRANT VIEW DEFINITION ON dbo.DemoTodoDelete TO [$(ApplicationUser)];

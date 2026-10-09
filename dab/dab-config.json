@@ -1,0 +1,34 @@
+{
+  "$schema": "https://github.com/Azure/data-api-builder/releases/download/v2.0.12/dab.draft.schema.json",
+  "data-source": {
+    "database-type": "mssql",
+    "connection-string": "@env('SQL_CONNECTION_STRING')",
+    "options": { "set-session-context": true }
+  },
+  "runtime": {
+    "rest": { "enabled": true, "path": "/api" },
+    "pagination": { "next-link-relative": true },
+    "graphql": { "enabled": true, "path": "/graphql", "allow-introspection": false },
+    "mcp": { "enabled": false },
+    "host": {
+      "mode": "production",
+      "authentication": {
+        "provider": "AzureAD",
+        "jwt": { "audience": "@env('API_CLIENT_ID')", "issuer": "@env('ENTRA_ISSUER')" }
+      }
+    }
+  },
+  "entities": {
+    "FileJob": {
+      "source": { "object": "dbo.FileJobs", "type": "table" },
+      "rest": { "enabled": true },
+      "graphql": { "enabled": true },
+      "permissions": [{
+        "role": "authenticated",
+        "actions": [
+          { "action": "read", "fields": { "exclude": ["blob_key"] }, "policy": { "database": "@item.owner_oid eq @claims.oid" } }
+        ]
+      }]
+    }
+  }
+}
