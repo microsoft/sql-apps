@@ -217,7 +217,8 @@ test('all beginner entry points use the same local-first journey and retain shar
   const readme = await readFile('README.md', 'utf8');
   assert.match(readme, /Describe -> Run locally -> Make it yours -> Share optionally/);
   assert.match(readme, /docs\/guides\/build-your-app\.md/);
-  assert.match(readme, /deployment workflow is not yet complete/);
+  assert.match(readme, /minimal public-demo workflow is incomplete/);
+  assert.match(readme, /private-network SQL deployment is paid and still needs live acceptance/);
   const guideReference = await readFile('docs/reference/guide.md', 'utf8');
   assert.match(guideReference, /historical/i);
   assert.match(guideReference, /does not authorize.*cloud deployment/);
