@@ -1,0 +1,90 @@
+# Get started
+
+Prepare your computer to build and run SQL Apps locally. You do not need an Azure subscription or Azure CLI login.
+
+## 1. Open the project
+
+On the repository page, choose **Code -> Download ZIP**, or clone it with Git. If it was shared with you, confirm which branch to use. For a ZIP download, extract it first.
+
+Open the folder containing `package.json`, `scripts` and `src` in your preferred editor, then open a terminal in that folder. In VS Code, these actions are **File -> Open Folder** and **Terminal -> New Terminal**. Only trust code from the intended source. Keep the project in a folder you own; local credentials and app data will be created later.
+
+You can ask your AI assistant:
+
+> Help me set up SQL Apps on this computer, one step at a time. Check what is installed and explain downloads and license requirements before changing anything. Do not deploy to Azure or delete existing data.
+
+An AI assistant is optional for running the application. Guided app building can use your preferred LLM provider, subject to its account, access and pricing conditions. Review its data-handling policies before sharing project files. Never paste passwords or registry credentials into chat.
+
+## 2. Check the requirements
+
+| Tool or access | Why you need it |
+| --- | --- |
+| Node.js 22 or 24 with npm | Build and run the application and setup check. |
+| .NET SDK 8 or later | Build and publish the SQL schema. Choose SDK, not just Runtime. |
+| Docker with Linux containers | Run local SQL and application services. |
+| Azure SQL Database container private-preview access | Download the SQL image for first use, unless a usable image is already cached or a current container is available. |
+
+Initial npm packages, SQL tools and container images require internet and disk space. Docker Desktop has [license conditions](https://docs.docker.com/subscription/desktop-license/) and is not free for every organization. No Azure CLI, host DAB, host sqlcmd or Functions Core Tools installation is needed.
+
+### Windows
+
+Install only what is missing:
+
+1. [Node.js](https://nodejs.org/en/download), including npm. Keep an existing supported version-manager installation.
+2. [.NET SDK](https://dotnet.microsoft.com/download), version 8 or later.
+3. [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/). Check its hardware, Windows and license requirements, then start it in **Linux containers** mode.
+
+If Docker requires WSL, virtualization or a reboot, follow its linked instructions with your administrator as needed. Review license agreements yourself.
+
+Close and reopen the terminal after installation. Restart your editor if it still sees the old PATH.
+
+### macOS
+
+Check **Apple menu -> About This Mac** for Intel or Apple Silicon. Install the matching [Node.js](https://nodejs.org/en/download), [.NET SDK](https://learn.microsoft.com/dotnet/core/install/macos) and [Docker Desktop](https://docs.docker.com/desktop/setup/install/mac-install/) packages.
+
+The SQL image is x64-only. Apple Silicon uses x64 emulation; having Docker installed does not guarantee that this workload will run. Follow Docker's emulation guidance if startup fails. Open a new terminal after installing tools.
+
+### Linux
+
+Check your distribution and version in `/etc/os-release`. Use [Node.js downloads](https://nodejs.org/en/download), the [.NET Linux distribution selector](https://learn.microsoft.com/dotnet/core/install/linux) and the [Docker Engine distribution selector](https://docs.docker.com/engine/install/).
+
+For Ubuntu or Debian, follow the official instructions for that exact distribution and version; package feeds differ. Verify Node is 22 or 24 instead of assuming the distribution package is current. Keep an existing supported version-manager installation.
+
+If Docker reports socket permission denied, follow its [post-install guidance](https://docs.docker.com/engine/install/linux-postinstall/). Docker group membership grants powerful host access. Do not make the socket world-writable or run the entire app as root to hide the problem.
+
+## 3. Run the setup check
+
+From the project folder:
+
+```powershell
+node scripts/setup-check.mjs
+```
+
+This works before dependency restore or build. It does not install tools, accept licenses, change databases or start services. Read each **Next** instruction and rerun after resolving missing requirements.
+
+If a command is not found, reopen the terminal before reinstalling. Supported version checks are `node --version`, `npm --version` and `dotnet --list-sdks`. Docker's engine must be running, not just installed.
+
+For a container that its owner has agreed you may reuse:
+
+```powershell
+node scripts/setup-check.mjs --container existing-sql-name
+```
+
+Replace the name with the actual container. This inspects safe state; it does not certify the engine or modify its database.
+
+## 4. Get SQL preview access
+
+For a first image download, use the [official preview signup](https://aka.ms/sqldbcontainerpreview-signup) and [announcement](https://devblogs.microsoft.com/azure-sql/azure-sql-database-container-prpr/). Complete registry sign-in in your own terminal with the provided pull credentials. Do not put them in chat, source files or screenshots.
+
+If a usable image is cached, you do not need to download it again just to refresh it. Startup verifies the actual SQL engine. If preview access is not available yet, keep your completed setup and resume when it is; do not substitute a different database.
+
+SQL startup accepts the container EULA using `ACCEPT_EULA=Y`. Review the preview's terms before starting it.
+
+## 5. Choose your next step
+
+- **Build your own app:** follow [Build your app](build-your-app.md).
+- **Try an implemented example:** follow the [Todo reference guide](../../examples/todo/README.md).
+- **Explore the file-processing foundation:** follow [Run locally](run-locally.md).
+
+The paths use the same tools but start different capabilities. You do not need to run the full file-processing demonstration before building a data-only app.
+
+For service diagnostics and data-preserving recovery, see the [local runtime reference](../reference/local-development.md).

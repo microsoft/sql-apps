@@ -1,0 +1,16 @@
+{
+  "Todo": {
+    "source": { "object": "dbo.Todos", "type": "table" },
+    "rest": { "enabled": true },
+    "graphql": { "enabled": true },
+    "permissions": [{
+      "role": "authenticated",
+      "actions": [
+        { "action": "create", "fields": { "include": ["id", "title", "completed"] } },
+        { "action": "read", "policy": { "database": "@item.owner_oid eq @claims.oid" } },
+        { "action": "update", "fields": { "include": ["id", "title", "completed"] } },
+        { "action": "delete", "policy": { "database": "@item.owner_oid eq @claims.oid" } }
+      ]
+    }]
+  }
+}

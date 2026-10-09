@@ -1,0 +1,129 @@
+# Install and use the Copilot plugin
+
+The SQL Apps plugin adds project-specific skills to GitHub Copilot. It does not require publication, a Git push, an Azure subscription, or another platform plugin. Copilot itself still requires its normal account/access and network connectivity; the local application does not call cloud APIs after prerequisite downloads.
+
+## Install from your checkout
+
+Prerequisites: Node 22/24 and the GitHub Copilot CLI on PATH, using the same Copilot profile as your App. Start with [first-time setup](../guides/getting-started.md) if tools are missing. Plugin installation does not require npm dependency restore or runtime compilation; its launcher can diagnose setup before the application is built.
+
+```powershell
+Set-Location "C:\git\sql-apps"
+npm run plugin:check
+npm run plugin:install
+```
+
+The installer:
+
+1. Validates the dedicated plugin bundle and marketplace paths.
+2. Registers this checkout as the local `sql-apps-skills` marketplace.
+3. Installs/enables `sql-apps@sql-apps-skills` and verifies actual discovery of all five skills.
+4. Binds the runtime to this checkout in `~/.copilot/sql-apps-local.json` (or `COPILOT_HOME` if set). The binding stores only a version and absolute directory, no secrets.
+
+Rerunning the installer is safe for the same checkout/profile. It refuses to replace a conflicting marketplace, differently sourced plugin, or runtime binding. Unrelated existing plugins are not disabled or modified.
+
+Only [plugins/sql-apps](../../plugins/sql-apps) is the installed package: manifest, five skills and a Node launcher. Runtime code, `.sql-apps` credentials, dependencies and SQL/Blob volumes stay outside the package. **Use this local marketplace, not a direct repository-root installation**, which is the older compatibility package.
+
+## Use the GitHub Copilot App
+
+Restart the App or create a **fresh session** after installation. In **Customize -> Plugins**, look for **sql-apps**, marketplace **sql-apps-skills**, version **0.1.0**, enabled. Its skills should appear under **Skills**:
+
+| Skill | Example prompt |
+| --- | --- |
+| `sql-apps-local` | Start SQL Apps locally; reuse it if it is already running. |
+| `sql-apps-diagnostics` | Check SQL Apps local service status without changing anything. |
+| `sql-apps-validation` | Run SQL Apps unit tests and typecheck; do not restart services. |
+| `sql-apps-cloud-preview` | Explain SQL Apps cloud prerequisites and costs; do not deploy. |
+| `sql-apps-application` | Build a domain-specific application without copying the Todo example; verify source, build, API and database boundaries. |
+
+Invoke a skill explicitly from the App's skill picker/slash completion if natural-language discovery picks another plugin instead. Ask for **SQL Apps** and confirm the **sql-apps-skills** marketplace. The plugin does not embed the browser UI; use the startup-reported origin (`http://127.0.0.1:18080/` in fixed-port mode) for the actual application.
+
+For beginners: **"Guide me through SQL Apps setup one step at a time. Ask before installing tools, downloading dependencies or changing my system. Do not deploy to Azure."** The local skill reads the OS-specific guide, runs setup checks, offers native approved installs and pauses for human-only license/restart/credential steps. No blanket installation or license approval is implied by enabling the plugin.
+
+For building an app: **"Help me describe, run and change a useful SQL Apps app locally. Ask about its users, information and actions, not cloud architecture. Sharing is optional."** Follow the [build walkthrough](../guides/build-your-app.md). Use `guide` to recover saved decisions and `guide-save <absolute-brief-path>` to save an agreed brief. Historical evidence never replaces live acceptance or authorizes installations/cloud writes.
+
+The local marketplace loads from disk (`source: live` in CLI output). Edit the bundled skills or launcher, run `npm run plugin:check`, then start a fresh session/restart to load changes. No Git push or plugin update is needed for this directory-backed source. After TypeScript runtime changes, separately build/restart the application as documented.
+
+If the App does not show the plugin, check the profile used to launch it. `COPILOT_HOME` can select a different configuration directory. Register the local checkout through the App's marketplace controls if available, or launch the App from the same configured CLI/profile (`copilot app`). Do not copy or overwrite the App's settings. Verify discovery with:
+
+```powershell
+copilot plugin list --json
+copilot skill list --json
+copilot plugin marketplace browse sql-apps-skills
+```
+
+The installer verifies the CLI loader when you run it. Check the visible App session/skill picker in your actual profile too; an already-open session may retain old capabilities.
+
+## Runtime binding and direct checks
+
+The launcher resolves the runtime independently of the session's current project:
+
+1. Explicit `SQL_APPS_HOME` environment variable.
+2. Installer-created binding under `COPILOT_HOME` / `~/.copilot`.
+3. Current directory or an ancestor that is the validated application checkout.
+
+Invalid explicit paths/bindings fail; they never silently fall back. This is important when the plugin is used from another repository or a plugin cache. Only one default checkout is bound per profile. To use another temporarily, set `SQL_APPS_HOME` to an absolute path. To move the default, review/edit just the `home` property of your binding and register the matching local marketplace explicitly; the installer will not overwrite it automatically.
+
+```powershell
+node "C:\git\sql-apps\plugins\sql-apps\scripts\sql-apps.mjs" home
+node "C:\git\sql-apps\plugins\sql-apps\scripts\sql-apps.mjs" workspace-check
+node "C:\git\sql-apps\plugins\sql-apps\scripts\sql-apps.mjs" guide
+node "C:\git\sql-apps\plugins\sql-apps\scripts\sql-apps.mjs" status
+node "C:\git\sql-apps\plugins\sql-apps\scripts\sql-apps.mjs" setup-check
+```
+
+`workspace-check` is dependency-free and read-only. It reports the active checkout, effective binding and selection source, runtime contract, selected application, source-content fingerprint, Git evidence when available, and build provenance. Equal package versions or Git commits do not prove that two worktrees contain the same uncommitted source. ZIP downloads work without Git; the report explicitly marks Git evidence unavailable.
+
+`guide` is also dependency-free and available before the runtime is built. It returns JSON with the four stages, saved brief, suggested next action and explicitly historical progress; it does not probe live services. `guide-save "<absolute-brief.json>"` validates and saves the agreed brief in `.sql-apps/guide.json` in the bound checkout. Both enforce the same runtime-home mismatch checks. Source changes flag saved progress for local re-verification. See [the brief contract](guide.md); do not include credentials or actual data.
+
+The guide also introduces cost awareness progressively; optional saved `costPreference` is not spending approval. The cloud-preview skill uses the offline `demo-cost` review before Azure requests. A zero-spend intent stays blocked while the minimal template has registry/network fixed charges; budgets are alerts, not spending caps. See [costs and paid growth](../guides/costs.md).
+
+If the active checkout differs from the installed binding, runtime execution is refused until you explicitly select the intended home. This also applies when the active worktree lacks the uncommitted foundation. Review the report, then select one checkout for this terminal/session:
+
+```powershell
+$env:SQL_APPS_HOME = "C:\git\your-intended-checkout"
+node "C:\git\sql-apps\plugins\sql-apps\scripts\sql-apps.mjs" workspace-check
+```
+
+This does not change the global binding, transfer source, or authorize copying files between worktrees. `home` and `workspace-check` remain available to diagnose mismatches. Runtime commands also require matching build provenance: `npm run build` records the source and compiled-artifact fingerprints and refuses to certify a build if source changes during compilation. Missing, stale, copied or tampered artifacts require a rebuild in the selected checkout. Source/build provenance is not live service ownership or cloud acceptance.
+
+`status` probes only loopback gateway liveness/data readiness and DAB HTTP health, with bounded timeouts and a nonzero exit on failure. It is read-only and does not create a development session or expose credentials. It does not certify worker/storage/SQL authorization. The launcher delegates local commands directly to the existing compiled CLI with the checkout as cwd, without shell interpolation; it never installs a second runtime.
+
+`setup-check` instead runs the dependency-free diagnostic in the bound checkout and prints JSON before runtime compilation. An optional second argument selects an existing SQL container; it does not initialize it. Action-needed reports exit nonzero, including a healthy gateway whose ownership must still be confirmed. Do not mistake that for permission to restart it.
+It reports selected workspace mode/ports/origins and requires matching workspace labels for isolated occupied Docker ports. For a new checkout, use `workspace-plan` after building, review its proposal, and approve `workspace-init <base-port>`; use explicit `workspace-init legacy` to preserve an existing stack. The plugin passes omitted SQL arguments through to the workspace's derived default, not the global legacy container.
+
+When needed:
+
+```powershell
+Set-Location "C:\git\sql-apps"
+npm run build
+node plugins\sql-apps\scripts\sql-apps.mjs app
+```
+
+The `app` command remains running until stopped. If healthy services are already running, reuse the browser instead of launching another gateway. Alternate SQL containers can be supplied as the second argument to applicable local commands.
+
+`recover-sql` is an explicitly approved isolated-SQL repair, not an automatic startup fallback. It preserves the stopped container's image version, credentials and scoped data; it rejects running/external/legacy or mismatched resources. If interrupted, resume it rather than deleting its sensitive recovery state. See [local-development.md](local-development.md) before use.
+
+## Safety and boundaries
+
+- This plugin adds skills, not MCP tools, custom UI, or another authentication layer.
+- No automatic startup hooks or cloud deployment commands are added.
+- Agents still use normal host approval/task controls; installing a plugin does not grant blanket tool permissions.
+- Retrying jobs and running maintenance mutate data; maintenance can delete expired data if retention is explicitly enabled.
+- `services-test` briefly stops/restarts owned worker/storage. Do not run it while another user is processing.
+- Preserve owner checks, production authentication and unrelated/user-owned containers.
+- Cloud preparation requires separate authorization for mutations. The existing Azure template contains billed resources.
+
+## Uninstall
+
+```powershell
+copilot plugin uninstall sql-apps@sql-apps-skills
+copilot plugin marketplace remove sql-apps-skills
+```
+
+These operations remove only this plugin/marketplace registration, not the application checkout or SQL/Blob data. The small `sql-apps-local.json` runtime binding remains for future reinstalls; remove that exact file manually if no longer wanted. Do not remove the Copilot profile directory or unrelated plugins.
+
+## Replace a pre-rebrand installation
+
+Review [migration notes](../maintainers/naming-transition.md). Inspect `copilot plugin list --json` and `copilot plugin marketplace list --json`, then disable/uninstall only the old development plugin and remove its marketplace registration. Install using the current steps above and explicitly select the new `sql-apps-local.json` binding; old bindings are not migrated.
+
+Do not remove other plugins, the Copilot profile, old credentials or persistent data.

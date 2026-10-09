@@ -1,0 +1,116 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { run } from '../dist/src/process.js';
+import { reviewDemoCost } from '../dist/src/demo-cost.js';
+
+async function compile(t, name) {
+  await assert.doesNotReject(access(resolve('infra', `${name}.bicep`)), `${name} template must exist`);
+  const directory = await mkdtemp(join(tmpdir(), 'sql-apps-demo-infra-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const output = join(directory, `${name}.json`);
+  await run('az', ['bicep', 'build', '--file', resolve('infra', `${name}.bicep`), '--outfile', output]);
+  return JSON.parse(await readFile(output, 'utf8'));
+}
+
+test('compiled minimal foundation has reviewed SQL sizing, narrow networking and no unrelated services', async t => {
+  const template = await compile(t, 'demo');
+  const resources = template.resources;
+  assert.deepEqual(resources.map(resource => resource.type).sort(), [
+    'Microsoft.App/managedEnvironments',
+    'Microsoft.Authorization/roleAssignments',
+    'Microsoft.ContainerRegistry/registries',
+    'Microsoft.ManagedIdentity/userAssignedIdentities',
+    'Microsoft.Network/virtualNetworks',
+    'Microsoft.Sql/servers',
+    'Microsoft.Sql/servers/databases',
+    'Microsoft.Sql/servers/virtualNetworkRules',
+  ].sort());
+  for (const field of ['sqlBillingMode', 'sqlSku', 'sqlMaxSizeBytes', 'sqlBackupRedundancy', 'location', 'tenantId', 'deploymentId', 'tags']) {
+    assert.equal(Object.hasOwn(template.parameters[field], 'defaultValue'), false, `${field} must be explicit`);
+  }
+  const database = resources.find(resource => resource.type === 'Microsoft.Sql/servers/databases');
+  assert.deepEqual(template.parameters.sqlBillingMode.allowedValues, ['free-paused', 'paid-reviewed']);
+  assert.equal(template.variables.freeSql, "[equals(parameters('sqlBillingMode'), 'free-paused')]");
+  assert.deepEqual(template.variables.freeSqlSku, { name: 'GP_S_Gen5_2', tier: 'GeneralPurpose', family: 'Gen5', capacity: 2 });
+  assert.equal(database.sku, "[if(variables('freeSql'), variables('freeSqlSku'), parameters('sqlSku'))]");
+  assert.match(database.properties, /useFreeLimit.*variables\('freeSql'\)/);
+  assert.match(database.properties, /maxSizeBytes.*34359738368.*sqlMaxSizeBytes/);
+  assert.match(database.properties, /requestedBackupStorageRedundancy.*Local.*sqlBackupRedundancy/);
+  assert.match(database.properties, /if\(variables\('freeSql'\).*freeLimitExhaustionBehavior.*AutoPause.*autoPauseDelay.*60.*minCapacity.*0\.5/);
+  assert.doesNotMatch(database.properties, /BillOverUsage|BillForUsage/);
+  const sql = resources.find(resource => resource.type === 'Microsoft.Sql/servers');
+  assert.equal(sql.properties.publicNetworkAccess, 'Enabled');
+  assert.equal(sql.properties.minimalTlsVersion, '1.2');
+  assert.equal(sql.properties.administrators.azureADOnlyAuthentication, true);
+  assert.equal(Object.hasOwn(sql.properties, 'administratorLoginPassword'), false);
+  const network = resources.find(resource => resource.type === 'Microsoft.Network/virtualNetworks');
+  assert.equal(network.properties.subnets.length, 1);
+  assert.deepEqual(network.properties.subnets[0].properties.serviceEndpoints.map(endpoint => endpoint.service), ['Microsoft.Sql']);
+  assert.equal(network.properties.subnets[0].properties.addressPrefix, '10.43.0.0/27');
+  const rule = resources.find(resource => resource.type === 'Microsoft.Sql/servers/virtualNetworkRules');
+  assert.equal(rule.properties.ignoreMissingVnetServiceEndpoint, false);
+  const registry = resources.find(resource => resource.type === 'Microsoft.ContainerRegistry/registries');
+  assert.equal(registry.sku.name, 'Basic', 'Cost review must reflect the actual fixed-charge registry');
+  assert.match(registry.name, /sqlappsdemo/);
+  for (const key of ['sql-apps-deployment', 'sql-apps-application', 'sql-apps-profile']) {
+    assert.ok(JSON.stringify(template.variables.ownedTags).includes(key), `Missing ownership tag ${key}`);
+  }
+  assert.equal(registry.properties.adminUserEnabled, false);
+  assert.equal(registry.properties.policies.azureADAuthenticationAsArmPolicy.status, 'enabled');
+  const environment = resources.find(resource => resource.type === 'Microsoft.App/managedEnvironments');
+  assert.deepEqual(environment.properties.workloadProfiles, [{ name: 'Consumption', workloadProfileType: 'Consumption' }]);
+  assert.equal(environment.properties.appLogsConfiguration.destination, 'none');
+  for (const key of ['runtimeIdentityResourceId', 'runtimeIdentityClientId', 'runtimeIdentityPrincipalId', 'sqlServerId', 'databaseId', 'subnetId', 'registryId']) {
+    assert.ok(template.outputs[key], `Missing exact tracked resource output ${key}`);
+  }
+  assert.doesNotMatch(JSON.stringify(template), /0\.0\.0\.0|listCredentials|Microsoft\.Graph|Microsoft\.Web|Microsoft\.Storage|privateEndpoints/);
+});
+
+test('compiled runtime exposes only HTTPS gateway with internal DAB and one scale-to-zero replica', async t => {
+  const template = await compile(t, 'demo-runtime');
+  assert.equal(template.resources.length, 1);
+  const app = template.resources[0];
+  assert.equal(app.type, 'Microsoft.App/containerApps');
+  assert.equal(app.properties.workloadProfileName, 'Consumption');
+  assert.equal(app.properties.configuration.ingress.external, true);
+  assert.equal(app.properties.configuration.ingress.allowInsecure, false);
+  assert.equal(app.properties.configuration.ingress.targetPort, 8080);
+  assert.equal(Object.hasOwn(app.properties.configuration.ingress, 'additionalPortMappings'), false);
+  assert.equal(app.properties.configuration.activeRevisionsMode, 'Single');
+  assert.equal(app.properties.template.scale.minReplicas, 0);
+  assert.equal(app.properties.template.scale.maxReplicas, 1);
+  assert.deepEqual(app.properties.template.containers.map(container => container.name), ['gateway', 'data']);
+  const gateway = app.properties.template.containers[0];
+  const data = app.properties.template.containers[1];
+  const costs = reviewDemoCost(JSON.parse(await readFile('azure-demo-cost.example.json', 'utf8')));
+  for (const selected of costs.compute.containers) {
+    const container = app.properties.template.containers.find(container => container.name === selected.name);
+    assert.ok(container, `Missing reviewed container ${selected.name}`);
+    assert.equal(container.resources.cpu, `[json('${selected.vCpu}')]`);
+    assert.equal(container.resources.memory, `${selected.memoryGiB}Gi`);
+  }
+  const memory = [gateway, data].reduce((sum, container) => sum + Number(container.resources.memory.replace('Gi', '')), 0);
+  assert.equal(memory, costs.compute.resources.memoryGiB);
+  assert.equal(app.properties.template.scale.minReplicas, costs.compute.minReplicas);
+  assert.equal(app.properties.template.scale.maxReplicas, costs.compute.maxReplicas);
+  assert.equal(gateway.image, "[parameters('gatewayImage')]");
+  assert.equal(data.image, "[parameters('dabImage')]");
+  assert.equal(gateway.env.find(variable => variable.name === 'SQL_APPS_PROFILE').value, 'public-demo');
+  for (const key of ['sql-apps-deployment', 'sql-apps-application', 'sql-apps-profile']) {
+    assert.ok(JSON.stringify(template.variables.ownedTags).includes(key), `Missing runtime ownership tag ${key}`);
+  }
+  assert.equal(gateway.env.find(variable => variable.name === 'DAB_URL').value, 'http://127.0.0.1:5000');
+  const connection = data.env.find(variable => variable.name === 'SQL_CONNECTION_STRING').value;
+  assert.match(connection, /Active Directory Managed Identity/);
+  assert.match(connection, /clientId/);
+  assert.match(connection, /TrustServerCertificate=False/);
+  assert.doesNotMatch(connection, /Password=/i);
+  assert.deepEqual(data.env.filter(variable => /URLS|PORT/.test(variable.name)), [
+    { name: 'ASPNETCORE_URLS', value: 'http://127.0.0.1:5000' },
+  ]);
+  assert.ok(gateway.probes.some(probe => probe.type === 'Readiness' && probe.httpGet.path === '/health/ready'));
+  assert.doesNotMatch(JSON.stringify(template), /passwordSecretRef|Simulator|Microsoft\.Graph|functionsImage/);
+});

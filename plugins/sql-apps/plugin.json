@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "sql-apps",
+  "version": "0.1.0",
+  "description": "Start, inspect, troubleshoot and validate the subscription-free SQL Apps local application.",
+  "author": { "name": "Microsoft SQL team (mssql)", "url": "https://github.com/microsoft" },
+  "homepage": "https://github.com/microsoft/sql-apps",
+  "repository": "https://github.com/microsoft/sql-apps",
+  "license": "MIT",
+  "keywords": ["azure", "local-development", "azure-sql", "data-api-builder", "zero-dimes"]
+}

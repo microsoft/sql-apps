@@ -1,0 +1,51 @@
+# Operating and releasing authenticated applications
+
+This checklist is for maintainers and operators of the full authenticated Azure deployment, not the local getting-started path.
+
+## Diagnostics
+
+Container Apps sends service logs to Log Analytics. Functions is configured with Application Insights. Gateway logs redact authorization/cookies and report request IDs and error types, not raw downstream exception messages.
+
+Use Azure CLI for container revisions, logs, identities, role assignments, and resource status. `status` checks the gateway resource and data-service readiness; it is not an authenticated storage/function smoke test.
+
+## Failure and retry
+
+- A failed CLI command exits nonzero and does not select another platform.
+- The command runner waits for process output streams to close before returning, so deployment JSON and error diagnostics are not truncated when the child exits.
+- Infrastructure/schema/runtime stages are persisted locally. Retry repeats declarative stages rather than assuming prior state is current.
+- Schema failure prevents new gateway/data rollout; existing runtime resources are not intentionally deleted.
+- Local lock files are removed on ordinary completion/failure. After an abrupt process termination, verify no deployment is running before removing that environment's exact `.lock` file.
+- ARM changes, SQL publishing, and Graph assignments are not a single transaction. Inspect recorded stages and Azure state after failure.
+- Runtime rollback does not reverse schema changes. Use expand/contract changes and operator-reviewed recovery.
+- Do not run deployment from two unrelated machines simultaneously. CI provides concurrency grouping; a distributed lock service is not implemented.
+
+## Durable data
+
+SQL owns application data and row-level security. Blob owns user files. Files are addressed by tenant/object-ID/name; deleting the application does not require deleting its data.
+
+The SQL administrator intentionally has privileged schema access. The DAB identity receives only table CRUD, and SQL block/filter predicates protect ownership. Gateway and function identities are separate.
+
+Blob shared keys and anonymous access are disabled. File storage uses managed identity. The Functions host receives Blob/Queue/Table roles on the account; gateway permission is scoped to the file container.
+
+Key Vault is provisioned with private access, RBAC, soft delete, and purge protection. `secret-set` writes a value supplied through `SQL_APPS_SECRET_VALUE` without persisting it locally or printing it. The operator needs Key Vault data-plane write permissions and private connectivity; provisioning permissions alone do not grant access.
+
+The function identity has Key Vault Secrets User. Function implementations can import `functionSecrets` from `functions/src/secrets.ts` using `KEY_VAULT_URL` and `FUNCTIONS_IDENTITY_CLIENT_ID`. The example echo function does not read or return secrets. Never expose this helper through a generic client-controlled secret lookup endpoint.
+
+Secret values, like SqlPackage access tokens, pass through the tools' normal process arguments on a trusted deployment host. Do not run deployment/secret operations on an untrusted shared host.
+
+## Production release gates
+
+Before production:
+
+- Run the deployed two-user acceptance suite in [deployment reference](../reference/deployment.md).
+- Verify network isolation and DNS from both trusted and untrusted hosts.
+- Pin every deployed image to an immutable digest, including validated base image provenance.
+- Exercise multiple replicas, temporary SQL outage, and dependency recovery.
+- Perform and document a SQL restore drill and Blob retention recovery.
+- Set SQL backup retention according to policy; do not treat default retention as an approved recovery plan.
+- Configure alert rules and cost budgets for the selected environment.
+- Verify tenant consent restrictions and least-privilege directory/resource deployment permissions.
+- Exercise CI SQL authentication/private networking; hosted GitHub runners do not inherently reach private endpoints.
+- Record regional quota/SKU availability and cost estimates.
+
+No automatic resource-deletion command is provided. Resource deletion, database restore, retention changes, and destructive migrations require explicit operator review.

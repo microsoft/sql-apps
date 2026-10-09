@@ -1,0 +1,46 @@
+name: Deploy Azure-native application
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: environment
+        required: true
+        description: Approved environment with private runner and Azure configuration
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: sql-apps-${{ inputs.environment }}
+  cancel-in-progress: false
+jobs:
+  deploy:
+    environment: ${{ inputs.environment }}
+    runs-on: [self-hosted, sql-apps-private]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - run: npm ci
+      - run: npm test
+      - run: npm run sql:tools
+      - name: Write approved nonsecret deployment configuration
+        shell: pwsh
+        env:
+          DEPLOYMENT_CONFIG: ${{ vars.SQL_APPS_CONFIG }}
+        run: |
+          if (-not $env:DEPLOYMENT_CONFIG) { throw 'Missing SQL_APPS_CONFIG environment variable' }
+          $env:DEPLOYMENT_CONFIG | ConvertFrom-Json | ConvertTo-Json -Depth 20 | Set-Content sql-apps.json
+      - run: npm run azure -- validate
+      - run: npm run azure -- plan
+      - run: npm run azure -- deploy
+      - run: npm run azure -- status
