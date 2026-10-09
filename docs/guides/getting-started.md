@@ -73,7 +73,7 @@ Replace the name with the actual container. This inspects safe state; it does no
 
 ## 4. Get SQL preview access
 
-The Azure SQL Database container is in **private preview**. For a first image download, follow its [documentation and signup instructions](https://microsoft.github.io/azure-sql-database-container/) to request access. Complete registry sign-in in your own terminal with the provided pull credentials. Do not put them in chat, source files or screenshots.
+The Azure SQL Database container is in **private preview**. [Request access](https://aka.ms/azuresqldb-container-signup) and follow the [container documentation](https://aka.ms/azuresqldb-container) for a first image download. Complete registry sign-in in your own terminal with the provided pull credentials. Do not put them in chat, source files or screenshots.
 
 If a usable image is cached, you do not need to download it again just to refresh it. Startup verifies the actual SQL engine. If preview access is not available yet, keep your completed setup and resume when it is; do not substitute a different database.
 
