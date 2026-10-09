@@ -2,7 +2,8 @@ targetScope = 'resourceGroup'
 
 @minLength(3)
 @maxLength(20)
-param name string
+@description('Deployment name used in generated hostnames. The SQL Apps starter uses sqlapps; changing an existing name selects different resources.')
+param name string = 'sqlapps'
 @allowed(['dev', 'test', 'prod'])
 param environment string
 param location string = resourceGroup().location

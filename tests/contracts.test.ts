@@ -2,6 +2,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
+test('starter deployment names use sqlapps for generated URL prefixes', async () => {
+  const config = JSON.parse(await readFile('sql-apps.example.json', 'utf8'));
+  assert.equal(config.name, 'sqlapps');
+  const template = await readFile('infra/main.bicep', 'utf8');
+  assert.match(template, /param name string = 'sqlapps'/);
+  assert.ok(template.includes("var prefix = '${name}-${environment}'"));
+  assert.ok(template.includes("output gatewayName string = '${prefix}-gateway'"));
+  assert.ok(template.includes("var functionName = '${prefix}-fn-${suffix}'"));
+});
+
 test('DAB requires AzureAD, authenticated permissions, ownership and immutable owner fields', async () => {
   const config = JSON.parse(await readFile('dab/dab-config.json', 'utf8'));
   assert.equal(config['data-source']['connection-string'], "@env('SQL_CONNECTION_STRING')");

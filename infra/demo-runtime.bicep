@@ -1,5 +1,6 @@
 targetScope = 'resourceGroup'
 
+@description('Explicit Container App name and hostname prefix. Use a sqlapps-prefixed name for the SQL Apps starter; this must match the reviewed deployment target.')
 param applicationName string
 param selectedApplication string
 param deploymentId string

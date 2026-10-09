@@ -2,7 +2,8 @@ targetScope = 'resourceGroup'
 
 @minLength(3)
 @maxLength(16)
-param name string
+@description('Deployment prefix. The SQL Apps starter uses sqlapps; changing an existing prefix selects different resources.')
+param name string = 'sqlapps'
 param selectedApplication string
 param deploymentId string
 param location string

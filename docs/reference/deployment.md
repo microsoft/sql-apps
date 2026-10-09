@@ -47,6 +47,10 @@ ACR tasks require suitable Azure permissions and may have region/subscription re
 
 Copy [the example](../../sql-apps.example.json) to `sql-apps.json`. Fill in the target tenant/subscription, SQL administrator, resource group/region, and images.
 
+The starter uses `"name": "sqlapps"`. With environment `dev`, the gateway's Azure-generated hostname starts with `sqlapps-dev-gateway.`; the Functions hostname starts with `sqlapps-dev-fn-`. Azure supplies the remaining domain/suffix, so use the actual deployment outputs rather than constructing a URL yourself. Image repository names can remain `sql-apps`; they do not determine the browser URL.
+
+An existing configuration with `name` set to `rayfin` still selects Rayfin-named resources. Review it before deployment. Changing the name creates/selects a different resource set and does not rename or migrate an existing app, database or URL. Preserve existing data and review Entra redirects and dependent endpoints before a separate migration.
+
 Create a dedicated app registration once:
 
 ```powershell

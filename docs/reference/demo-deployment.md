@@ -50,6 +50,8 @@ The existing full-foundation commands remain separate. Before future demo provis
 
 ## Minimal template preparation
 
+The foundation's default deployment prefix is `sqlapps`. The runtime requires an explicit `applicationName`, which determines the browser hostname prefix; use a reviewed `sqlapps`-prefixed name for the starter. Existing resource names and URLs are not changed automatically.
+
 The separate [foundation template](../../infra/demo.bicep) prepares a Container Apps Consumption environment, one runtime managed identity, Basic Azure Container Registry, a selected VNet/subnet with a SQL service endpoint, Azure SQL server/database and narrow subnet rule. The [runtime template](../../infra/demo-runtime.bicep) subsequently deploys only the selected gateway and internal DAB sidecar. This split allows infrastructure, source publication and SQL preparation to remain separately approved stages.
 
 - **SQL billing is explicit:** require `sqlBillingMode` with `free-paused` or `paid-reviewed`. Free-paused enrolls a new serverless database in the free tier with `AutoPause`, fixed 2-vCore maximum/0.5 minimum, 32 GiB size, local backup redundancy and 60-minute idle auto-pause. Paid-reviewed uses the required reviewed SKU/size/backup parameters. Both retain those parameter fields; use the matching cost report fragment. No paid continuation, existing-database conversion or paid fallback is authorized. Verify free eligibility/region/slots; unsupported configurations must fail rather than change tiers.

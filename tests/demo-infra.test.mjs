@@ -17,6 +17,7 @@ async function compile(t, name) {
 
 test('compiled minimal foundation has reviewed SQL sizing, narrow networking and no unrelated services', async t => {
   const template = await compile(t, 'demo');
+  assert.equal(template.parameters.name.defaultValue, 'sqlapps');
   const resources = template.resources;
   assert.deepEqual(resources.map(resource => resource.type).sort(), [
     'Microsoft.App/managedEnvironments',
