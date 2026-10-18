@@ -16,7 +16,7 @@ const execute = promisify(execFile);
 const cli = resolve('scripts/local-consent.mjs');
 
 async function fixture(t, selected = false) {
-  const home = await mkdtemp(join(tmpdir(), 'sql-apps-consent-'));
+  const home = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-consent-')));
   t.after(() => rm(home, { recursive: true, force: true }));
   const files = {
     'package.json': JSON.stringify({ name: 'sql-apps', scripts: { build: 'node scripts/build-provenance.mjs' } }),
