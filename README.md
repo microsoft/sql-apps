@@ -15,6 +15,40 @@ SQL Apps gives you a working application foundation and guides for creating your
 
 These are ideas for your own application, not prebuilt templates. SQL Apps includes a separate [Todo reference app](examples/todo/README.md) if you want to try a concrete example first.
 
+## Install the Copilot plugin from the repository marketplace
+
+With the GitHub Copilot CLI installed and signed in, register this repository's
+marketplace and install SQL Apps:
+
+```powershell
+copilot plugin marketplace add microsoft/sql-apps
+copilot plugin install sql-apps@sql-apps-skills
+copilot plugin list
+```
+
+Inside a Copilot session, the equivalent commands are
+`/plugin marketplace add microsoft/sql-apps`, then
+`/plugin install sql-apps@sql-apps-skills`. Restart the Copilot App or start a
+fresh session and confirm that `sql-apps` is enabled under **Customize -> Plugins**.
+This installs six skills and their launcher, not the application runtime.
+The repository marketplace is available independently of the pending default
+Copilot marketplace listing.
+
+To create your first project, use an existing foundation checkout or clone one,
+then select it in the terminal used to launch Copilot:
+
+```powershell
+git clone https://github.com/microsoft/sql-apps.git "C:\git\sql-apps"
+$env:SQL_APPS_HOME = "C:\git\sql-apps"
+copilot
+```
+
+Generated applications also need `@microsoft/sql-apps@0.2.3` from your configured
+npm feed. Installing the plugin does not make that package available; if the feed
+cannot resolve it, application restoration is blocked. See the
+[plugin installation guide](docs/reference/copilot-plugin.md) for checkout-based
+installation, cloud companion plugins, verification and removal.
+
 ## Create a project
 
 Keep this foundation checkout as the SQL Apps tool source. Create each application
