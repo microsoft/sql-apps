@@ -1,12 +1,30 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, mkdtemp, rm, cp } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { pathToFileURL } from 'node:url';
 import { tmpdir } from 'node:os';
 import { initialProgress } from '../src/creation-progress.mjs';
 import { readCreationJson, writeCreationJson } from '../src/creation-session.mjs';
 import { startCreationProcess } from '../scripts/creation.mjs';
+
+test('cold creation and design evidence helpers load without restored packages or build output', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'sql-apps-cold-creation-'));
+  t.after(() => rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
+  for (const directory of ['src', 'scripts']) {
+    await cp(resolve(directory), join(root, directory), { recursive: true });
+  }
+  const module = pathToFileURL(join(root, 'scripts', 'creation.mjs')).href;
+  const check = pathToFileURL(join(root, 'scripts', 'check-application.mjs')).href;
+  const { stdout } = await promisify(execFile)(process.execPath, ['--input-type=module', '-e',
+    `await import(${JSON.stringify(module)}); const { inspectDesignAcceptance } = await import(${JSON.stringify(check)}); ` +
+      `console.log(JSON.stringify(await inspectDesignAcceptance(process.cwd())));`],
+  { cwd: root });
+  assert.equal(JSON.parse(stdout).accepted, false);
+});
 
 async function freeOrigin() {
   const server = createServer();

@@ -74,6 +74,11 @@ export async function resolveHome(options = {}) {
 
 async function resolveToolHome(options = {}) {
   const environment = options.environment ?? process.env;
+  if (environment.SQL_APPS_HOME !== undefined) {
+    const home = await validateHome(environment.SQL_APPS_HOME);
+    const pkg = JSON.parse(await readFile(join(home, 'package.json'), 'utf8'));
+    if (pkg.name === 'sql-apps') return home;
+  }
   const userHome = resolve(options.userHome ?? homedir());
   const configuredBinding = join(environment.COPILOT_HOME || join(userHome, '.copilot'), 'sql-apps-local.json');
   let binding;

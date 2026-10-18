@@ -1,6 +1,29 @@
 # Install and use the Copilot plugin
 
-The SQL Apps plugin adds project-specific skills to GitHub Copilot. It does not require publication, a Git push, an Azure subscription, or another platform plugin. Copilot itself still requires its normal account/access and network connectivity; the local application does not call cloud APIs after prerequisite downloads.
+The SQL Apps plugin adds project-specific skills to GitHub Copilot. Installing its skills and launcher does not require npm publication, an Azure subscription, or another platform plugin. Copilot itself still requires its normal account/access and network connectivity; the local application does not call cloud APIs after prerequisite downloads.
+
+## Install from GitHub
+
+Register the repository marketplace and install the dedicated plugin:
+
+```powershell
+copilot plugin marketplace add microsoft/sql-apps
+copilot plugin install sql-apps@sql-apps-skills
+```
+
+This installs the manifest, six skills and launcher, not the application runtime or project factory. A listing in the default Copilot marketplace requires separate upstream review; registering this repository does not create that listing.
+
+First-project creation still needs a foundation checkout. Select it explicitly in the terminal used to launch Copilot, without replacing a remote marketplace registration with the local installer:
+
+```powershell
+git clone https://github.com/microsoft/sql-apps.git "C:\git\sql-apps"
+$env:SQL_APPS_HOME = "C:\git\sql-apps"
+copilot
+```
+
+Use an existing foundation checkout instead of cloning again when appropriate. `SQL_APPS_HOME` takes precedence for project creation when it names the foundation; a generated application is not a project factory. The existing local installer below remains an alternative for checkout-based development and creates a persistent foundation binding.
+
+Generated applications restore exactly `@microsoft/sql-apps@0.2.3` from the configured npm feed. Plugin installation does not publish that package or prove it is available. A missing package blocks application restoration; a local tarball or foundation build is not clean-feed release acceptance. See the [release prerequisites](progressive-creation.md).
 
 ## Install from your checkout
 

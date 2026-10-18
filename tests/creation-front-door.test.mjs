@@ -64,6 +64,7 @@ test('one origin serves pre-install status, verified app, proxy and isolated fai
   const root = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-front-door-')));
   let door, upstream, releaseSlowCheck, slowCheckStarted;
   const slowCheckStartedPromise = new Promise(done => { slowCheckStarted = done; });
+  const slowCheckReleased = new Promise(done => { releaseSlowCheck = done; });
   t.after(async () => {
     releaseSlowCheck?.();
     if (door) await door.close();
@@ -95,7 +96,8 @@ test('one origin serves pre-install status, verified app, proxy and isolated fai
     } else if (request.url === '/api/Reports') {
       response.writeHead(503).end('{"error":"Fixture report unavailable"}');
     } else if (request.url === '/api/Slow') {
-      await new Promise(done => { releaseSlowCheck = done; slowCheckStarted(); });
+      slowCheckStarted();
+      await slowCheckReleased;
       response.end('{"value":[{"ready":1}]}');
     } else if (request.url === '/api/Fast') {
       response.end('{"value":[{"ready":1}]}');
@@ -121,6 +123,8 @@ test('one origin serves pre-install status, verified app, proxy and isolated fai
   const usable = await eventually(publicOrigin, state => state.usable);
   assert.equal(usable.ready, false);
   assert.deepEqual(usable.blockers, ['browser-workflow', 'design-review']);
+  const completed = await (await fetch(`${publicOrigin}/__sql_apps/check`)).json();
+  assert.equal(completed.usable, true);
   await new Promise(done => setTimeout(done, 225));
   const cached = await (await fetch(`${publicOrigin}/__sql_apps/progress`)).json();
   assert.equal(cached.usable, false, 'an idle cached observation must not claim current health');
@@ -165,7 +169,8 @@ test('one origin serves pre-install status, verified app, proxy and isolated fai
   valid = false;
   await eventually(publicOrigin, state => state.capabilities.some(item => item.state === 'failed'));
   healthy = false;
-  const dataAccessFailure = await eventually(publicOrigin, state => state.diagnostic === 'DATA_ACCESS_NOT_READY');
+  const dataAccessFailure = await eventually(publicOrigin, state => state.diagnostic === 'DATA_ACCESS_NOT_READY' &&
+    state.capabilities.find(item => item.id === 'data').state === 'verified');
   assert.equal(dataAccessFailure.capabilities.find(item => item.id === 'data').state, 'verified');
   assert.match(await (await fetch(publicOrigin)).text(), /Bringing your application to life/);
   healthy = true; valid = true;

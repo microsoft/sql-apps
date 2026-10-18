@@ -72,6 +72,12 @@ test('tooling:pack uses a POSIX-portable package path', async () => {
   );
 });
 
+test('locked tooling dependencies exclude the unpatched sprintf-js advisory', async () => {
+  const lock = JSON.parse(await readFile(join(root, 'package-lock.json'), 'utf8'));
+  assert.equal(Object.keys(lock.packages).some(path => /(?:^|\/)node_modules\/sprintf-js$/.test(path)), false,
+    'Use the upstream tedious fix instead of shipping CVE-2026-97058');
+});
+
 test('stages publishable package metadata with synchronized exact runtime dependencies', async () => {
   const [pkg, source, rootPackage] = await Promise.all([
     readFile(join(staged, 'package.json'), 'utf8').then(JSON.parse),
