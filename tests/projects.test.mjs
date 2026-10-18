@@ -243,7 +243,7 @@ test('a fresh generated project installs its exact tooling version with npm ci f
 
 test('create scaffolds an independent named project and records it as active', async t => {
   const source = await sourceFixture(t);
-  const userHome = await mkdtemp(join(tmpdir(), 'sql-apps-project-user-'));
+  const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-project-user-')));
   t.after(() => rm(userHome, { recursive: true, force: true }));
   const created = await projects.createProject(source, 'To Do', { userHome, initializeGit: false });
   assert.equal(created.name, 'To Do');
