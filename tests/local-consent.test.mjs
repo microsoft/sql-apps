@@ -16,7 +16,7 @@ const execute = promisify(execFile);
 const cli = resolve('scripts/local-consent.mjs');
 
 async function fixture(t, selected = false) {
-  const home = await mkdtemp(join(tmpdir(), 'sql-apps-consent-'));
+  const home = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-consent-')));
   t.after(() => rm(home, { recursive: true, force: true }));
   const files = {
     'package.json': JSON.stringify({ name: 'sql-apps', scripts: { build: 'node scripts/build-provenance.mjs' } }),
@@ -103,19 +103,6 @@ test('Express instance changes are separate, target-bound one-operation grants, 
   await grantConsent(home, authPlan, { once: true });
   await assertConsent(home, authRequest);
   await assert.rejects(assertConsent(home, authRequest), /permission/);
-});
-
-test('endpoint CLI initializes its approved workspace without interpreting the port block as a container', async t => {
-  const home = await realpath(await fixture(t));
-  const { proposeWorkspace } = await import('../src/workspace.mjs');
-  const proposal = await proposeWorkspace(home, undefined, { includeSql: false });
-  const workspace = String((proposal.conflicts.length ? proposal.alternative : proposal.descriptor).basePort);
-  const sqlTarget = { version: 1, provider: 'express', instance: 'SQLEXPRESS', server: '127.0.0.1', port: 1433, database: 'development' };
-  const bundle = await planBundle(home, { profile: 'role-based-data', workspace, sqlTarget });
-  await grantBundle(home, { profile: 'role-based-data', workspace, sqlTarget, approval: bundle.approval });
-  await execute(process.execPath, [resolve('dist', 'src', 'local-cli.js'), 'workspace-init', workspace],
-    { cwd: home, env: { ...process.env, SQL_APPS_PROJECT_HOME: home } });
-  assert.equal(JSON.parse(await readFile(join(home, '.sql-apps', 'workspace.json'), 'utf8')).basePort, Number(workspace));
 });
 
 test('composite startup lists every missing scope before any mutation', async t => {

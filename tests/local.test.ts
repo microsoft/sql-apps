@@ -1,10 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { cp, readFile, realpath, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { localCommand, localConnection, localDabConfig, localPrincipal, verifyLocal, startLocalSql, sqlImage, dabImage } from '../src/local.js';
 import { run, type Run } from '../src/process.js';
 import { startLocalApplication } from '../src/local-startup.js';
-import { runtimeFor, type WorkspaceRuntime } from '../src/workspace.mjs';
+import { proposeWorkspace, runtimeFor, type WorkspaceRuntime } from '../src/workspace.mjs';
+import { planBundle, grantBundle } from '../src/local-consent.mjs';
 import { localWorkspaceFixture } from './local-workspace-fixture.js';
 
 function sqlOwnership(runtime: WorkspaceRuntime, args: readonly string[]): string | undefined {
@@ -60,6 +62,34 @@ test('actual application CLI rejects invalid input during preflight before start
     env: { NODE_ENV: 'development' },
   }), error => error instanceof Error && /failed \(1\)/.test(error.message) &&
     /Invalid SQL container name/.test(error.message) && !/Starting SQL container/.test(error.message));
+});
+
+test('endpoint CLI initializes its approved workspace without interpreting the port block as a container', async t => {
+  const source = process.cwd();
+  await localWorkspaceFixture(t);
+  const home = await realpath(process.cwd());
+  for (const directory of ['src', 'scripts', 'sql', 'dab', '.config']) {
+    await cp(join(source, directory), join(home, directory), {
+      recursive: true,
+      filter: path => !/(?:^|[\\/])(?:bin|obj|node_modules)(?:[\\/]|$)/.test(path),
+    });
+  }
+  for (const file of ['package.json', 'package-lock.json', 'tsconfig.json', 'tsconfig.runtime.json']) {
+    await cp(join(source, file), join(home, file));
+  }
+  await writeFile(join(home, 'role-based-data.json'),
+    '{"profile":"role-based-data","requiredRole":"AppUser","readinessPath":"/api/Ready"}');
+  const proposal = await proposeWorkspace(home, undefined, { includeSql: false });
+  const selection = proposal.conflicts?.length ? proposal.alternative : proposal.descriptor;
+  assert.ok(selection, 'A free workspace port block must be available');
+  const workspace = String(selection.basePort);
+  const sqlTarget = { version: 1, provider: 'express', instance: 'SQLEXPRESS', server: '127.0.0.1',
+    port: 1433, database: 'development' } as const;
+  const bundle = await planBundle(home, { profile: 'role-based-data', workspace, sqlTarget });
+  await grantBundle(home, { profile: 'role-based-data', workspace, sqlTarget, approval: bundle.approval });
+  await run(process.execPath, [resolve(source, 'dist', 'src', 'local-cli.js'), 'workspace-init', workspace],
+    { env: { SQL_APPS_PROJECT_HOME: home } });
+  assert.equal(JSON.parse(await readFile(join(home, '.sql-apps', 'workspace.json'), 'utf8')).basePort, Number(workspace));
 });
 
 test('local workflow fails closed on SQL Server instead of Azure SQL', async () => {

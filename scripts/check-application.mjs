@@ -1,7 +1,6 @@
 import { readFile, readdir, lstat } from 'node:fs/promises';
 import { join, resolve, extname, relative, dirname, basename } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import ts from 'typescript';
 
 const sampleMarkers = [
   /\b(?:TodoExampleClient|TodoOwnerPredicate|TodoOwnerPolicy)\b/,
@@ -242,7 +241,8 @@ async function customizedUi(root) {
       new Set(['app.js', 'auth/redirect.js']));
 }
 
-function exampleDependencies(path, content) {
+async function exampleDependencies(path, content) {
+  const { default: ts } = await import('typescript');
   const source = ts.createSourceFile(path, content, ts.ScriptTarget.Latest, true);
   const dependencies = new Set();
   const scopes = [new Map()];
@@ -316,7 +316,7 @@ export async function checkApplication(root = process.cwd(), model) {
       inspected++;
       const content = await readFile(path, 'utf8');
       if (tests) {
-        for (const dependency of exampleDependencies(path, content)) {
+        for (const dependency of await exampleDependencies(path, content)) {
           violations.push(`Unselected example dependency in ${path}: ${dependency}`);
         }
       } else if (sampleMarkers.some(marker => marker.test(content))) violations.push(path);

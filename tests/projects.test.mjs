@@ -243,7 +243,7 @@ test('a fresh generated project installs its exact tooling version with npm ci f
 
 test('create scaffolds an independent named project and records it as active', async t => {
   const source = await sourceFixture(t);
-  const userHome = await mkdtemp(join(tmpdir(), 'sql-apps-project-user-'));
+  const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-project-user-')));
   t.after(() => rm(userHome, { recursive: true, force: true }));
   const created = await projects.createProject(source, 'To Do', { userHome, initializeGit: false });
   assert.equal(created.name, 'To Do');
@@ -410,4 +410,17 @@ test('plugin project dispatch uses the bound foundation as scaffold source witho
     projectMain: async (args, home) => calls.push({ args, home }),
   });
   assert.deepEqual(calls, [{ args: ['create', 'A New App'], home: source }]);
+});
+
+test('marketplace project dispatch accepts an explicit foundation without a local-plugin binding', async t => {
+  const source = await sourceFixture(t);
+  const userHome = await mkdtemp(join(tmpdir(), 'sql-apps-marketplace-project-'));
+  t.after(() => rm(userHome, { recursive: true, force: true }));
+  const calls = [];
+  await plugin.dispatchProjects(['create-plan', 'A New App'], {
+    userHome,
+    environment: { SQL_APPS_HOME: source },
+    projectMain: async (args, home) => calls.push({ args, home }),
+  });
+  assert.deepEqual(calls, [{ args: ['create-plan', 'A New App'], home: source }]);
 });
