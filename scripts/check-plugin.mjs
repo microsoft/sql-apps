@@ -14,9 +14,11 @@ export async function checkPlugin() {
   assert.equal(manifest.name, 'sql-apps');
   assert.equal(manifest.version, '0.2.3');
   assert.ok(manifest.description?.length);
-  const allowed = new Set(['$schema', 'name', 'version', 'description', 'author', 'homepage', 'repository', 'license', 'keywords']);
+  const allowed = new Set(['$schema', 'name', 'version', 'description', 'author', 'homepage', 'repository', 'license', 'keywords', 'extensions']);
   assert.ok(Object.keys(manifest).every(key => allowed.has(key)), 'Manifest uses only Agent Plugins 1.0 metadata fields');
-  const { $schema, ...metadata } = manifest;
+  assert.deepEqual(Object.keys(manifest.extensions ?? {}), ['com.openai'], 'Only OpenAI presentation metadata is namespaced');
+  assert.ok(manifest.extensions['com.openai'].interface?.displayName, 'Codex presentation metadata is declared');
+  const { $schema, extensions, ...metadata } = manifest;
   assert.deepEqual(JSON.parse(await readFile(join(plugin, '.claude-plugin', 'plugin.json'), 'utf8')), metadata,
     'Claude metadata matches the portable manifest without portable schema fields');
   const gemini = JSON.parse(await readFile(join(plugin, 'gemini-extension.json'), 'utf8'));

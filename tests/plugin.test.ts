@@ -29,9 +29,18 @@ test('SQL Apps identity is consistent across packages, platform manifests and ma
   const repository = 'https://github.com/microsoft/sql-apps';
   const portable = JSON.parse(await readFile('plugins/sql-apps/plugin.json', 'utf8'));
   const native = JSON.parse(await readFile('plugins/sql-apps/.claude-plugin/plugin.json', 'utf8'));
-  const { $schema, ...metadata } = portable;
+  const { $schema, extensions, ...metadata } = portable;
   assert.equal($schema, 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json');
   assert.deepEqual(native, metadata, 'Native Claude metadata must match the portable package');
+  assert.deepEqual(Object.keys(extensions), ['com.openai'], 'Only OpenAI presentation metadata is namespaced');
+  assert.deepEqual(extensions['com.openai'].interface, {
+    displayName: 'SQL Apps',
+    shortDescription: 'Build an Azure SQL and Data API Builder application',
+    developerName: 'Microsoft SQL team (mssql)',
+    category: 'Coding',
+    capabilities: ['Read', 'Write'],
+    websiteURL: repository,
+  });
   for (const path of ['plugins/sql-apps/plugin.json', 'plugins/sql-apps/.claude-plugin/plugin.json']) {
     const manifest = JSON.parse(await readFile(path, 'utf8'));
     assert.equal(manifest.name, 'sql-apps', path);

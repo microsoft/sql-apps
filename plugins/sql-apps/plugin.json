@@ -7,5 +7,17 @@
   "homepage": "https://github.com/microsoft/sql-apps",
   "repository": "https://github.com/microsoft/sql-apps",
   "license": "MIT",
-  "keywords": ["azure-sql", "data-api-builder", "local-development", "application-foundation"]
+  "keywords": ["azure-sql", "data-api-builder", "local-development", "application-foundation"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "SQL Apps",
+        "shortDescription": "Build an Azure SQL and Data API Builder application",
+        "developerName": "Microsoft SQL team (mssql)",
+        "category": "Coding",
+        "capabilities": ["Read", "Write"],
+        "websiteURL": "https://github.com/microsoft/sql-apps"
+      }
+    }
+  }
 }

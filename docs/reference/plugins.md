@@ -11,7 +11,7 @@ publish npm tooling, grant setup permissions, or deploy resources.
 | --- | --- |
 | Claude Code | Native manifest in the canonical bundle; strict validation and isolated seven-skill discovery gated with CLI `2.1.296`. |
 | GitHub Copilot CLI | Portable manifest; isolated marketplace install and seven-skill discovery gated with CLI `1.0.98`. App discovery additionally needs verification in the user's actual profile. |
-| Codex and Cursor | Their documentation supports the portable Agent Plugins package. Catalogs target the same bundle; native loaders have not been verified here. |
+| Codex (OpenAI) and Cursor | Their documentation supports the portable Agent Plugins package. Codex presentation metadata lives under `extensions["com.openai"]` in [plugin.json](../../plugins/sql-apps/plugin.json), and [.agents/plugins/marketplace.json](../../.agents/plugins/marketplace.json) is the repo marketplace. Native loaders have not been verified here. |
 | Gemini CLI | Native extension manifest inside the same bundle; documented local-directory installation, but loader behavior has not been verified here. |
 | Other assistants | Use the provider-neutral project guides. This is not a claim of native plugin integration. |
 
