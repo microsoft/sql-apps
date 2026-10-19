@@ -5,7 +5,9 @@ description: "Use when a SQL Apps workflow fails or reads are slow, including lo
 
 # Diagnose SQL Apps
 
-Resolve `../../scripts/sql-apps.mjs` from this installed skill, run `home`, and confirm the application checkout with `workspace-check`. Use bounded, project-owned evidence.
+Resolve `../../scripts/sql-apps.mjs` relative to this skill, not cwd. Quote its
+absolute path; `home` selects the app containing input `docs/...`.
+Confirm it with `workspace-check`; use bounded, project-owned evidence.
 
 ## Diagnose the selected app
 

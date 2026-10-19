@@ -6,7 +6,8 @@ UI is required. Your assistant can drive it through the existing plugin; direct
 commands work without an assistant.
 
 The coordinator requires Node 22 or 24 but no application build. The installed
-plugin can bootstrap an unrestored project through its explicit foundation binding.
+plugin can bootstrap an unrestored project through an explicit foundation selection
+(`SQL_APPS_FOUNDATION_HOME` or the Copilot installer binding).
 If Node is missing, the assistant must first inspect the OS/CPU and obtain
 approval for an official compatible Node installer. A Node script cannot
 bootstrap its own missing runtime. Preserve existing version managers.

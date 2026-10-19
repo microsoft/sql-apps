@@ -8,7 +8,7 @@
       "name": "sql-apps",
       "source": {
         "source": "local",
-        "path": "./"
+        "path": "./plugins/sql-apps"
       },
       "policy": {
         "installation": "AVAILABLE",

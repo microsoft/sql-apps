@@ -5,7 +5,8 @@ description: "Use when checking SQL Apps prerequisites, selecting SQL/workspace,
 
 # Run SQL Apps locally
 
-Confirm the application via absolute installed `../../scripts/sql-apps.mjs home`.
+Resolve `../../scripts/sql-apps.mjs` relative to this skill, not cwd. Quote its
+absolute path; `home` selects the app containing input `docs/...`.
 Never run from plugin caches or silently rebind. Own lifecycle, not domain acceptance.
 
 ## Plan and approve
@@ -13,7 +14,8 @@ Never run from plugin caches or silently rebind. Own lifecycle, not domain accep
 Run `guide`, then `setup plan --json` for prerequisites, restore/build, workspace,
 terms and lifecycle. `role-based-data` (SQL, DAB, gateway) is the only profile.
 
-Foundation bootstrap only plans/restores. After restore, re-run `setup plan`
+`SQL_APPS_FOUNDATION_HOME` selects bootstrap tooling for planning/restore only.
+After restore, re-run `setup plan`
 through the pinned package and review changed approvals before continuing;
 never use a foundation runtime fallback.
 

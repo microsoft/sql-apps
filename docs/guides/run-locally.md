@@ -24,7 +24,8 @@ SQL Apps has one profile, [role-based-data](../reference/role-based-data.md): Az
 The [setup coordinator](../reference/setup.md) connects these steps without
 requiring a desktop executable. Run `npm run setup -- plan --json`
 before changing anything. Before tooling restore, use the installed plugin's
-`setup plan --json` instead. Bootstrap setup stops after restore; review the
+`setup plan --json` with `SQL_APPS_FOUNDATION_HOME` (or the Copilot installer
+binding) selecting the foundation. Bootstrap setup stops after restore; review the
 installed package's plan and changed approval scopes before continuing.
 After explicit approvals, `run` or `resume` rechecks
 the checkout, skips current dependencies/builds and launches the app.

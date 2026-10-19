@@ -5,14 +5,15 @@ description: "Use when defining or changing a SQL Apps application, screen, clie
 
 # Build the application
 
-Confirm the project with absolute installed `../../scripts/sql-apps.mjs home`.
+Resolve `../../scripts/sql-apps.mjs` relative to this skill, not cwd. Quote its
+absolute path; `home` selects the project containing input `docs/...`.
 Review `projects create-plan "<name>"`, obtain approval, then
 `projects create "<name>" --approval <id>`. Edit only the generated project.
 `SQL_APPS_HOME` selects runtime, not skills.
 
 ## Agree on one useful slice
 
-Read the saved brief with `guide`; the requested change is the useful slice. Ask only about missing users/access, fields, actions, validation or outcomes, one question at a time. Summarize decisions/exclusions without repeated discovery.
+Read the saved brief with `guide`; the requested change is the useful slice. Ask only about missing users/access, fields, actions, validation or outcomes one question at a time. Summarize decisions/exclusions without repetition.
 
 Consult `docs/guides/build-your-app.md` for unresolved scope; apply `docs/maintainers/application-boundary.md` before edits.
 
@@ -36,7 +37,7 @@ expanding. Product screens show account/access, never persona selectors.
 Developer-page simulations do not prove Entra assignment or cloud tokens;
 label mock/synthetic behavior.
 
-For list/search/dashboard/detail read changes, apply `docs/reference/read-performance.md`: bounded results, ordering, freshness, latency and redundant requests. Preserve authorization and read-after-write behavior; cache proposals need a separate reviewed contract.
+For list/search/dashboard/detail reads, apply `docs/reference/read-performance.md`: bounds, ordering, freshness, latency and redundant requests. Preserve authorization and read-after-write; cache proposals need separate review.
 
 ## Check the application boundary
 

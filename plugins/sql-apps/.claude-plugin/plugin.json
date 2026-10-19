@@ -1,11 +1,10 @@
 {
   "name": "sql-apps",
   "version": "0.2.3",
-  "description": "Build and validate Azure SQL Database and Data API Builder applications; use maintained Azure skills for the general cloud lifecycle.",
+  "description": "Build and validate applications on Azure SQL Database and Data API Builder; route general Azure work to maintained Azure skills.",
   "author": { "name": "Microsoft SQL team (mssql)", "url": "https://github.com/microsoft" },
   "homepage": "https://github.com/microsoft/sql-apps",
   "repository": "https://github.com/microsoft/sql-apps",
   "license": "MIT",
-  "skills": "./skills/",
-  "keywords": ["azure-sql", "typescript", "data-api-builder"]
+  "keywords": ["azure-sql", "data-api-builder", "local-development", "application-foundation"]
 }

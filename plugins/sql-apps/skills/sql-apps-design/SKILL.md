@@ -7,6 +7,8 @@ description: "Use when building or changing SQL Apps screens, or reviewing a gen
 
 Own the design pass in the app's existing stack. No companion skill is required. Functional acceptance and design acceptance are separate.
 
+Use the confirmed app's `docs/...` for references and outputs.
+
 ## Choose a direction
 
 - From the brief, name the audience, recurring task, and first-read information.
@@ -29,7 +31,7 @@ The first implementation is a candidate, not an approved design:
 3. **Fix observed problems and re-review.** Batch changes, re-render affected views, critique again. Unresolved findings, not a loop count, drive passes.
 4. **Expand** to remaining states once the composition stabilizes.
 
-Hand off only task, render/build, ranked defects, changes, what to preserve and recheck. Reuse the browser session; skip backend checks for visual-only edits. Progress is an improved rendered screen, not another document.
+Hand off task, render/build, ranked defects, changes and preservation/recheck needs. Reuse the browser session; skip backend checks for visual-only edits. Improve the rendered screen, not document count.
 
 Accept only when the primary task and information lead, the composition serves this domain, and no material defects remain; record tradeoffs. Record critique, matrix and `Design quality` verdict in `docs/design-review.md`; run `sql-apps check`. Coverage is not quality.
 

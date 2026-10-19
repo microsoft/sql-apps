@@ -71,7 +71,8 @@ tooling package. `SQL_APPS_PROJECT_HOME` is an internal dispatch boundary and
 must be an absolute path to the same validated project.
 
 Before the first restore, use the installed plugin launcher for `guide`,
-`setup plan` and the approved restore. Its explicit foundation binding supplies
+`setup plan` and the approved restore. Its explicit foundation selection
+(`SQL_APPS_FOUNDATION_HOME` or the Copilot installer binding) supplies
 only the bootstrap commands. Bootstrap setup stops after restore: re-run setup
 through the installed pinned package and review any changed approval scopes.
 Build, runtime execution and subsequent provenance checks all use that package;

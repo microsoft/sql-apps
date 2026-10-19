@@ -7,6 +7,49 @@ on:
 permissions:
   contents: read
 jobs:
+  plugin-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - run: npm run plugin:check
+      - run: node --test tests/plugin-loaders.test.mjs
+  plugin-loaders:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        host: [claude, copilot]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - if: matrix.host == 'claude'
+        run: npm install --global @anthropic-ai/claude-code@2.1.296
+      - if: matrix.host == 'copilot'
+        run: npm install --global @github/copilot@1.0.98
+      - name: Verify native loader without model calls
+        shell: pwsh
+        run: |
+          $npmRoot = npm root --global
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $packagePath = if ('${{ matrix.host }}' -eq 'claude') {
+            Join-Path $npmRoot '@anthropic-ai' 'claude-code'
+          } else {
+            Join-Path $npmRoot '@github' 'copilot'
+          }
+          $manifest = Get-Content -Raw (Join-Path $packagePath 'package.json') | ConvertFrom-Json
+          $entrypoint = Join-Path $packagePath $manifest.bin.${{ matrix.host }}
+          npm run plugin:check:${{ matrix.host }} -- "$entrypoint" 2>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'plugin-loader-${{ matrix.host }}.txt')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: plugin-loader-${{ matrix.host }}-${{ matrix.os }}
+          path: ${{ runner.temp }}/plugin-loader-${{ matrix.host }}.txt
   setup-diagnostics:
     strategy:
       matrix:

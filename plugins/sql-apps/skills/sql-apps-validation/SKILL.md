@@ -5,7 +5,9 @@ description: "Use when validating SQL Apps changes or collecting test, browser, 
 
 # Validate SQL Apps
 
-Run absolute installed `../../scripts/sql-apps.mjs` with `home`; confirm checkout. Inspect `package.json`: `sqlApps.project` identifies generated apps. Choose the smallest covering check; full suite only when warranted.
+Resolve `../../scripts/sql-apps.mjs` relative to this skill, not cwd. Quote its
+absolute path; `home` selects the checkout containing input `docs/...`.
+Inspect `package.json`: `sqlApps.project` identifies generated apps. Choose the smallest covering check; full suite only when warranted.
 
 ## Generated applications
 

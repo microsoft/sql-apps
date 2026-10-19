@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm, readFile, realpath, readdir } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, writeFile, rm, readFile, realpath, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -15,33 +15,30 @@ const recordFixture = (home: string) => run(process.execPath, ['--input-type=mod
 const probe = async (code: string, env: NodeJS.ProcessEnv = {}) =>
   run(process.execPath, ['--input-type=module', '-e', `import { resolveHome, status, main } from ${JSON.stringify(moduleUrl)}; ${code}`], { env });
 const skillPaths = [
-  'skills/sql-apps-getting-started/SKILL.md',
+  'plugins/sql-apps/skills/sql-apps-getting-started/SKILL.md',
   ...['application', 'local', 'validation', 'cloud-preview', 'diagnostics', 'design']
     .map(name => `plugins/sql-apps/skills/sql-apps-${name}/SKILL.md`),
 ];
 
 test('local plugin bundle validates its manifests, matching skill names and isolated sources', async () => {
-  assert.match(await run(process.execPath, [resolve('scripts', 'check-plugin.mjs')]), /six focused skills, MIT license/);
+  assert.match(await run(process.execPath, [resolve('scripts', 'check-plugin.mjs')]), /seven focused skills, MIT license/);
   assert.equal(await readFile(resolve('plugins', 'sql-apps', 'LICENSE'), 'utf8'), await readFile('LICENSE', 'utf8'));
 });
 
 test('SQL Apps identity is consistent across packages, platform manifests and marketplaces', async () => {
   const repository = 'https://github.com/microsoft/sql-apps';
-  for (const path of [
-    'plugin.json', '.claude-plugin/plugin.json', '.codex-plugin/plugin.json', '.cursor-plugin/plugin.json',
-    '.grok-plugin/plugin.json', '.kimi-plugin/plugin.json', 'plugins/sql-apps/plugin.json',
-  ]) {
+  const portable = JSON.parse(await readFile('plugins/sql-apps/plugin.json', 'utf8'));
+  const native = JSON.parse(await readFile('plugins/sql-apps/.claude-plugin/plugin.json', 'utf8'));
+  const { $schema, ...metadata } = portable;
+  assert.equal($schema, 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json');
+  assert.deepEqual(native, metadata, 'Native Claude metadata must match the portable package');
+  for (const path of ['plugins/sql-apps/plugin.json', 'plugins/sql-apps/.claude-plugin/plugin.json']) {
     const manifest = JSON.parse(await readFile(path, 'utf8'));
     assert.equal(manifest.name, 'sql-apps', path);
     assert.equal(manifest.homepage, repository, path);
     assert.equal(manifest.repository, repository, path);
     assert.equal(manifest.version, '0.2.3', path);
     assert.deepEqual(manifest.author, { name: 'Microsoft SQL team (mssql)', url: 'https://github.com/microsoft' }, path);
-    if (manifest.interface) {
-      assert.equal(manifest.interface.displayName, 'SQL Apps');
-      assert.equal(manifest.interface.websiteURL, repository);
-      assert.equal(manifest.interface.developerName, 'Microsoft SQL team (mssql)');
-    }
   }
   for (const path of ['.github/plugin/marketplace.json', '.claude-plugin/marketplace.json', '.agents/plugins/marketplace.json']) {
     const marketplace = JSON.parse(await readFile(path, 'utf8'));
@@ -51,22 +48,26 @@ test('SQL Apps identity is consistent across packages, platform manifests and ma
     if (marketplace.owner) assert.deepEqual(marketplace.owner, { name: 'Microsoft', url: 'https://www.microsoft.com' }, path);
     if (typeof marketplace.plugins[0].source === 'string') {
       assert.equal(marketplace.plugins[0].source, './plugins/sql-apps');
+      assert.equal(marketplace.plugins[0].version, path.startsWith('.claude-plugin') ? undefined : portable.version);
     } else {
-      assert.deepEqual(marketplace.plugins[0].source, { source: 'local', path: './' });
+      assert.deepEqual(marketplace.plugins[0].source, { source: 'local', path: './plugins/sql-apps' });
       assert.equal(marketplace.interface.displayName, 'SQL Apps Skills');
     }
   }
-  const kimi = JSON.parse(await readFile('kimi-marketplace.json', 'utf8')).plugins[0];
-  assert.equal(kimi.id, 'sql-apps');
-  assert.equal(kimi.displayName, 'SQL Apps');
-  assert.equal(kimi.source, repository);
-  assert.equal(JSON.parse(await readFile('gemini-extension.json', 'utf8')).name, 'sql-apps');
+  for (const obsolete of [
+    'plugin.json', '.claude-plugin/plugin.json', '.codex-plugin/plugin.json', '.cursor-plugin/plugin.json',
+    '.grok-plugin/plugin.json', '.kimi-plugin/plugin.json', 'kimi-marketplace.json', 'gemini-extension.json',
+    join('skills', 'sql-apps-getting-started', 'SKILL.md'),
+  ]) await assert.rejects(readFile(obsolete), { code: 'ENOENT' }, `No root compatibility package: ${obsolete}`);
+  const gemini = JSON.parse(await readFile('plugins/sql-apps/gemini-extension.json', 'utf8'));
+  assert.equal(gemini.name, portable.name);
+  assert.equal(gemini.version, portable.version);
   assert.equal(JSON.parse(await readFile('package.json', 'utf8')).name, 'sql-apps');
   const lock = JSON.parse(await readFile('package-lock.json', 'utf8'));
   assert.equal(lock.name, 'sql-apps');
   assert.equal(lock.packages[''].name, 'sql-apps');
   assert.deepEqual(JSON.parse(await readFile('application.json', 'utf8')), { name: 'sql-apps', selectedExamples: [] });
-  assert.match(await readFile('skills/sql-apps-getting-started/SKILL.md', 'utf8'), /^---\r?\nname: sql-apps-getting-started\r?\n/);
+  assert.match(await readFile('plugins/sql-apps/skills/sql-apps-getting-started/SKILL.md', 'utf8'), /^---\r?\nname: sql-apps-getting-started\r?\n/);
 });
 
 test('SQL Apps UI, wordmark and private-state exclusions use the new brand', async () => {
@@ -124,11 +125,11 @@ test('application boundary retains the proven SQL storage and mutation rules', a
 });
 
 test('SQL Apps routes new apps and meaningful UI changes through intentional design', async () => {
-  const gettingStarted = await readFile(resolve('skills', 'sql-apps-getting-started', 'SKILL.md'), 'utf8');
+  const gettingStarted = await readFile(resolve('plugins', 'sql-apps', 'skills', 'sql-apps-getting-started', 'SKILL.md'), 'utf8');
   const application = await readFile(resolve('plugins', 'sql-apps', 'skills', 'sql-apps-application', 'SKILL.md'), 'utf8');
   const design = await readFile(resolve('plugins', 'sql-apps', 'skills', 'sql-apps-design', 'SKILL.md'), 'utf8');
   const validation = await readFile(resolve('plugins', 'sql-apps', 'skills', 'sql-apps-validation', 'SKILL.md'), 'utf8');
-  const pluginReference = await readFile(resolve('docs', 'reference', 'copilot-plugin.md'), 'utf8');
+  const pluginReference = await readFile(resolve('docs', 'reference', 'plugins.md'), 'utf8');
   const runGuide = await readFile(resolve('docs', 'guides', 'run-locally.md'), 'utf8');
   assert.match(application, /before implementing a new user-facing app or meaningful UI change[\s\S]*sql-apps-design/i);
   assert.doesNotMatch(application, /sql-apps-design` for substantial|substantial visual work/i);
@@ -195,8 +196,8 @@ test('SQL Apps routes new apps and meaningful UI changes through intentional des
 test('SQL Apps design is self-contained and does not require external design skills', async () => {
   const paths = [
     'plugins/sql-apps/skills/sql-apps-design/SKILL.md',
-    'skills/sql-apps-getting-started/SKILL.md',
-    'docs/reference/copilot-plugin.md',
+    'plugins/sql-apps/skills/sql-apps-getting-started/SKILL.md',
+    'docs/reference/plugins.md',
     'docs/reference/design-acceptance.md',
     'docs/maintainers/agent-evaluations.md',
   ];
@@ -218,7 +219,7 @@ test('SQL Apps design is self-contained and does not require external design ski
 
 test('SQL Apps requires rendered browser review with bounded evidence claims', async () => {
   const read = (path: string) => readFile(resolve(path), 'utf8');
-  const gettingStarted = await read('skills/sql-apps-getting-started/SKILL.md');
+  const gettingStarted = await read('plugins/sql-apps/skills/sql-apps-getting-started/SKILL.md');
   const application = await read('plugins/sql-apps/skills/sql-apps-application/SKILL.md');
   const local = await read('plugins/sql-apps/skills/sql-apps-local/SKILL.md');
   const validation = await read('plugins/sql-apps/skills/sql-apps-validation/SKILL.md');
@@ -311,7 +312,7 @@ test('SQL Apps read performance diagnostics discovers slowness and preserves spe
     'diagnose-blocking-and-deadlocks', 'diagnose-resource-pressure',
   ]) assert.ok(diagnostics.includes(name), `Preserve the ${name} handoff`);
   assert.ok(diagnostics.indexOf('## Diagnose the selected app') < diagnostics.indexOf('## Escalate the isolated issue'));
-  const entry = await readFile(resolve('skills', 'sql-apps-getting-started', 'SKILL.md'), 'utf8');
+  const entry = await readFile(resolve('plugins', 'sql-apps', 'skills', 'sql-apps-getting-started', 'SKILL.md'), 'utf8');
   assert.match(entry, /sql-apps-diagnostics[^\r\n]*(?:slow|latency|performance)/i);
 });
 
@@ -339,7 +340,7 @@ test('SQL Apps read performance reference defines correctness and measurement bo
 });
 
 test('SQL Apps read performance documentation links the shared contract and evaluations', async () => {
-  const paths = ['docs/README.md', 'docs/reference/copilot-plugin.md', 'docs/reference/monitor-growth.md'];
+  const paths = ['docs/README.md', 'docs/reference/plugins.md', 'docs/reference/monitor-growth.md'];
   const contents = await Promise.all(paths.map(path => readFile(resolve(path), 'utf8')));
   for (const [index, content] of contents.entries()) {
     assert.match(content, /\]\([^)\r\n]*read-performance\.md[^)\r\n]*\)/, `${paths[index]} must link the read contract`);
@@ -375,7 +376,7 @@ test('design and review guidance preserves access, consent, state and stack boun
 
 test('agent guidance stays concise, stack-neutral and script-led', async () => {
   const read = (path: string) => readFile(resolve(path), 'utf8');
-  const gettingStarted = await read('skills/sql-apps-getting-started/SKILL.md');
+  const gettingStarted = await read('plugins/sql-apps/skills/sql-apps-getting-started/SKILL.md');
   const application = await read('plugins/sql-apps/skills/sql-apps-application/SKILL.md');
   const local = await read('plugins/sql-apps/skills/sql-apps-local/SKILL.md');
   const cloud = await read('plugins/sql-apps/skills/sql-apps-cloud-preview/SKILL.md');
@@ -406,7 +407,7 @@ test('agent guidance stays concise, stack-neutral and script-led', async () => {
   assert.match(cloud, /manual recovery/i);
   assert.doesNotMatch(cloud, /npm run publish -- (?:container|aca)/i, 'SQL Apps must not add a second cloud deployer');
   assert.doesNotMatch(cloud, /For an SLA, managed identity/, 'Managed identity must not route to both production and Container Apps');
-  assert.match(cloud, /managed identity that does not meet the conditions below/i);
+  assert.match(cloud, /unsupported managed identity|managed identity that does not meet the conditions below/i);
   assert.match(sharing, /only the gateway has public ingress[\s\S]*DAB is reachable over localhost/i);
   assert.match(sharing, /managed identity[\s\S]*object-scoped permissions/i);
   assert.match(sharing, /not a bundled SQL Apps deployment/i);
@@ -464,6 +465,35 @@ test('plugin launcher reports invalid bindings and commands rather than falling 
   await assert.rejects(probe('await resolveHome();', { SQL_APPS_HOME: join(profile, 'not-sql-apps') }), /ENOENT/);
   await assert.rejects(run(process.execPath, [launcher, 'deploy']), /Unsupported plugin command/);
   await assert.rejects(run(process.execPath, [launcher, 'verify', 'invalid;container']), /Invalid SQL container name/);
+});
+
+test('copied plugin selects the explicit application outside its cache and session directory', async t => {
+  const fixture = await realpath(await mkdtemp(join(tmpdir(), 'sql apps copied plugin ')));
+  t.after(() => rm(fixture, { recursive: true, force: true }));
+  const copied = join(fixture, 'plugin cache');
+  const session = join(fixture, 'unrelated session');
+  await cp(resolve('plugins', 'sql-apps'), copied, { recursive: true });
+  await mkdir(session);
+  const copiedUrl = pathToFileURL(join(copied, 'scripts', 'sql-apps.mjs')).href;
+  const home = await realpath(resolve('.'));
+  const output = await run(process.execPath, ['--input-type=module', '-e',
+    `process.chdir(${JSON.stringify(session)}); const { main } = await import(${JSON.stringify(copiedUrl)}); await main(['home']);`],
+  { env: { SQL_APPS_HOME: home, COPILOT_HOME: join(fixture, 'unused profile') } });
+  assert.equal(output.trim(), home);
+  assert.deepEqual((await readdir(fixture)).sort(), ['plugin cache', 'unrelated session']);
+});
+
+test('missing foundation selection explains SQL_APPS_HOME without requiring a Copilot install', async t => {
+  const fixture = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-no-home-')));
+  t.after(() => rm(fixture, { recursive: true, force: true }));
+  const url = pathToFileURL(launcher).href;
+  await assert.rejects(run(process.execPath, ['--input-type=module', '-e',
+    `const { dispatchProjects } = await import(${JSON.stringify(url)});
+     await dispatchProjects(['list'], { environment: {}, cwd: ${JSON.stringify(fixture)}, userHome: ${JSON.stringify(fixture)} });`]),
+  /SQL_APPS_(?:FOUNDATION_)?HOME.*absolute.*foundation/i);
+  await assert.rejects(probe(`await resolveHome({ environment: { SQL_APPS_HOME: 'relative' }, cwd: ${JSON.stringify(fixture)}, userHome: ${JSON.stringify(fixture)} });`),
+    /absolute checkout path/);
+  assert.deepEqual(await readdir(fixture), []);
 });
 
 test('plugin status is bounded, read-only and distinguishes healthy, HTTP failure and connection failure', async () => {

@@ -22,7 +22,7 @@ Local mutations enforce [remembered permissions](local-consent.md) before dispat
 
 ## Prerequisites
 
-First time installing development tools? Use [guided setup](../guides/getting-started.md) rather than treating this list as instructions. Copilot can offer approved installations, explain access/license conditions, guide restarts and verify each step on Windows, macOS or Linux. After tooling restore, `npm run setup:check` needs no application build and never installs or mutates resources. Before restore, use the installed plugin's `setup plan --json` through its explicit foundation binding.
+First time installing development tools? Use [guided setup](../guides/getting-started.md) rather than treating this list as instructions. Copilot can offer approved installations, explain access/license conditions, guide restarts and verify each step on Windows, macOS or Linux. After tooling restore, `npm run setup:check` needs no application build and never installs or mutates resources. Before restore, use the installed plugin's `setup plan --json` through its explicit foundation selection (`SQL_APPS_FOUNDATION_HOME` or the Copilot installer binding).
 
 - Node.js 22 or 24 LTS and npm.
 - .NET SDK 8 or later. The CLI restores this repository's SqlPackage tool.

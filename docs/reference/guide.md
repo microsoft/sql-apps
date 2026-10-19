@@ -10,7 +10,7 @@ npm run guide -- --json
 ```
 
 These commands require restored tooling but no application build. Before restore,
-use the installed plugin's `guide` and explicit foundation binding. They report
+use the installed plugin's `guide` and explicit foundation selection. They report
 source/build/workspace state, saved decisions and a suggested next action without
 starting services or contacting Azure.
 
@@ -74,4 +74,4 @@ Brief/state files must be regular files at most 16 KiB. Invalid JSON, oversized 
 
 Keep credentials and actual application records out of the brief. Preserve local state when moving or troubleshooting the checkout.
 
-The plugin equivalents are `guide` and `guide-save "<absolute-brief-path>"`; see [runtime binding](copilot-plugin.md#runtime-binding-and-direct-checks).
+The plugin equivalents are `guide` and `guide-save "<absolute-brief-path>"`; see [runtime binding](plugins.md#runtime-binding-and-direct-checks).

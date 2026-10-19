@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { access, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile, realpath } from 'node:fs/promises';
+import { access, cp, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -27,13 +27,17 @@ function runNpm(args, cwd) {
 async function sourceFixture(t) {
   const source = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-project-source-')));
   t.after(() => rm(source, { recursive: true, force: true }));
-  for (const directory of ['.config', 'dab', 'docs/guides', 'functions/src', 'infra', 'public', 'scripts', 'sql', 'src']) {
+  for (const directory of ['.config', 'dab', 'docs/guides', 'docs/maintainers', 'docs/reference', 'functions/src', 'infra', 'public', 'scripts', 'sql', 'src']) {
     await mkdir(join(source, directory), { recursive: true });
   }
   const files = {
     '.config/dotnet-tools.json': '{}',
     'dab/dab-config.json': '{"entities":{}}',
     'docs/guides/build-your-app.md': '# Build your app',
+    'docs/maintainers/application-boundary.md': '# Application boundary',
+    'docs/reference/read-performance.md': '# Read performance',
+    'docs/reference/progressive-creation.md': '# Progressive creation',
+    'docs/reference/design-acceptance.md': '# Design acceptance',
     'functions/src/index.ts': 'export {};',
     'infra/personal-free.bicep': '',
     'public/index.html': '<h1>SQL Apps</h1>',
@@ -122,6 +126,69 @@ test('the plugin can guide an unrestored project through its explicit foundation
       env: { ...process.env, SQL_APPS_HOME: created.path, COPILOT_HOME: copilotHome,
         SQL_APPS_PROJECT_HOME: undefined, SQL_APPS_TOOLING_HOME: undefined },
     }), error => /Restore the pinned project tooling/.test(error.stderr));
+  }
+});
+
+test('a copied plugin bootstraps the selected app without a Copilot binding or foundation cwd', async t => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'sql apps Claude bootstrap ')));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const foundation = await realpath(process.cwd());
+  const created = await projects.createProject(foundation, 'Claude App', { userHome: root, initializeGit: false });
+  const copied = join(root, 'plugin cache');
+  const session = join(root, 'unrelated session');
+  await cp(resolve('plugins', 'sql-apps'), copied, { recursive: true });
+  await mkdir(session);
+  const launcher = join(copied, 'scripts', 'sql-apps.mjs');
+  const environment = {
+    ...process.env, SQL_APPS_HOME: created.path, SQL_APPS_FOUNDATION_HOME: foundation,
+    COPILOT_HOME: join(root, 'unused Copilot profile'),
+    SQL_APPS_PROJECT_HOME: undefined, SQL_APPS_TOOLING_HOME: undefined,
+  };
+  for (const cwd of [created.path, session]) {
+    const options = { cwd, env: environment, maxBuffer: 4 * 1024 * 1024 };
+    const report = JSON.parse((await execute(process.execPath, [launcher, 'workspace-check'], options)).stdout);
+    assert.equal(report.bound.home, created.path);
+    assert.equal(report.bound.toolingHome, foundation);
+    assert.equal(report.bound.bootstrap, true);
+    const guide = JSON.parse((await execute(process.execPath, [launcher, 'guide'], options)).stdout);
+    assert.equal(guide.home, created.path);
+  }
+  await assert.rejects(execute(process.execPath, [launcher, 'setup', 'plan', '--json'], {
+    cwd: session, env: environment, maxBuffer: 4 * 1024 * 1024,
+  }), error => {
+    const plan = JSON.parse(error.stdout);
+    assert.equal(error.code, 1, 'An unrestored, unapproved plan must report a blocker');
+    assert.equal(plan.home, created.path);
+    assert.equal(plan.bootstrap, true);
+    assert.equal(plan.stages.find(stage => stage.id === 'build').status, 'blocked');
+    return true;
+  });
+  for (const command of [['verify'], ['consent-run', 'build']]) {
+    await assert.rejects(execute(process.execPath, [launcher, ...command], { cwd: session, env: environment }),
+      error => /Restore the pinned project tooling/.test(error.stderr));
+  }
+  await assert.rejects(access(environment.COPILOT_HOME), { code: 'ENOENT' });
+  await assert.rejects(access(join(created.path, 'node_modules')), { code: 'ENOENT' });
+});
+
+test('explicit foundation selection fails visibly instead of falling back or selecting the app as tooling', async t => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-explicit-foundation-')));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const foundation = await realpath(process.cwd());
+  const created = await projects.createProject(foundation, 'Selected App', { userHome: root, initializeGit: false });
+  const environment = { SQL_APPS_HOME: created.path, SQL_APPS_FOUNDATION_HOME: foundation };
+  assert.equal(await plugin.dispatchProjects(['list'], {
+    environment, userHome: root,
+    projectMain: async (_args, home) => home,
+  }), foundation);
+  for (const [selection, message] of [
+    ['relative', /absolute checkout path/],
+    [join(root, 'missing'), /ENOENT/],
+    [created.path, /foundation checkout, not an application/i],
+  ]) {
+    await assert.rejects(plugin.workspaceReport(created.path, {
+      cwd: foundation, userHome: root, environment: { ...environment, SQL_APPS_FOUNDATION_HOME: selection },
+    }), message);
   }
 });
 
@@ -270,6 +337,13 @@ test('create scaffolds an independent named project and records it as active', a
   assert.deepEqual(pkg.dependencies, { '@microsoft/sql-apps': '1.2.3' });
   assert.deepEqual(pkg.devDependencies, {});
   assert.match(await readFile(join(created.path, 'docs', 'guides', 'build-your-app.md'), 'utf8'), /Build your app/);
+  for (const reference of [
+    'maintainers/application-boundary.md', 'reference/read-performance.md',
+    'reference/progressive-creation.md', 'reference/design-acceptance.md',
+  ]) {
+    assert.equal(await readFile(join(created.path, 'docs', reference), 'utf8'),
+      await readFile(join(source, 'docs', reference), 'utf8'));
+  }
   const state = await projects.readProjectsState({ userHome });
   assert.equal(state.activeProject, created.path);
   assert.deepEqual(state.projects.map(project => project.path), [created.path]);

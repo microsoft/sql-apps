@@ -42,7 +42,7 @@ Load a specialist only after evidence identifies its boundary:
 
 For cloud resource samples and cost/capacity decisions, reuse [Monitor usage and growth](monitor-growth.md), not another monitoring workflow. Local preview results do not prove cloud capacity or cold-start behavior.
 
-If the companion is unavailable, report the missing specialist and hand over the action, target, window, observed evidence and isolated question. See [companion plugin installation](copilot-plugin.md#install-companion-plugins-for-cloud-work); installation is a separate decision, not an automatic prerequisite for application-side diagnosis. Do not replace it with a competing DMV cookbook.
+If the companion is unavailable, report the missing specialist and hand over the action, target, window, observed evidence and isolated question. See [companion plugin installation](plugins.md#install-companion-plugins-for-cloud-work); installation is a separate decision, not an automatic prerequisite for application-side diagnosis. Do not replace it with a competing DMV cookbook.
 
 ## 4. Consider a cache only under a separate contract
 

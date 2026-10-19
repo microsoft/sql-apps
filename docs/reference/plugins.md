@@ -1,4 +1,116 @@
-# Install and use the Copilot plugin
+# Install and use the SQL Apps plugin
+
+One package, [plugins/sql-apps](../../plugins/sql-apps), contains all seven
+skills and the dependency-free launcher. The repository root contains catalogs,
+not another plugin. Installing skills does not install the application runtime,
+publish npm tooling, grant setup permissions, or deploy resources.
+
+## Assistant support
+
+| Surface | Packaging and evidence |
+| --- | --- |
+| Claude Code | Native manifest in the canonical bundle; strict validation and isolated seven-skill discovery gated with CLI `2.1.296`. |
+| GitHub Copilot CLI | Portable manifest; isolated marketplace install and seven-skill discovery gated with CLI `1.0.98`. App discovery additionally needs verification in the user's actual profile. |
+| Codex and Cursor | Their documentation supports the portable Agent Plugins package. Catalogs target the same bundle; native loaders have not been verified here. |
+| Gemini CLI | Native extension manifest inside the same bundle; documented local-directory installation, but loader behavior has not been verified here. |
+| Other assistants | Use the provider-neutral project guides. This is not a claim of native plugin integration. |
+
+The release checks below validate loaders, not model behavior or live application
+acceptance. A missing or incompatible CLI is a blocker, not a passing check.
+
+## Install in Claude Code
+
+```powershell
+claude plugin marketplace add microsoft/sql-apps
+claude plugin install sql-apps@sql-apps-skills
+claude plugin list --json
+claude plugin details sql-apps
+```
+
+Start a fresh Claude session and invoke `/sql-apps:sql-apps-getting-started`,
+or describe the SQL Apps task naturally. The other commands use the same
+`/sql-apps:<skill-name>` namespace. No hooks or MCP servers are required.
+
+For first-project creation, select an existing foundation checkout before
+launching Claude; the plugin cache is not a project factory:
+
+```powershell
+$env:SQL_APPS_FOUNDATION_HOME = "C:\git\sql-apps"
+$env:SQL_APPS_HOME = $env:SQL_APPS_FOUNDATION_HOME
+claude
+```
+
+Use the [project guide](projects.md) to create an independent application.
+`projects` commands use `SQL_APPS_FOUNDATION_HOME` when set, otherwise a
+foundation-valued `SQL_APPS_HOME`; a generated application is not a foundation.
+Once created, set `SQL_APPS_HOME` to that app's
+absolute path and open it; retain `SQL_APPS_FOUNDATION_HOME` for pre-restore
+`guide` and `setup plan` from any directory. This independent selection never
+changes the runtime home. After restore, the app's pinned installed tooling wins.
+Do not run the Copilot-specific installer merely to configure Claude.
+
+For local plugin development, load only the canonical directory:
+
+```powershell
+claude --plugin-dir "C:\git\sql-apps\plugins\sql-apps"
+```
+
+After edits, use `/reload-plugins` or restart. Local directory sources load in
+place; remotely installed packages use cached versions. Release a changed plugin
+version to update remote copies, then run `claude plugin update sql-apps@sql-apps-skills`
+and reload/restart. The native manifest supplies Claude's version; its catalog
+entry deliberately does not duplicate it. The portable manifest must match.
+
+To remove Claude's plugin, run `claude plugin uninstall sql-apps@sql-apps-skills`.
+This does not delete the separate foundation, generated apps, or SQL data.
+
+## Verify the package and loaders
+
+From the foundation checkout:
+
+```powershell
+npm run plugin:check
+npm run plugin:check:claude
+npm run plugin:check:copilot
+```
+
+The native checks require the pinned CLIs above, provisioned explicitly on PATH.
+An npm shell shim is not a native executable on Windows. Pass the absolute
+package `bin` entrypoint as an optional argument: native binaries run directly;
+JavaScript entrypoints run through the current Node executable, without a shell.
+For an npm-installed Copilot CLI:
+
+```powershell
+$packagePath = Join-Path (npm root --global) '@github' 'copilot'
+$manifest = Get-Content -Raw (Join-Path $packagePath 'package.json') | ConvertFrom-Json
+npm run plugin:check:copilot -- (Join-Path $packagePath $manifest.bin.copilot)
+```
+
+For Claude, select the `@anthropic-ai` / `claude-code` package and
+`$manifest.bin.claude` instead. CI resolves these entrypoints from the pinned
+packages on both operating systems rather than relying on npm shims.
+
+They use disposable profiles and copied bundles, remove their fixtures, and make
+no model calls. They do not upgrade tools, use the real profile's credentials,
+create a runtime binding, or start services. Their stdout records source,
+version, inventory and (for Claude) projected token cost; CI retains that output.
+CI is configured to run the same checks on Windows and Linux. A copied bundle is
+not proof of a remote GitHub-install canary.
+
+The observed Windows Claude `2.1.296` baseline is seven skills and **~267
+always-on tokens**, with individual on-invoke estimates of ~370 tokens to ~1.1k.
+These are loader estimates, not billed usage or measured behavioral improvement.
+Existing source-word budgets remain unchanged. The
+[evaluation playbook](../maintainers/agent-evaluations.md) records discovery
+boundaries and a separately approved, local-only model-evaluation follow-on;
+normal installation, tests and CI never initiate that spend.
+
+Skill-relative launcher paths are resolved from the loaded `SKILL.md`, not cwd.
+Use quoted absolute launcher paths; its `home` command identifies the app.
+Input `docs/...` belongs to that selected app, or to the explicitly selected
+foundation before creation, not the plugin cache.
+
+## Copilot installation and use
 
 The SQL Apps plugin adds project-specific skills to GitHub Copilot. Installing its skills and launcher does not require npm publication, an Azure subscription, or another platform plugin. Copilot itself still requires its normal account/access and network connectivity; the local application does not call cloud APIs after prerequisite downloads.
 
@@ -11,17 +123,23 @@ copilot plugin marketplace add microsoft/sql-apps
 copilot plugin install sql-apps@sql-apps-skills
 ```
 
-This installs the manifest, six skills and launcher, not the application runtime or project factory. A listing in the default Copilot marketplace requires separate upstream review; registering this repository does not create that listing.
+This installs the manifests, seven skills and launcher, not the application runtime or project factory. A listing in the default Copilot marketplace requires separate upstream review; registering this repository does not create that listing.
 
 First-project creation still needs a foundation checkout. Select it explicitly in the terminal used to launch Copilot, without replacing a remote marketplace registration with the local installer:
 
 ```powershell
 git clone https://github.com/microsoft/sql-apps.git "C:\git\sql-apps"
-$env:SQL_APPS_HOME = "C:\git\sql-apps"
+$env:SQL_APPS_FOUNDATION_HOME = "C:\git\sql-apps"
+$env:SQL_APPS_HOME = $env:SQL_APPS_FOUNDATION_HOME
 copilot
 ```
 
-Use an existing foundation checkout instead of cloning again when appropriate. `SQL_APPS_HOME` takes precedence for project creation when it names the foundation; a generated application is not a project factory. The existing local installer below remains an alternative for checkout-based development and creates a persistent foundation binding.
+Use an existing foundation checkout instead of cloning again when appropriate.
+`SQL_APPS_FOUNDATION_HOME` retains explicit bootstrap/project-factory selection
+while `SQL_APPS_HOME` selects the generated app. Without the separate foundation
+selection, `SQL_APPS_HOME` can select a foundation for creation only; an app is
+not a project factory. The local installer below remains a Copilot alternative
+and creates a persistent foundation binding.
 
 Generated applications restore exactly `@microsoft/sql-apps@0.2.3` from the configured npm feed. Plugin installation does not publish that package or prove it is available. A missing package blocks application restoration; a local tarball or foundation build is not clean-feed release acceptance. See the [release prerequisites](progressive-creation.md).
 
@@ -39,12 +157,12 @@ The installer:
 
 1. Validates the dedicated plugin bundle and marketplace paths.
 2. Registers this checkout as the local `sql-apps-skills` marketplace.
-3. Installs/enables `sql-apps@sql-apps-skills` and verifies actual discovery of all six skills.
+3. Installs/enables `sql-apps@sql-apps-skills` and verifies actual discovery of all seven skills.
 4. Binds the runtime to this checkout in `~/.copilot/sql-apps-local.json` (or `COPILOT_HOME` if set). The binding stores only a version and absolute directory, no secrets.
 
 Rerunning the installer is safe for the same checkout/profile. It refuses to replace a conflicting marketplace, differently sourced plugin, or runtime binding. Unrelated existing plugins are not disabled or modified.
 
-Only [plugins/sql-apps](../../plugins/sql-apps) is the installed package: manifest, six focused skills, an MIT license and a Node launcher. Runtime code, `.sql-apps` credentials, dependencies and SQL volumes stay outside the package. **Use this local marketplace, not a direct repository-root installation**, which is the older compatibility package.
+Only [plugins/sql-apps](../../plugins/sql-apps) is the installed package: manifests, seven focused skills, an MIT license and a Node launcher. Runtime code, `.sql-apps` credentials, dependencies and SQL volumes stay outside the package. The repository root contains marketplace catalogs, not a second plugin package.
 
 ## Install companion plugins for cloud work
 
@@ -76,6 +194,7 @@ Restart the App or create a **fresh session** after installation. In **Customize
 
 | Skill | Example prompt |
 | --- | --- |
+| `sql-apps-getting-started` | Shape a SQL Apps idea and choose the next local-first step. |
 | `sql-apps-local` | Start SQL Apps locally; reuse it if it is already running. |
 | `sql-apps-diagnostics` | Diagnose a failed SQL Apps workflow or slow read without changing services. |
 | `sql-apps-validation` | Run SQL Apps unit tests and typecheck; do not restart services. |
@@ -154,16 +273,22 @@ The launcher resolves the application runtime in this order:
 1. Explicit `SQL_APPS_HOME` environment variable.
 2. Current directory or an ancestor that is a validated SQL Apps project.
 3. Active project in `~/.sql-apps/projects.json`.
-4. Installer-created foundation binding under `COPILOT_HOME` / `~/.copilot`
-   for compatibility and project creation.
+4. Copilot installer-created foundation binding under `COPILOT_HOME` / `~/.copilot`.
+
+The foundation that supplies the project factory and pre-restore bootstrap
+tooling is resolved separately:
+
+1. Explicit `SQL_APPS_FOUNDATION_HOME` (must be the foundation, not an app).
+2. `SQL_APPS_HOME` when it points to the foundation.
+3. Copilot installer-created foundation binding.
 
 Invalid explicit paths/bindings fail; they never silently fall back. The
-installer binding identifies the trusted foundation that supplies the project
-factory. It does not require applications to live beside that checkout.
+foundation selection does not change the runtime home or require applications
+to live beside that checkout.
 
 Once a project's exact pinned `@microsoft/sql-apps` package is restored, that
-package owns command dispatch and build provenance, even when the plugin retains
-a foundation binding. A missing package permits read-only/bootstrap commands,
+package owns command dispatch and build provenance, even when a foundation
+remains selected. A missing package permits read-only/bootstrap commands,
 not foundation-owned application builds or runtime execution. Bootstrap setup
 stops after restore; plan again through the installed package and explicitly
 review changed approval scopes before continuing.
@@ -231,7 +356,9 @@ The `app` command remains running until stopped. If healthy services are already
 - Preserve owner checks, production authentication and unrelated/user-owned containers.
 - Cloud preparation requires separate authorization for mutations. The existing Azure template contains billed resources.
 
-## Uninstall
+## Uninstall from Copilot
+
+For Claude, see [Install in Claude Code](#install-in-claude-code).
 
 ```powershell
 copilot plugin uninstall sql-apps@sql-apps-skills
@@ -239,9 +366,3 @@ copilot plugin marketplace remove sql-apps-skills
 ```
 
 These operations remove only this plugin/marketplace registration, not the application checkout or SQL data. The small `sql-apps-local.json` runtime binding remains for future reinstalls; remove that exact file manually if no longer wanted. Do not remove the Copilot profile directory or unrelated plugins.
-
-## Replace a pre-rebrand installation
-
-Review [migration notes](../maintainers/naming-transition.md). Inspect `copilot plugin list --json` and `copilot plugin marketplace list --json`, then disable/uninstall only the old development plugin and remove its marketplace registration. Install using the current steps above and explicitly select the new `sql-apps-local.json` binding; old bindings are not migrated.
-
-Do not remove other plugins, the Copilot profile, old credentials or persistent data.

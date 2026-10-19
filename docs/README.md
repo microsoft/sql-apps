@@ -24,7 +24,7 @@ To try something already implemented, use the [Todo reference app](../examples/t
 - [Design acceptance](reference/design-acceptance.md): design intent, the render-critique-improve loop, rendered coverage versus design quality, and final verdicts.
 - [Application read performance](reference/read-performance.md): bounded reads, redundant requests, safe cache proposals and comparable user-action measurements.
 - [Role-based-data profile](reference/role-based-data.md): SQL/DAB/browser startup, application-role authorization and private SQL Azure deployment.
-- [Copilot plugin](reference/copilot-plugin.md): installation, binding and troubleshooting.
+- [SQL Apps plugin](reference/plugins.md): assistant support, installation, binding and native loader verification.
 - [Guide command](reference/guide.md): saved brief and checkpoint format.
 - [Monitor usage and growth](reference/monitor-growth.md): free Database Hub preview setup, read-only SQL diagnostics and capacity decisions.
 - [Personal-free Azure deployment](reference/personal-free-deployment.md): primary Static Web Apps Free, managed Functions and Azure SQL free-offer workflow.

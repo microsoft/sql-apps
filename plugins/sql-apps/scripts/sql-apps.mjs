@@ -65,32 +65,37 @@ export async function resolveHome(options = {}) {
   if (binding !== undefined) {
     const config = JSON.parse(binding);
     if (config.version !== 1 || Object.keys(config).some(key => !['version', 'home'].includes(key))) {
-      throw new Error('Invalid SQL Apps local binding; rerun npm run plugin:install from the checkout');
+      throw new Error('Invalid SQL Apps local binding; review it or set SQL_APPS_HOME to the absolute application/foundation path. Copilot users can rerun npm run plugin:install from the foundation checkout.');
     }
     return validateHome(config.home);
   }
-  throw new Error('SQL Apps checkout not configured. Run npm run plugin:install there, or set SQL_APPS_HOME to its absolute path');
+  throw new Error('SQL Apps checkout not configured. Set SQL_APPS_HOME to its absolute application/foundation path. Copilot users can alternatively run npm run plugin:install from the foundation checkout.');
 }
 
 async function resolveToolHome(options = {}) {
   const environment = options.environment ?? process.env;
-  if (environment.SQL_APPS_HOME !== undefined) {
-    const home = await validateHome(environment.SQL_APPS_HOME);
+  const selection = environment.SQL_APPS_FOUNDATION_HOME !== undefined
+    ? environment.SQL_APPS_FOUNDATION_HOME : environment.SQL_APPS_HOME;
+  if (selection !== undefined) {
+    const home = await validateHome(selection);
     const pkg = JSON.parse(await readFile(join(home, 'package.json'), 'utf8'));
     if (pkg.name === 'sql-apps') return home;
+    if (environment.SQL_APPS_FOUNDATION_HOME !== undefined) {
+      throw new Error('SQL_APPS_FOUNDATION_HOME must point to the foundation checkout, not an application project.');
+    }
   }
   const userHome = resolve(options.userHome ?? homedir());
   const configuredBinding = join(environment.COPILOT_HOME || join(userHome, '.copilot'), 'sql-apps-local.json');
   let binding;
   try { binding = JSON.parse(await readFile(configuredBinding, 'utf8')); }
   catch (error) {
-    if (error.code === 'ENOENT') throw new Error('SQL Apps project creation requires an installed foundation binding. Run npm run plugin:install from the SQL Apps foundation checkout.');
-    if (error instanceof SyntaxError) throw new Error('Invalid SQL Apps local binding; rerun npm run plugin:install from the foundation checkout.');
+    if (error.code === 'ENOENT') throw new Error('SQL Apps bootstrap requires an installed foundation binding or explicit selection. Set SQL_APPS_FOUNDATION_HOME to the absolute foundation checkout path while SQL_APPS_HOME selects the application. For project creation alone, SQL_APPS_HOME may select the foundation. Copilot users can alternatively run npm run plugin:install there.');
+    if (error instanceof SyntaxError) throw new Error('Invalid SQL Apps local binding; review it or set SQL_APPS_FOUNDATION_HOME to the absolute foundation checkout path.');
     throw error;
   }
   if (binding.version !== 1 || typeof binding.home !== 'string' ||
       Object.keys(binding).some(key => !['version', 'home'].includes(key))) {
-    throw new Error('Invalid SQL Apps local binding; rerun npm run plugin:install from the foundation checkout.');
+    throw new Error('Invalid SQL Apps local binding; review it or set SQL_APPS_FOUNDATION_HOME to the absolute foundation checkout path.');
   }
   const home = await validateHome(binding.home);
   const pkg = JSON.parse(await readFile(join(home, 'package.json'), 'utf8'));
@@ -124,8 +129,9 @@ export async function workspaceReport(home, options = {}) {
     }
   }
   if (!foundation && tools === home) {
+    if (environment.SQL_APPS_FOUNDATION_HOME !== undefined) tools = await resolveToolHome(options);
     let candidate = resolve(options.cwd ?? process.cwd());
-    while (true) {
+    while (tools === home) {
       try {
         const current = JSON.parse(await readFile(join(candidate, 'package.json'), 'utf8'));
         if (current.name === 'sql-apps') {

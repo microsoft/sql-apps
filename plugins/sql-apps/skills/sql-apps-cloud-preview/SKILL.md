@@ -1,21 +1,23 @@
 ---
 name: sql-apps-cloud-preview
-description: "Use when a user wants to publish, share, deploy, price, or assess cloud readiness for a SQL Apps project, especially a small private or personal application."
+description: "Use when a user wants to publish, share, deploy, price, or assess cloud readiness for a SQL Apps project, especially a small private or personal project."
 ---
 
-# Publish a SQL Apps project
+# Publish SQL Apps
 
-Sharing is optional. `personal-free` is the primary and only bundled cloud profile for a personal project: **Static Web Apps Free + managed Functions + Azure SQL Database free offer**. It has **no Static Web Apps SLA** and is only **potentially $0 within current allowances**.
+Sharing is optional. `personal-free`, the primary and only bundled cloud profile: **Static Web Apps Free + managed Functions + Azure SQL Database free offer**. **No Static Web Apps SLA**; **potentially $0 within current allowances**.
 
-Resolve `../../scripts/sql-apps.mjs` from this installed skill, run `home`, and confirm the project with `workspace-check` before any change.
+Resolve `../../scripts/sql-apps.mjs` relative to this skill, not cwd. Quote its
+absolute path; `home` selects the project containing input `docs/...`.
+Run `workspace-check` before changes.
 
-For an SLA, private networking, organizational controls, multiple application roles, or managed identity that does not meet the conditions below, design a production architecture with maintained Azure/SQL skills; do not add another bundled topology.
+For SLA, private networking, organizational controls, multiple app roles, or unsupported managed identity, use maintained Azure/SQL skills; never add a bundled topology.
 
 ## When personal-free does not fit
 
-When Entra-only SQL/managed identity is the only unmet need and the user accepts scale-to-zero, cold starts, interruptions and possible charges, Container Apps Consumption with a public gateway and localhost-only DAB is a candidate—not a bundled profile. Otherwise (guaranteed $0, continuous availability, no SQL-resume delay, blocked policy or permissions) use a production architecture. Verify current DAB auth for the pinned image, access, availability and quotas with maintained skills. Expose declared DAB operations only; derive roles from validated identity.
+If only Entra-only SQL/managed identity is unmet, with scale-to-zero, cold starts, interruptions and possible charges accepted, Container Apps Consumption (public gateway, localhost-only DAB) is a candidate—not a bundled profile. Guaranteed $0, continuous availability, no SQL-resume delay or blocked policy/permissions require production architecture. Verify pinned DAB auth, access, availability and quotas with maintained skills. Expose declared operations only; derive roles from validated identity.
 
-Hand infrastructure to `azure-prepare` → `azure-validate` → `azure-deploy`; do not build another publisher. Before writes, inventory and estimate supporting services; get separate approvals for spend, identity changes and interruption. Replica limits and budgets are not spending caps. Validate shutdown, alerts and manual recovery in a disposable deployment, preserving the database.
+Hand infrastructure to `azure-prepare` → `azure-validate` → `azure-deploy`, never another publisher. Before writes, inventory/estimate supporting services; get separate approvals for spend, identity changes and interruption. Replica limits and budgets are not spending caps. Validate shutdown, alerts and manual recovery disposably, preserving the database.
 
 ## Personal-free pipeline
 

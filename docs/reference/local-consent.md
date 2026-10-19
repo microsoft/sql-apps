@@ -46,7 +46,7 @@ Individual `plan`/`grant` commands below remain for scripted or partial use.
 `grant --plan-from <operation> [selection]` records a freshly computed plan
 without a temporary file.
 
-Before the first restore, the plugin's explicit foundation binding provides
+Before the first restore, the plugin's explicit foundation selection provides
 bootstrap planning and approved restore only. Setup stops after restore; plan
 again through the installed pinned package and review changed approval scopes.
 Bootstrap grants do not silently authorize a different implementation.
@@ -59,7 +59,7 @@ and checkpoints are not acceptance.
 
 Run from the intended checkout after tooling restore. No application build is
 required. Before restore, use the plugin's `consent-plan`, `consent-status` and
-approved `consent-run restore` through its explicit foundation binding:
+approved `consent-run restore` through its explicit foundation selection:
 
 ```powershell
 npm run consent -- plan build

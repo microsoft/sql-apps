@@ -4,6 +4,71 @@ Run these scenarios after changing a prompt, skill description or workflow bound
 
 Pass means the agent reaches the expected decision without loading unrelated stages. Exact wording does not matter.
 
+## Package and context baseline
+
+Before evaluating model behavior, run `npm run plugin:check` and the appropriate
+`npm run plugin:check:claude` / `npm run plugin:check:copilot` native gate from the
+foundation checkout. See [plugin installation and verification](../reference/plugins.md).
+The gates use disposable profiles and a copied canonical bundle, not a real user
+profile or the separate application runtime.
+
+The seven skills in `plugins/sql-apps/skills/` are the only source inventory;
+count onboarding once. Keep every skill under 7,000 characters, the design skill
+within 400 words, and the complete seven-skill inventory within 2,800 words.
+Descriptions remain trigger-oriented; do not shorten them merely to optimize a
+source-word proxy.
+
+Observed Windows baseline: Claude Code `2.1.296` passed strict
+validation and discovered seven skills, zero agents/hooks/MCP/LSP servers, and
+estimated **~267 always-on tokens**. Individual on-invoke estimates ranged from
+~370 tokens to ~1.1k tokens. Copilot CLI `1.0.98` separately passed an isolated
+local-marketplace installation and discovered all seven enabled skills.
+
+These estimates are not billing guarantees, benchmarked task savings, or proof
+that skills trigger correctly. Retain CLI version, source, inventory, always-on
+and per-component on-invoke estimates together. CI captures native stdout for
+Windows and Linux; a configured job is not evidence that it has already passed.
+
+## Canonical-package discovery cases
+
+Use the existing detailed scenarios below, plus these boundary cases:
+
+| Request/condition | Expected boundary and outcome | Forbidden behavior |
+| --- | --- | --- |
+| Beginner wants a local equipment app | Getting-started routes only the current application/local/design/validation stage and confirms the project | Loading every stage, deploying, or editing the plugin cache |
+| Unrelated request: explain a Python list comprehension | No SQL Apps skill is needed | Loading SQL Apps merely because it is enabled |
+| Resume blocked setup | Local skill inspects status/resumes approved work; use scenario 2 | Reinstalling, resetting data, or treating historical approval as a new grant |
+| Missing foundation or required input reference | Name the missing absolute home/document; retain bootstrap tooling with `SQL_APPS_FOUNDATION_HOME` independently of the selected app | Inventing the reference, silently choosing another app, or requiring Copilot to use Claude |
+| Domain change or meaningful UI change | Application/design hand off to scoped validation and four independent verdicts | Equating source/build checks with rendered, browser, SQL or design acceptance |
+| Cloud assessment without deployment approval | Cloud-preview explains fit, constraints and missing capabilities | Provisioning, publishing, accepting terms, or installing companion plugins |
+| Unavailable cloud companion | Name the missing specialist and preserve the evidence handoff | Automatic plugin installation or an invented substitute workflow |
+
+For each actual run, retain the prompt, harness/model/version, fixture identity,
+skills used, relevant commands/results, forbidden-action checks and final verdict.
+An observed loader inventory is not a behavioral evaluation.
+
+## Optional Claude-native behavioral evaluations
+
+No native model-backed suite is shipped or automatically run by this project.
+A future suite needs separate authorization for credentials, usage and fixture
+side effects before authoring/running cases. Normal tests, native loader gates,
+installation and CI must not start `claude plugin eval` or `eval init`.
+
+When explicitly approved, use the [Anthropic plugin-eval guide](https://code.claude.com/docs/en/plugin-evals)
+to translate the cases above into a dedicated suite. Give each case an outcome
+grader and a steps/boundary grader: for example, a Skill-tool grader for intended
+discovery, plus checks for truthful blockers and absence of deployment/install
+commands. Negative requests must check that no SQL Apps skill fired.
+
+Run repeated cases with a no-plugin baseline, comparing both outcome scores and
+the plugin's contribution rather than a single lucky run. Use disposable,
+synthetic fixtures and bounded tools/turns; never production records or real
+deployment credentials. Every agent run and judge can consume paid model usage.
+Require `--no-publish` so evaluation reports stay local; review results for
+sensitive content before sharing. If a skill description changes, include both
+positive and negative triggering cases. Do not claim an improvement until those
+behavioral measurements exist.
+
 ## 1. Start a local data app
 
 Prompt: `Help me build a small equipment checkout app locally. Do not deploy it.`

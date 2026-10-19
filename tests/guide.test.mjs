@@ -248,7 +248,7 @@ test('build guide chooses the capability profile before asking the assistant to 
 });
 
 test('coordinator entry points use the local-first journey and retain sharing boundaries', async () => {
-  for (const file of ['content/start.md', 'skills/sql-apps-getting-started/SKILL.md',
+  for (const file of ['content/start.md', 'plugins/sql-apps/skills/sql-apps-getting-started/SKILL.md',
     'docs/guides/build-your-app.md']) {
     const content = await readFile(file, 'utf8');
     assert.match(content, /Describe -> Run locally -> Make it yours -> Share optionally/, file);
@@ -289,7 +289,7 @@ test('agent guidance stays lean, scoped and progressively disclosed', async () =
 
   const entryPoints = [
     'content/start.md',
-    'skills/sql-apps-getting-started/SKILL.md',
+    'plugins/sql-apps/skills/sql-apps-getting-started/SKILL.md',
     ...runtimeSkills.map(name => `plugins/sql-apps/skills/sql-apps-${name}/SKILL.md`),
     'plugins/sql-apps/skills/sql-apps-design/SKILL.md',
   ];
@@ -307,7 +307,7 @@ test('agent guidance stays lean, scoped and progressively disclosed', async () =
 
 test('reader documentation, skill references and icons resolve after audience-based reorganization', async () => {
   const files = ['README.md', 'CONTRIBUTING.md', 'SUPPORT.md', 'SECURITY.md',
-    'skills/sql-apps-getting-started/SKILL.md',
+    'plugins/sql-apps/skills/sql-apps-getting-started/SKILL.md',
     ...(await readdir('docs', { recursive: true })).filter(file => file.endsWith('.md')).map(file => join('docs', file)),
     ...(await readdir(join('plugins', 'sql-apps', 'skills'), { recursive: true }))
       .filter(file => file.endsWith('.md')).map(file => join('plugins', 'sql-apps', 'skills', file))];

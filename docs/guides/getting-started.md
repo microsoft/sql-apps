@@ -91,7 +91,7 @@ npm run setup:check
 
 This requires restored tooling, not an application build. Before restore, use
 the installed plugin launcher's `setup plan --json` through its explicit
-foundation binding; see [setup](../reference/setup.md). The checks do not install
+foundation selection; see [setup](../reference/setup.md). The checks do not install
 tools, accept licenses, change databases or start services. Read each **Next**
 instruction and rerun after resolving missing requirements.
 
