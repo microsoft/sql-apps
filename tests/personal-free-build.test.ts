@@ -52,6 +52,36 @@ test('personal-free build emits only static and managed Functions artifacts', as
   assert.match(entry, /parsePersonalFreeBody/);
 });
 
+test('personal-free build publishes every application asset under public', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'sql-apps-personal-free-assets-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(join(root, 'public', 'images', 'icons'), { recursive: true });
+  for (const [name, content] of [
+    ['index.html', '<img src="/images/icons/logo.svg">'],
+    ['style.css', '@font-face{src:url(/fonts/brand.woff2)}'],
+    ['app.js', ''],
+    ['staticwebapp.config.json', '{}'],
+    ['images/icons/logo.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>'],
+  ] as const) await writeFile(join(root, 'public', name), content);
+  await mkdir(join(root, 'public', 'fonts'));
+  await writeFile(join(root, 'public', 'fonts', 'brand.woff2'), Buffer.from([0, 1, 2, 3]));
+  await writeFile(join(root, 'personal-free-api.json'), JSON.stringify({
+    version: 1, authenticationProvider: 'aad',
+    routes: [{ method: 'GET', path: '/api/AppReady', procedure: { name: 'AppReady', parameters: {} } }],
+  }));
+  const destination = join(root, 'artifact');
+  const manifest = await buildPersonalFreeArtifact(root, destination);
+  assert.equal(await readFile(join(destination, 'static', 'images', 'icons', 'logo.svg'), 'utf8'),
+    '<svg xmlns="http://www.w3.org/2000/svg"/>');
+  assert.deepEqual([...await readFile(join(destination, 'static', 'fonts', 'brand.woff2'))], [0, 1, 2, 3]);
+  const paths = manifest.files.map(file => file.path);
+  assert.ok(paths.includes('static/images/icons/logo.svg'));
+  assert.ok(paths.includes('static/fonts/brand.woff2'));
+
+  await writeFile(join(root, 'public', 'auth-config.json'), '{}');
+  await assert.rejects(buildPersonalFreeArtifact(root, destination), /auth-config\.json.*generated/i);
+});
+
 test('personal-free build rejects duplicate routes and procedure declarations before deployment', async t => {
   const root = await mkdtemp(join(tmpdir(), 'sql-apps-personal-free-duplicates-'));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -82,4 +112,28 @@ test('personal-free build rejects duplicate routes and procedure declarations be
     ],
   }));
   await assert.rejects(buildPersonalFreeArtifact(root, destination), /duplicate.*procedure/i);
+});
+
+test('personal-free build requires member access to readiness when members can call routes', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'sql-apps-personal-free-team-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(join(root, 'public'), { recursive: true });
+  for (const name of ['index.html', 'style.css', 'app.js']) await writeFile(join(root, 'public', name), 'x');
+  await writeFile(join(root, 'public', 'staticwebapp.config.json'), '{}');
+  const api = (readinessRoles?: string[]) => JSON.stringify({
+    version: 1, authenticationProvider: 'github', routes: [
+      { method: 'GET', path: '/api/AppReady', ...(readinessRoles ? { roles: readinessRoles } : {}),
+        procedure: { name: 'AppReady', parameters: {} } },
+      { method: 'POST', path: '/api/SaveLoan', roles: ['owner', 'member'],
+        procedure: { name: 'SaveLoan', parameters: { item: 'nvarchar' } } },
+    ],
+  });
+  await writeFile(join(root, 'personal-free-api.json'), api());
+  await assert.rejects(buildPersonalFreeArtifact(root, join(root, 'artifact')), /readiness route \/api\/AppReady must also list "member"/);
+  await writeFile(join(root, 'personal-free-api.json'), api(['member', 'member']));
+  await assert.rejects(buildPersonalFreeArtifact(root, join(root, 'artifact')), /unique/);
+  await writeFile(join(root, 'personal-free-api.json'), api(['owner', 'member']));
+  await buildPersonalFreeArtifact(root, join(root, 'artifact'));
+  const entry = await readFile(join(root, 'artifact', 'api', 'dist', 'index.mjs'), 'utf8');
+  assert.match(entry, /"roles":\["owner","member"\]/);
 });

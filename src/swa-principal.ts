@@ -3,6 +3,8 @@ import { z } from 'zod';
 
 const text = z.string().min(1).max(256);
 const role = z.string().min(1).max(128);
+export const appRoles = ['owner', 'member'] as const;
+export type AppRole = typeof appRoles[number];
 const principalSchema = z.strictObject({
   identityProvider: text,
   userId: text,
@@ -12,16 +14,17 @@ const principalSchema = z.strictObject({
   if (new Set(value.userRoles).size !== value.userRoles.length) {
     context.addIssue({ code: 'custom', path: ['userRoles'], message: 'Principal roles must be unique' });
   }
-  if (!value.userRoles.includes('owner')) {
-    context.addIssue({ code: 'custom', path: ['userRoles'], message: 'Principal must have the owner role' });
+  if (!appRoles.some(role => value.userRoles.includes(role))) {
+    context.addIssue({ code: 'custom', path: ['userRoles'], message: 'Principal must have the owner or member role' });
   }
 });
 
-export interface SwaOwnerPrincipal {
+export interface SwaAppPrincipal {
   provider: string;
   userId: string;
   details: string;
   roles: string[];
+  role: AppRole;
   ownerId: string;
 }
 
@@ -33,7 +36,7 @@ function ownerUuid(provider: string, userId: string): string {
   return `${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20)}`;
 }
 
-export function parseOwnerPrincipal(header: string | null | undefined): SwaOwnerPrincipal {
+export function parseAppPrincipal(header: string | null | undefined): SwaAppPrincipal {
   if (!header) throw new Error('SWA client principal is required');
   let decoded: Buffer;
   try {
@@ -49,13 +52,14 @@ export function parseOwnerPrincipal(header: string | null | undefined): SwaOwner
     throw new Error('SWA client principal is invalid JSON');
   }
   const parsed = principalSchema.safeParse(input);
-  if (!parsed.success) throw new Error('SWA client principal or owner role is invalid');
+  if (!parsed.success) throw new Error('SWA client principal or app role is invalid');
   const value = parsed.data;
   return {
     provider: value.identityProvider,
     userId: value.userId,
     details: value.userDetails,
     roles: [...value.userRoles],
+    role: value.userRoles.includes('owner') ? 'owner' : 'member',
     ownerId: ownerUuid(value.identityProvider, value.userId),
   };
 }

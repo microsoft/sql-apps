@@ -1,6 +1,6 @@
 # Personal-free Azure deployment
 
-`personal-free` is the primary SQL Apps cloud profile for a small, private, one-owner application. It deploys Azure Static Web Apps Free with a managed Functions API and an Azure SQL Database configured for the free offer.
+`personal-free` is the primary SQL Apps cloud profile for a small, private application used by one owner or a small invited team. It deploys Azure Static Web Apps Free with a managed Functions API and an Azure SQL Database configured for the free offer.
 
 This profile has no Static Web Apps SLA. It is **potentially $0**, not guaranteed free: the subscription must be eligible and usage must remain within current allowances.
 
@@ -29,7 +29,16 @@ JSON booleans to `bit`, 32-bit whole numbers to `int`, UUID strings to
 JSON or parameters return HTTP 400; internal SQL errors are logged without
 being returned to callers.
 
-Set `authenticationProvider` to `aad`, `github`, or `google`. The same provider must be used by `invite-owner`.
+Set `authenticationProvider` to `aad`, `github`, or `google`. The same provider must be used by `invite`.
+
+Each route is owner-only unless it lists roles. To let invited team members call a route, add `"roles": ["owner", "member"]`:
+
+```json
+{ "method": "GET", "path": "/api/ListLoans", "roles": ["owner", "member"],
+  "procedure": { "name": "ListLoans", "parameters": {} } }
+```
+
+When any route admits members, the first GET route (the browser readiness check) must admit them too; the build fails otherwise. Every call sets `SESSION_CONTEXT(N'oid')` to the caller's opaque ID and `SESSION_CONTEXT(N'role')` to `owner` or `member`. Each procedure decides whether its rows are shared by the team or scoped to the caller; the route roles control who may call it, not which rows it returns.
 
 ## Plan and deploy
 
@@ -78,18 +87,19 @@ Rotate the runtime SQL secret using the current deployment approval code:
 npm run publish -- rotate-secret --approve <approval-code>
 ```
 
-## Invite the owner
+## Invite people
 
-After deployment, create a seven-day invitation:
+After deployment, create a seven-day invitation for each person:
 
 ```powershell
-npm run publish -- invite-owner --provider aad --user owner@example.com
+npm run publish -- invite --role owner --provider aad --user owner@example.com
+npm run publish -- invite --role member --provider github --user teammate-handle
 ```
 
-Open the returned link with the intended account. Authentication alone is insufficient: the API requires the custom `owner` role, and SQL ownership derives from the provider plus immutable provider user ID rather than email.
+`invite-owner` remains an alias for `invite --role owner`. Open the returned link with the intended account. Authentication alone is insufficient: the API requires an invited `owner` or `member` role, and SQL identity derives from the provider plus immutable provider user ID rather than email. Static Web Apps Free allows invited roles for up to 25 people per app; beyond that, or for organizational group-based access, plan a separate architecture with maintained Azure skills.
 
 ## Validation
 
-Test anonymous, invited-owner, and signed-in-nonowner states. Complete a browser write, confirm the row in SQL, and reload the browser. Record functional and design acceptance separately.
+Test anonymous, invited-owner, invited-member (when used) and signed-in-uninvited states, including a member call to an owner-only route (HTTP 403). Complete a browser write, confirm the row in SQL, and reload the browser. Record functional and design acceptance separately.
 
 The publisher does not run a live Azure canary automatically. Azure creation, invitations, and any resulting usage require explicit operator approval.

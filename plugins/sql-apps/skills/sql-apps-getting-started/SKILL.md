@@ -8,7 +8,8 @@ description: "Use when a beginner is starting a SQL Apps project, shaping an app
 Resolve and quote `../../scripts/sql-apps.mjs` from this skill, not cwd.
 `SQL_APPS_HOME` selects the app; `SQL_APPS_FOUNDATION_HOME` retains bootstrap tooling.
 Input `docs/...` belongs to that app, or foundation before creation.
-Create via `projects create "<name>"`; use generated commands afterward.
+Create via `projects create-plan "<name>"`, then after approval
+`projects create "<name>" --approval <id>`; relay its `SQL_APPS_HOME` command.
 Never edit the foundation/plugin or other plugins.
 
 Follow **Describe -> Run locally -> Make it yours -> Share optionally**.
@@ -36,10 +37,12 @@ Load only the needed stage; stop gathering context once its command or blocker i
 
 ## Finish locally
 
-After authorized startup, use `sql-apps-validation`: verify a real browser action and SQL save/reload, plus required rendered browser review for new apps/meaningful UI changes. Follow its evidence/reporting contract; never claim unobserved checks passed.
+First value is one persisted domain workflow, not readiness; build it first.
+After authorized startup, use `sql-apps-validation`: real browser action,
+SQL save/reload, invalid-save error, required rendered review.
 
-Exclude secrets/real records from briefs. Local success does not require Azure.
+Exclude secrets/real records from briefs. Local success needs no Azure.
 
 Missing preview access must not stop 5x5. Let `sql-apps-local` offer container ->
 Azure SQL -> Windows x64 SQL Server 2025 Express with host DAB, separate
-approvals and sticky targets. Never claim unobserved persistence.
+approvals and sticky targets. Never claim unobserved checks passed.

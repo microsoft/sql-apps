@@ -76,4 +76,24 @@ test('publish status verifies live free settings and fails closed on drift', asy
     main(['status', '--config', configPath], () => {}, missingAzure),
     /spawn az ENOENT/,
   );
+
+  const invitations: string[][] = [];
+  const inviteRun: Run = async (_command, args) => { invitations.push([...args]); return 'https://invite.example/link\n'; };
+  const output: string[] = [];
+  await main(['invite', '--role', 'member', '--provider', 'github', '--user', 'teammate', '--config', configPath],
+    message => output.push(message), inviteRun);
+  await main(['invite-owner', '--provider', 'aad', '--user', 'owner@example.com', '--config', configPath],
+    message => output.push(message), inviteRun);
+  assert.deepEqual(invitations.map(args => args[args.indexOf('--roles') + 1]), ['member', 'owner']);
+  assert.match(output[0]!, /Member invitation for teammate[\s\S]*25 people[\s\S]*invite\.example/);
+  assert.match(output[1]!, /Owner invitation/);
+  await assert.rejects(
+    main(['invite', '--role', 'admin', '--provider', 'aad', '--user', 'x', '--config', configPath], () => {}, inviteRun),
+    /--role must be owner or member/,
+  );
+  await assert.rejects(
+    main(['invite', '--provider', 'aad', '--user', 'x', '--config', configPath], () => {}, inviteRun),
+    /--role is required/,
+  );
+  assert.equal(invitations.length, 2);
 });

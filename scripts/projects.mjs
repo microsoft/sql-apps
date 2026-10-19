@@ -213,6 +213,22 @@ async function customizeProject(target, name, slug, tooling) {
   await writeFile(join(target, 'README.md'), `# ${name}\n\nA SQL Apps project.\n\n## Local development\n\n\`\`\`powershell\nnpm ci\nnpm run build\nnpm run setup -- plan --profile role-based-data\n\`\`\`\n`);
 }
 
+async function requireGit(runner = execute) {
+  try { await runner('git', ['--version'], { windowsHide: true, maxBuffer: 1024 * 1024 }); }
+  catch {
+    throw new Error('Git is required because each SQL Apps project is its own Git repository. Install Git from https://git-scm.com/downloads, open a new terminal so it is on PATH, then retry. Nothing was created.');
+  }
+}
+
+function nextSteps(path) {
+  const quoted = `'${path.replaceAll("'", "''")}'`;
+  return {
+    selectProject: `Point SQL_APPS_HOME at this project and keep SQL_APPS_FOUNDATION_HOME on the foundation. PowerShell: $env:SQL_APPS_HOME = ${quoted}; bash: export SQL_APPS_HOME='${path.replaceAll("'", "'\\''")}'. Then restart the assistant in this directory.`,
+    beforeRestore: 'Run setup plan --json through the installed SQL Apps launcher to review restore and prerequisite approvals.',
+    afterRestore: ['npm run guide', 'npm run setup -- plan'],
+  };
+}
+
 async function initializeRepository(target, runner = execute) {
   const options = { cwd: target, windowsHide: true, maxBuffer: 4 * 1024 * 1024 };
   await runner('git', ['init'], options);
@@ -278,6 +294,7 @@ export async function createProject(sourceValue, name, options = {}) {
   const toolingManifest = await readFile(join(source, 'packages', 'sql-apps', 'package.json'), 'utf8');
   const tooling = JSON.parse(toolingManifest);
   const userHome = resolve(options.userHome ?? homedir());
+  if (options.initializeGit !== false) await requireGit(options.runner);
   const creation = options.progressive ? await planProjectCreation(source, name, { ...options, toolingManifest }) : null;
   if (creation && options.approval !== creation.approval) throw new Error('Review projects create-plan and explicitly approve its current id before starting the browser experience.');
   return withProjectsLock(userHome, async () => {
@@ -322,7 +339,7 @@ export async function createProject(sourceValue, name, options = {}) {
       state.projects = [...state.projects.filter(item => item.path !== destination), project];
       state.activeProject = destination;
       await saveProjectsState(state, userHome);
-      return { ...project, ...(origin ? { launchUrl: origin, reviewPending: true } : {}) };
+      return { ...project, ...(origin ? { launchUrl: origin, reviewPending: true } : {}), next: nextSteps(destination) };
     } catch (error) {
       await rm(temporary, { recursive: true, force: true });
       if (origin) {

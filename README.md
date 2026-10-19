@@ -69,18 +69,24 @@ installation, cloud companion plugins, verification and removal.
 
 Keep this foundation checkout as the SQL Apps tool source. Create each application
 as an independent Git repository under your user project root (by default
-`%USERPROFILE%\SqlAppsProjects` on Windows):
+`%USERPROFILE%\SqlAppsProjects` on Windows). [Git](https://git-scm.com/downloads)
+is required; creation stops before changing anything if it is missing.
 
 ```powershell
-npm run projects -- create "Equipment Checkout"
+npm run projects -- create-plan "Equipment Checkout"
+npm run projects -- create "Equipment Checkout" --approval <printed-id>
 ```
 
-The command creates `%USERPROFILE%\SqlAppsProjects\equipment-checkout`, records
-it as the active SQL Apps project and initializes its Git history. It refuses to
-merge into an existing folder. Use `npm run projects -- root D:\SqlAppsProjects`
-to choose another absolute root, `npm run projects -- list` to see registered
-projects, and `npm run projects -- open C:\path\to\project` to register an
-existing SQL Apps project.
+The plan prints every effect (destination, Git repository, local ports, the
+creation page it opens) and an approval ID; nothing changes until you run the
+second command with that ID. Creation makes
+`%USERPROFILE%\SqlAppsProjects\equipment-checkout`, records it as the active
+project and prints the command that points `SQL_APPS_HOME` at it. Run that
+command, keep `SQL_APPS_FOUNDATION_HOME` on the foundation, and restart your
+assistant in the new folder. Creation refuses to merge into an existing folder.
+Use `npm run projects -- root D:\SqlAppsProjects` to choose another absolute
+root, `npm run projects -- list` to see registered projects, and
+`npm run projects -- open C:\path\to\project` to register an existing project.
 
 Open the generated project—not this foundation checkout—in your preferred editor
 and give your AI assistant access to that project. Ask:
@@ -111,9 +117,9 @@ For one connected setup journey, ask your assistant to use the [setup coordinato
 
 **Your application.** Work with your AI assistant to implement and test its screens and SQL behavior in its generated repository. The project factory creates the runtime foundation, not a finished domain app. The default project has no Todo screen or sample data; examples are selected explicitly.
 
-**A useful first result.** Run the app, sign in as a development user and see its readiness check pass, then add your first table, stored procedure and screen. A launch URL is usable only after the intended server responds. [Run locally](docs/guides/run-locally.md) explains startup paths, scoped approvals and how to keep your data between sessions.
+**A useful first result is one real workflow, not a readiness check.** Within the first session you should be able to do the one thing your app is for (check out a laptop, record a signup), see it saved in SQL, reload the page and still see it, and see a clear message when a save is invalid. A passing readiness check or a launch URL only means the plumbing works. [Run locally](docs/guides/run-locally.md) explains startup paths, scoped approvals and how to keep your data between sessions.
 
-**Sharing is optional.** The primary personal-project target is Static Web Apps Free, managed Functions and the Azure SQL Database free offer. It can plausibly remain at $0 only within current allowances, and it has no Static Web Apps SLA. When you are ready to share, read [Sharing your app](docs/guides/sharing.md) and [Costs and growth](docs/guides/costs.md).
+**Sharing is optional.** The primary cloud target is Static Web Apps Free, managed Functions and the Azure SQL Database free offer, for yourself or a small team: invite people as `owner` or `member` (up to 25) and choose which operations members may call. It can plausibly remain at $0 only within current allowances, and it has no Static Web Apps SLA. When you are ready to share, read [Sharing your app](docs/guides/sharing.md) and [Costs and growth](docs/guides/costs.md).
 
 ## Find your next step
 

@@ -1,16 +1,18 @@
 import { z } from 'zod';
-import { parseOwnerPrincipal } from './swa-principal.js';
+import { parseAppPrincipal, type AppRole } from './swa-principal.js';
 import type { ProcedureDefinition } from './sql-procedure-runtime.js';
 
 export interface PersonalFreeRoute {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   path: `/api/${string}`;
+  roles?: readonly AppRole[];
   procedure: ProcedureDefinition;
 }
 
 export interface PersonalFreeRuntime {
   execute(
     ownerId: string,
+    role: AppRole,
     procedure: string,
     values: Record<string, string | boolean | number | null>,
   ): Promise<unknown[]>;
@@ -49,6 +51,31 @@ function validParameter(type: ProcedureDefinition['parameters'][string], value: 
   return typeof value === 'string' && Number.isFinite(Date.parse(value));
 }
 
+// Query strings carry only text, so declared int/bit parameters are converted from their canonical forms.
+function queryParameters(
+  search: URLSearchParams,
+  parameters: ProcedureDefinition['parameters'],
+): Record<string, string | boolean | number> | null {
+  const values: Record<string, string | boolean | number> = {};
+  for (const name of new Set(search.keys())) {
+    const all = search.getAll(name);
+    if (all.length !== 1) return null;
+    const text = all[0]!;
+    const type = parameters[name];
+    if (type === 'int') {
+      if (!/^-?(0|[1-9][0-9]{0,9})$/.test(text)) return null;
+      values[name] = Number(text);
+    } else if (type === 'bit') {
+      if (text !== 'true' && text !== 'false') return null;
+      values[name] = text === 'true';
+    } else {
+      if (type !== 'nvarchar' && text === '') return null;
+      values[name] = text;
+    }
+  }
+  return values;
+}
+
 export function createPersonalFreeHandler(
   routes: readonly PersonalFreeRoute[],
   runtime: PersonalFreeRuntime,
@@ -68,16 +95,19 @@ export function createPersonalFreeHandler(
     }
     let principal;
     try {
-      principal = parseOwnerPrincipal(request.headers.get('x-ms-client-principal'));
+      principal = parseAppPrincipal(request.headers.get('x-ms-client-principal'));
     } catch (error) {
-      const forbidden = error instanceof Error && /owner role/i.test(error.message);
-      return Response.json({ error: forbidden ? 'Owner role required' : 'Authentication required' },
+      const forbidden = error instanceof Error && /app role/i.test(error.message);
+      return Response.json({ error: forbidden ? 'Owner or member role required' : 'Authentication required' },
         { status: forbidden ? 403 : 401 });
     }
     const route = routeMap.get(`${request.method} ${url.pathname}`);
     if (!route) return Response.json({ error: 'Route not found' }, { status: 404 });
+    if (!(route.roles ?? ['owner']).includes(principal.role)) {
+      return Response.json({ error: 'Your role cannot perform this operation' }, { status: 403 });
+    }
     const candidate = request.method === 'GET'
-      ? Object.fromEntries(url.searchParams.entries())
+      ? queryParameters(url.searchParams, route.procedure.parameters)
       : request.body ?? {};
     const parsed = z.record(z.string(), scalar).safeParse(candidate);
     const expected = Object.keys(route.procedure.parameters).sort();
@@ -87,7 +117,7 @@ export function createPersonalFreeHandler(
       return Response.json({ error: 'Invalid procedure parameters' }, { status: 400 });
     }
     try {
-      const rows = await runtime.execute(principal.ownerId, route.procedure.name, parsed.data);
+      const rows = await runtime.execute(principal.ownerId, principal.role, route.procedure.name, parsed.data);
       return Response.json({ value: rows });
     } catch (error) {
       reportError(error);

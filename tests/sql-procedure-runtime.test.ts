@@ -23,6 +23,8 @@ test('SQL session context satisfies and clears the shipped owner predicate contr
   assert.match(predicate, /SESSION_CONTEXT\(N'scp'\)/);
   assert.match(runtime, /@key=N'scp', @value=N'access_as_user'/);
   assert.match(runtime, /@key=N'scp', @value=NULL/);
+  assert.match(runtime, /@key=N'role', @value=@app_role/);
+  assert.match(runtime, /@key=N'role', @value=NULL/);
 });
 
 test('SQL runtime retries a paused free database with exponential delays and a fresh pool', async () => {
@@ -41,7 +43,7 @@ test('SQL runtime retries a paused free database with exponential delays and a f
   const runtime = createProcedureRuntime(env, [{ name: 'AppReady', parameters: {} }], {
     driver, sleep: async milliseconds => { delays.push(milliseconds); },
   });
-  assert.deepEqual(await runtime.execute('11111111-1111-5111-8111-111111111111', 'AppReady', {}), []);
+  assert.deepEqual(await runtime.execute('11111111-1111-5111-8111-111111111111', 'owner', 'AppReady', {}), []);
   assert.equal(connects, 3);
   assert.deepEqual(delays, [5_000, 10_000]);
 });
@@ -57,9 +59,9 @@ test('SQL runtime rejects undeclared procedures and does not retry credentials',
     },
     sleep: async () => { throw new Error('must not sleep'); },
   });
-  await assert.rejects(runtime.execute('11111111-1111-5111-8111-111111111111', 'Unknown', {}), /declared/);
+  await assert.rejects(runtime.execute('11111111-1111-5111-8111-111111111111', 'owner', 'Unknown', {}), /declared/);
   assert.equal(connects, 0);
-  await assert.rejects(runtime.execute('11111111-1111-5111-8111-111111111111', 'AppReady', {}), /login failed/);
+  await assert.rejects(runtime.execute('11111111-1111-5111-8111-111111111111', 'owner', 'AppReady', {}), /login failed/);
   assert.equal(connects, 1);
 });
 
@@ -71,9 +73,10 @@ test('SQL runtime requires exact declared parameters', async () => {
     driver: {
       async connect() {
         return {
-          async execute(ownerId, procedure, values, definition) {
+          async execute(ownerId, role, procedure, values, definition) {
             called = true;
             assert.equal(ownerId, '11111111-1111-5111-8111-111111111111');
+            assert.equal(role, 'owner');
             assert.equal(procedure, 'UpdateItem');
             assert.deepEqual(values, { id: '22222222-2222-5222-8222-222222222222', completed: true });
             assert.deepEqual(definition.parameters, { id: 'uniqueidentifier', completed: 'bit' });
@@ -85,9 +88,12 @@ test('SQL runtime requires exact declared parameters', async () => {
     },
     sleep: async () => {},
   });
-  await assert.rejects(runtime.execute('11111111-1111-5111-8111-111111111111', 'UpdateItem', { id: 'x' }), /parameters/);
+  await assert.rejects(runtime.execute('11111111-1111-5111-8111-111111111111', 'owner', 'UpdateItem', { id: 'x' }), /parameters/);
+  await assert.rejects(runtime.execute('11111111-1111-5111-8111-111111111111', 'admin' as 'owner', 'UpdateItem', {
+    id: '22222222-2222-5222-8222-222222222222', completed: true,
+  }), /application role/);
   assert.equal(called, false);
-  assert.deepEqual(await runtime.execute('11111111-1111-5111-8111-111111111111', 'UpdateItem', {
+  assert.deepEqual(await runtime.execute('11111111-1111-5111-8111-111111111111', 'owner', 'UpdateItem', {
     id: '22222222-2222-5222-8222-222222222222', completed: true,
   }), [{ outcome: 'ok' }]);
 });
@@ -113,11 +119,11 @@ test('SQL runtime reconnects after a connection is discarded during cleanup', as
     sleep: async () => {},
   });
   await assert.rejects(
-    runtime.execute('11111111-1111-5111-8111-111111111111', 'AppReady', {}),
+    runtime.execute('11111111-1111-5111-8111-111111111111', 'owner', 'AppReady', {}),
     /SQL owner context cleanup failed/,
   );
   assert.deepEqual(
-    await runtime.execute('11111111-1111-5111-8111-111111111111', 'AppReady', {}),
+    await runtime.execute('11111111-1111-5111-8111-111111111111', 'owner', 'AppReady', {}),
     [{ status: 'ready' }],
   );
   assert.equal(connects, 2);

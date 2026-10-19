@@ -11,7 +11,7 @@
     },
     {
       "route": "/api/*",
-      "allowedRoles": ["owner"]
+      "allowedRoles": ["owner", "member"]
     }
   ],
   "navigationFallback": {

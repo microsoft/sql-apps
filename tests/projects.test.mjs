@@ -347,6 +347,29 @@ test('create scaffolds an independent named project and records it as active', a
   const state = await projects.readProjectsState({ userHome });
   assert.equal(state.activeProject, created.path);
   assert.deepEqual(state.projects.map(project => project.path), [created.path]);
+  assert.ok(created.next.selectProject.includes(`$env:SQL_APPS_HOME = '${created.path}'`),
+    'creation tells the user how to select the new project instead of the foundation');
+  assert.match(created.next.selectProject, /keep SQL_APPS_FOUNDATION_HOME/);
+  assert.deepEqual(created.next.afterRestore, ['npm run guide', 'npm run setup -- plan']);
+  for (const command of created.next.afterRestore) {
+    assert.ok(Object.hasOwn(pkg.scripts, command.split(' ')[2]), `${command} must exist in a generated project`);
+  }
+});
+
+test('create fails before any filesystem or registry effect when Git is unavailable', async t => {
+  const source = await sourceFixture(t);
+  const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-project-nogit-')));
+  t.after(() => rm(userHome, { recursive: true, force: true }));
+  const calls = [];
+  const runner = async (file, args) => {
+    calls.push([file, ...args]);
+    throw Object.assign(new Error('spawn git ENOENT'), { code: 'ENOENT' });
+  };
+  await assert.rejects(projects.createProject(source, 'No Git', { userHome, runner }),
+    /Git is required[\s\S]*git-scm\.com[\s\S]*Nothing was created/);
+  assert.deepEqual(calls, [['git', '--version']]);
+  await assert.rejects(access(join(userHome, 'SqlAppsProjects')), { code: 'ENOENT' });
+  assert.deepEqual((await projects.readProjectsState({ userHome })).projects, []);
 });
 
 test('generated app validation guidance uses available project scripts', async t => {

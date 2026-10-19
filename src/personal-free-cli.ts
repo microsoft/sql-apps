@@ -24,6 +24,7 @@ function usage(): string {
     '  sql-apps publish init --name <name> --location <region> [--environment prod] [--resource-group <name>]',
     '  sql-apps publish plan [--config <path>]',
     '  sql-apps publish deploy --approve <code> [--config <path>]',
+    '  sql-apps publish invite --role <owner|member> --provider <aad|github|google> --user <email-or-handle> [--config <path>]',
     '  sql-apps publish invite-owner --provider <aad|github|google> --user <email-or-handle> [--config <path>]',
     '  sql-apps publish rotate-secret --approve <current-deployment-code> [--config <path>]',
     '  sql-apps publish status [--config <path>]',
@@ -95,8 +96,10 @@ async function deploy(args: readonly string[], command: Run): Promise<string> {
   return `Deployment stage: ${state.stage}\nApplication: https://${state.staticWebAppHostname}`;
 }
 
-async function inviteOwner(args: readonly string[], command: Run): Promise<string> {
+async function invite(args: readonly string[], command: Run, fixedRole?: 'owner'): Promise<string> {
   const values = flags(args);
+  const role = fixedRole ?? take(values, '--role');
+  if (!['owner', 'member'].includes(role)) throw new Error('--role must be owner or member');
   const provider = take(values, '--provider').toLowerCase();
   if (!['aad', 'github', 'google'].includes(provider)) throw new Error('--provider must be aad, github, or google');
   const user = take(values, '--user');
@@ -105,7 +108,7 @@ async function inviteOwner(args: readonly string[], command: Run): Promise<strin
   const config = await readPersonalFreeConfig(configPath);
   const state = protectedDeploymentStateSchema.parse(JSON.parse(
     await readFile(personalFreeStatePath(config), 'utf8')));
-  if (!state.staticWebAppName || !state.staticWebAppHostname) throw new Error('Deploy the application before inviting its owner');
+  if (!state.staticWebAppName || !state.staticWebAppHostname) throw new Error('Deploy the application before inviting people');
   const invitation = await command('az', [
     'staticwebapp', 'users', 'invite',
     '--subscription', config.subscriptionId,
@@ -113,12 +116,12 @@ async function inviteOwner(args: readonly string[], command: Run): Promise<strin
     '--name', state.staticWebAppName,
     '--authentication-provider', provider,
     '--user-details', user,
-    '--roles', 'owner',
+    '--roles', role,
     '--domain', state.staticWebAppHostname,
     '--invitation-expiration-in-hours', '168',
     '--query', 'invitationUrl', '-o', 'tsv',
   ]);
-  return `Owner invitation (expires in 7 days):\n${invitation.trim()}`;
+  return `${role === 'owner' ? 'Owner' : 'Member'} invitation for ${user} (expires in 7 days; Static Web Apps Free allows invited roles for up to 25 people):\n${invitation.trim()}`;
 }
 
 async function status(args: readonly string[], command: Run): Promise<string> {
@@ -171,7 +174,8 @@ export async function main(
     init: () => init(rest, command),
     plan: () => plan(rest),
     deploy: () => deploy(rest, command),
-    'invite-owner': () => inviteOwner(rest, command),
+    invite: () => invite(rest, command),
+    'invite-owner': () => invite(rest, command, 'owner'),
     'rotate-secret': () => rotateSecret(rest, command),
     status: () => status(rest, command),
   };

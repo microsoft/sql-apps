@@ -58,7 +58,7 @@ export function planPersonalFreeDeployment(config: PersonalFreeConfig, sourceHas
       'Target: personal-free (Azure Static Web Apps Free; no SLA).',
       'Cost: potentially $0 only while Static Web Apps and Azure SQL remain inside current free allowances.',
       'Network: Azure SQL uses a public endpoint. The 0.0.0.0 firewall rule admits all resources inside the Azure boundary, including other subscriptions.',
-      'Authentication: an explicitly invited owner role; generated least-privilege SQL credentials are stored outside source.',
+      'Authentication: explicitly invited owner and member roles (up to 25 invited people on Static Web Apps Free); generated least-privilege SQL credentials are stored outside source.',
       'Not created: DAB, Container Apps, ACR, VNet, private endpoint, private DNS, Log Analytics, Application Insights, or Key Vault.',
     ].join('\n'),
   };

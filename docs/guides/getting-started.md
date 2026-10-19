@@ -4,7 +4,11 @@ Prepare your computer to build and run SQL Apps locally. You do not need an Azur
 
 ## 1. Install the foundation and create a project
 
-On the repository page, choose **Code -> Download ZIP**, or clone it with Git. If it was shared with you, confirm which branch to use. For a ZIP download, extract it first.
+Install [Git](https://git-scm.com/downloads) first: every SQL Apps application is
+its own Git repository, and project creation stops before changing anything when
+Git is missing. Clone the repository, or on the repository page choose
+**Code -> Download ZIP** and extract it. If it was shared with you, confirm which
+branch to use.
 
 Open a terminal in the trusted SQL Apps foundation folder, then create an
 independent application:
@@ -28,9 +32,11 @@ your application as capabilities are verified. Creation does not authorize later
 setup changes. See [progressive creation](../reference/progressive-creation.md).
 
 The create command refuses an existing destination, initializes a new Git
-repository and records the project as active. Open the generated folder
-containing `package.json`, `scripts` and `src` in your preferred editor. The
-foundation/plugin checkout remains separate and should not become an
+repository and records the project as active. Its output includes the exact
+command that points `SQL_APPS_HOME` at the new project; run it, keep
+`SQL_APPS_FOUNDATION_HOME` on the foundation, and restart your assistant in the
+generated folder (it contains `package.json`, `src` and `sql`, but no `scripts`).
+The foundation/plugin checkout remains separate and should not become an
 application. See [Manage projects](../reference/projects.md).
 
 You can ask your AI assistant:
@@ -43,6 +49,7 @@ An AI assistant is optional for running the application. Guided app building can
 
 | Tool or access | Why you need it |
 | --- | --- |
+| Git | Each application is created as its own Git repository. |
 | Node.js 22 or 24 with npm | Build and run the application and setup check. |
 | .NET SDK 8 or later | Build and publish the SQL schema. Choose SDK, not just Runtime. |
 | Docker with Linux containers | Preferred container route only; endpoint fallbacks use host DAB without Docker. |

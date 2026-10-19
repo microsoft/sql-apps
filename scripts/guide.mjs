@@ -129,7 +129,7 @@ export async function readGuide(home) {
   const checkpoint = state?.brief.checkpoint;
   const profile = await lstat(join(source.home, 'role-based-data.json')).then(() => 'role-based-data', () => null);
   const suggestedProfile = 'role-based-data';
-  const setupPlan = 'setup plan (node scripts/setup.mjs plan)';
+  const setupPlan = 'setup plan (npm run setup -- plan; before dependencies are restored, use the installed SQL Apps launcher: setup plan)';
   const nextStage = !state ? 'describe' : changed ? 'run-locally' :
     checkpoint?.stage === 'make-it-yours' ? 'share-optionally' :
       checkpoint?.stage === 'run-locally' ? 'make-it-yours' : 'run-locally';
@@ -139,7 +139,7 @@ export async function readGuide(home) {
       `Source changed since the saved checkpoint, so its evidence is historical. Run ${setupPlan} to rebuild with approval, then verify the actual app locally again.` :
       `Run ${setupPlan} first. It orders setup checks and names each approval before installations, downloads, workspace selection or schema/startup changes.`,
     'make-it-yours': 'Recheck the intended running app, then make the saved nextChange. Verify browser validation, SQL save/reload and existing behavior before recording evidence.',
-    'share-optionally': 'You can stop here with a useful local app. Sharing requires separate data/access review and explicit cloud approval; a saved checkpoint never authorizes deployment.',
+    'share-optionally': 'You can stop here with a useful local app. To share, review data/access, then run npm run publish -- init, npm run publish -- plan and deploy only with its approval code; a saved checkpoint never authorizes deployment.',
   };
   return {
     home: source.home, application: source.application, profile, suggestedProfile, brief: state?.brief ?? null,
@@ -151,15 +151,15 @@ export async function readGuide(home) {
       origin: runtime.mode === 'legacy-unselected' ? null : runtime.origins.app },
     localServices: ['SQL', 'Data API', 'Browser/API'],
     cloud: { authorized: false, optional: true,
-      note: 'Public anonymous demos require synthetic data only. Use the maintained Azure Skills (prepare, validate, deploy) for new cloud deployments, then run SQL Apps live acceptance.' },
+      note: 'Cloud sharing uses the bundled personal-free publisher (npm run publish -- init, plan, deploy --approve, then invite people). Use maintained Azure Skills only for services outside that profile.' },
     cost: {
       preference: state?.brief.costPreference ?? 'zero-azure-spend',
       phase: nextStage === 'share-optionally' ? 'deployment-cost-review' :
         nextStage === 'make-it-yours' ? 'capability-cost-awareness' : 'local-cost-awareness',
       message: nextStage === 'share-optionally' ?
-        'Before sharing, review expected Azure costs with the Azure Cost tooling (forecast, estimate and actual usage). Free SQL/compute allowances do not remove registry or managed-network charges. A zero-spend intent is blocked by the current template; never fall back to paid resources.' :
+        'The personal-free publisher targets Static Web Apps Free and the Azure SQL free offer: potentially $0 only while the subscription is eligible and usage stays within allowances, with no Static Web Apps SLA. It pauses rather than bills at free limits, and npm run publish -- status verifies that guard; never fall back to paid resources without a separate decision.' :
         'Local operation has no Azure usage bill; tool/access/licensing conditions still apply. Review cloud costs only when sharing, not during initial design.',
-      reviewCommand: 'Use the azure-cost plugin (Azure Cost skills) to estimate the planned resources before approving any deployment.',
+      reviewCommand: 'Review the resources and cost boundary printed by npm run publish -- plan before approving deployment.',
       usageStatus: 'not-queried',
       spendingAuthorized: false,
       scaleGuidance: 'Review actual remaining allowances, latency and availability needs before paying for capacity. User count is not a scaling threshold. Budgets are alerts, not hard spending caps.',

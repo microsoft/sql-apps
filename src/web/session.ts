@@ -109,7 +109,7 @@ export async function prepareAuthentication(
     return {
       session: parsed ? {
         name: parsed.name,
-        authorized: parsed.roles.includes('owner'),
+        authorized: parsed.roles.includes('owner') || parsed.roles.includes('member'),
         getAccessToken: async () => 'static-web-apps-platform-session',
       } : undefined,
       signIn: async () => navigate(`/.auth/login/${config.provider}?post_login_redirect_uri=/`),

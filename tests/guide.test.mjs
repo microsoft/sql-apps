@@ -79,13 +79,14 @@ test('guide routes run-locally through setup plan and suggests the profile that 
   assert.equal(report.suggestedProfile, 'role-based-data', 'every brief uses the single data profile');
   assert.match(report.nextAction, /setup plan/);
   assert.doesNotMatch(report.nextAction, /setup-check/, 'the coordinator, not the raw readiness check, orders approvals');
-  assert.match(report.cost.reviewCommand, /azure-cost/);
+  assert.match(report.cost.reviewCommand, /npm run publish -- plan/);
+  assert.doesNotMatch(report.nextAction, /node scripts\//, 'generated projects have no scripts directory');
   await writeFile(join(home, 'role-based-data.json'), '{}');
   report = await readGuide(home);
   assert.equal(report.profile, 'role-based-data');
   assert.equal(report.suggestedProfile, 'role-based-data', 'a configured profile wins over the brief');
   assert.match(report.nextAction, /setup plan/);
-  assert.match(report.cost.reviewCommand, /azure-cost/);
+  assert.match(report.cost.reviewCommand, /npm run publish -- plan/);
   assert.doesNotMatch(report.cost.reviewCommand, /demo-cost|role-based-cost/);
 });
 
@@ -198,7 +199,10 @@ test('sharing reveals cost blockers without converting a saved preference into s
   assert.equal(report.cost.preference, 'review-paid-costs');
   assert.equal(report.cost.spendingAuthorized, false);
   assert.equal(report.cost.usageStatus, 'not-queried');
-  assert.match(report.cost.message, /zero-spend intent is blocked/);
+  assert.match(report.cost.message, /potentially \$0/);
+  assert.match(report.cost.message, /no Static Web Apps SLA/);
+  assert.match(report.nextAction, /npm run publish -- init/);
+  assert.match(report.cloud.note, /personal-free publisher/);
   assert.match(report.cost.scaleGuidance, /not.*scaling threshold/);
   assert.equal(report.cloud.authorized, false);
 });

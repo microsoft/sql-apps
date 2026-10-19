@@ -77,9 +77,26 @@ Pass:
 
 - asks about users, records and actions one question at a time;
 - uses `role-based-data`; explains that requested files/jobs are outside SQL Apps rather than inventing another bundled profile;
+- creates through `projects create-plan` and an approved `create --approval`, then relays the printed `SQL_APPS_HOME` selection;
 - runs `guide` and `setup plan`; uses the standalone setup check only for a named prerequisite failure;
 - stops when the plan names an approval or blocker;
 - does not load cloud deployment or cost guidance.
+
+### 5x5 first-value measurement
+
+On a prepared machine (prerequisites installed, SQL route available, tooling
+package resolvable), measure from the first prompt to the first persisted domain
+workflow. Pass only when:
+
+- **about 5 minutes of wall-clock time** pass from approved creation to first value, excluding the user's own think time;
+- **at most 5 meaningful user decisions** are requested (scope summary, creation approval, setup approvals); repeated or confirmation-only prompts count;
+- **first value is observed, not reported:** the app's main domain action saves through the browser, survives a fresh document reload, shows the persisted row, and an invalid save shows visible feedback with the input retained;
+- readiness checks, a launch URL, a scaffold or a green `app:check` are **not** first value;
+- the agent builds only that slice before adding other screens, and does not stream long plans or repeated status messages between decisions.
+
+Measure the cold path (installs, image pulls, preview-access fallback) separately
+and report its time and decisions; do not hide it inside the prepared-machine
+number. Record failures with the stage that consumed the time.
 
 ## 1a. Verify progressive creation
 

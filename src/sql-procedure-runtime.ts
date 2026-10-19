@@ -1,5 +1,6 @@
 import sql from 'mssql';
 import { z } from 'zod';
+import { appRoles, type AppRole } from './swa-principal.js';
 
 export type ProcedureParameterType = 'nvarchar' | 'uniqueidentifier' | 'bit' | 'int' | 'datetime2';
 export interface ProcedureDefinition {
@@ -22,6 +23,7 @@ export interface SqlConnectionConfig {
 export interface SqlRuntimeConnection {
   execute(
     ownerId: string,
+    role: AppRole,
     procedure: string,
     values: Readonly<Record<string, string | boolean | number | null>>,
     definition: ProcedureDefinition,
@@ -71,7 +73,7 @@ const mssqlDriver: SqlRuntimeDriver = {
   async connect(config) {
     const pool = await new sql.ConnectionPool(config).connect();
     return {
-      async execute(subject, procedure, values, definition) {
+      async execute(subject, role, procedure, values, definition) {
         const transaction = new sql.Transaction(pool);
         let contextSet = false;
         let cleanupError: unknown;
@@ -80,8 +82,10 @@ const mssqlDriver: SqlRuntimeDriver = {
           contextSet = true;
           await new sql.Request(transaction)
             .input('owner_oid', sql.NVarChar(36), subject)
+            .input('app_role', sql.NVarChar(16), role)
             .query("EXEC sys.sp_set_session_context @key=N'oid', @value=@owner_oid, @read_only=0;\n" +
-              "EXEC sys.sp_set_session_context @key=N'scp', @value=N'access_as_user', @read_only=0;");
+              "EXEC sys.sp_set_session_context @key=N'scp', @value=N'access_as_user', @read_only=0;\n" +
+              "EXEC sys.sp_set_session_context @key=N'role', @value=@app_role, @read_only=0;");
           const request = new sql.Request(transaction);
           for (const [name, type] of Object.entries(definition.parameters)) {
             request.input(name, inputType(type), values[name]);
@@ -89,7 +93,8 @@ const mssqlDriver: SqlRuntimeDriver = {
           const result = await request.execute(procedure);
           await new sql.Request(transaction)
             .query("EXEC sys.sp_set_session_context @key=N'scp', @value=NULL, @read_only=0;\n" +
-              "EXEC sys.sp_set_session_context @key=N'oid', @value=NULL, @read_only=0;");
+              "EXEC sys.sp_set_session_context @key=N'oid', @value=NULL, @read_only=0;\n" +
+              "EXEC sys.sp_set_session_context @key=N'role', @value=NULL, @read_only=0;");
           contextSet = false;
           await transaction.commit();
           return result.recordset ?? [];
@@ -98,7 +103,8 @@ const mssqlDriver: SqlRuntimeDriver = {
             try {
               await new sql.Request(transaction)
                 .query("EXEC sys.sp_set_session_context @key=N'scp', @value=NULL, @read_only=0;\n" +
-                  "EXEC sys.sp_set_session_context @key=N'oid', @value=NULL, @read_only=0;");
+                  "EXEC sys.sp_set_session_context @key=N'oid', @value=NULL, @read_only=0;\n" +
+              "EXEC sys.sp_set_session_context @key=N'role', @value=NULL, @read_only=0;");
             } catch (cleanup) {
               cleanupError = cleanup;
             }
@@ -166,15 +172,16 @@ export function createProcedureRuntime(
     }
   };
   return {
-    async execute(subject: string, procedure: string, values: Record<string, string | boolean | number | null>) {
+    async execute(subject: string, role: AppRole, procedure: string, values: Record<string, string | boolean | number | null>) {
       ownerId.parse(subject);
+      if (!appRoles.includes(role)) throw new Error('SQL caller role is not an application role');
       const definition = definitions.get(procedure);
       if (!definition) throw new Error('SQL procedure is not declared for this application');
       const expected = Object.keys(definition.parameters).sort();
       const actual = Object.keys(values).sort();
       if (JSON.stringify(expected) !== JSON.stringify(actual)) throw new Error('SQL procedure parameters do not match the declaration');
       try {
-        return await (await connect()).execute(subject, procedure, values, definition);
+        return await (await connect()).execute(subject, role, procedure, values, definition);
       } catch (error) {
         if (error instanceof SqlConnectionDiscardedError) connection = undefined;
         throw error;

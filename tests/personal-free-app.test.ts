@@ -16,8 +16,8 @@ test('personal-free API maps only declared routes to typed procedures', async ()
     path: '/api/UpdateItem',
     procedure: { name: 'UpdateItem', parameters: { id: 'uniqueidentifier', completed: 'bit' } },
   }], {
-    async execute(ownerId, procedure, values) {
-      calls.push({ ownerId, procedure, values });
+    async execute(ownerId, role, procedure, values) {
+      calls.push({ ownerId, role, procedure, values });
       return [{ outcome: 'ok' }];
     },
     async ready() {},
@@ -32,6 +32,7 @@ test('personal-free API maps only declared routes to typed procedures', async ()
   assert.deepEqual(await response.json(), { value: [{ outcome: 'ok' }] });
   assert.deepEqual(calls, [{
     ownerId: '9e63b381-bc6b-56ec-bb77-9dfe59f62474',
+    role: 'owner',
     procedure: 'UpdateItem',
     values: { id: '22222222-2222-5222-8222-222222222222', completed: true },
   }]);
@@ -89,6 +90,41 @@ test('personal-free API validates values against declared SQL parameter types', 
   assert.equal(called, false);
 });
 
+test('personal-free API parses typed GET query parameters strictly', async () => {
+  const calls: unknown[] = [];
+  const handler = createPersonalFreeHandler([{
+    method: 'GET',
+    path: '/api/ListItems',
+    procedure: {
+      name: 'ListItems',
+      parameters: { limit: 'int', completed: 'bit', name: 'nvarchar', since: 'datetime2' },
+    },
+  }], {
+    async execute(_ownerId, _role, _procedure, values) { calls.push(values); return []; },
+    async ready() {},
+  });
+  const get = (query: string) => handler({
+    method: 'GET',
+    url: `https://example.test/api/ListItems?${query}`,
+    headers: new Headers({ 'x-ms-client-principal': ownerHeader }),
+  });
+  const accepted = await get('limit=10&completed=false&name=12&since=2026-01-02T03%3A04%3A05Z');
+  assert.equal(accepted.status, 200);
+  assert.deepEqual(calls, [{ limit: 10, completed: false, name: '12', since: '2026-01-02T03:04:05Z' }]);
+  for (const query of [
+    'limit=10.5&completed=false&name=a&since=2026-01-02',
+    'limit=1e3&completed=false&name=a&since=2026-01-02',
+    'limit=2147483648&completed=false&name=a&since=2026-01-02',
+    'limit=10&completed=yes&name=a&since=2026-01-02',
+    'limit=10&limit=11&completed=true&name=a&since=2026-01-02',
+    'limit=&completed=true&name=a&since=2026-01-02',
+  ]) {
+    const rejected = await get(query);
+    assert.equal(rejected.status, 400, query);
+  }
+  assert.equal(calls.length, 1);
+});
+
 test('personal-free API logs procedure failures without returning database details', async () => {
   const failures: unknown[] = [];
   const handler = createPersonalFreeHandler([{
@@ -115,4 +151,31 @@ test('personal-free request body parser reports malformed JSON as client input',
   assert.throws(() => parsePersonalFreeBody('{broken'), error =>
     error instanceof Error && error.message === 'Invalid JSON request body' &&
     'statusCode' in error && error.statusCode === 400);
+});
+
+test('personal-free API admits team members only on routes that list the member role', async () => {
+  const calls: { role: string; procedure: string }[] = [];
+  const handler = createPersonalFreeHandler([
+    { method: 'GET', path: '/api/ListLoans', roles: ['owner', 'member'], procedure: { name: 'ListLoans', parameters: {} } },
+    { method: 'POST', path: '/api/DeleteLoan', procedure: { name: 'DeleteLoan', parameters: { id: 'int' } } },
+  ], {
+    async execute(_ownerId, role, procedure) { calls.push({ role, procedure }); return []; },
+    async ready() {},
+  });
+  const memberHeader = Buffer.from(JSON.stringify({
+    identityProvider: 'github', userId: 'member-id', userDetails: 'teammate',
+    userRoles: ['anonymous', 'authenticated', 'member'],
+  })).toString('base64');
+  const call = (header: string, method: string, path: string, body?: unknown) => handler({
+    method, url: `https://example.test${path}`, headers: new Headers({ 'x-ms-client-principal': header }), body,
+  });
+  assert.equal((await call(memberHeader, 'GET', '/api/ListLoans')).status, 200);
+  const denied = await call(memberHeader, 'POST', '/api/DeleteLoan', { id: 1 });
+  assert.equal(denied.status, 403, 'routes without roles stay owner-only');
+  assert.deepEqual(await denied.json(), { error: 'Your role cannot perform this operation' });
+  assert.equal((await call(ownerHeader, 'POST', '/api/DeleteLoan', { id: 1 })).status, 200);
+  assert.deepEqual(calls, [
+    { role: 'member', procedure: 'ListLoans' },
+    { role: 'owner', procedure: 'DeleteLoan' },
+  ]);
 });

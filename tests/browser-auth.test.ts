@@ -107,6 +107,11 @@ test('Static Web Apps authentication uses the platform session and requires the 
 });
 
 test('Static Web Apps keeps a signed-in nonowner visible but unauthorized', async () => {
+  const member = sessionHost(async () => Response.json({
+    clientPrincipal: { userDetails: 'teammate', userRoles: ['anonymous', 'authenticated', 'member'] },
+  }));
+  assert.equal((await prepareAuthentication(staticWebAppsConfig, member.host)).session?.authorized, true,
+    'an invited team member is authorized');
   const fixture = sessionHost(async () => Response.json({
     clientPrincipal: {
       userDetails: 'reader@example.invalid',
