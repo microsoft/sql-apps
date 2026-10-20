@@ -21,7 +21,9 @@ const defaultConfig = join(projectRoot, 'sql-apps.personal-free.json');
 function usage(): string {
   return [
     'Usage:',
-    '  sql-apps publish init --name <name> --location <region> [--environment prod] [--resource-group <name>]',
+    '  sql-apps publish init --name <name> --subscription <id> --web-location <westus2|centralus|eastus2|westeurope|eastasia>',
+    '      --data-location <region|same> --resource-group <name> --resource-group-mode <new|existing>',
+    '      --environment <dev|test|prod> --sharing <personal|team>',
     '  sql-apps publish plan [--config <path>]',
     '  sql-apps publish deploy --approve <code> [--config <path>]',
     '  sql-apps publish invite --role <owner|member> --provider <aad|github|google> --user <email-or-handle> [--config <path>]',
@@ -29,7 +31,7 @@ function usage(): string {
     '  sql-apps publish rotate-secret --approve <current-deployment-code> [--config <path>]',
     '  sql-apps publish status [--config <path>]',
     '',
-    'This personal-project profile targets Static Web Apps Free, managed Functions, and the Azure SQL free offer.',
+    'This personal-project profile targets Static Web Apps Free, managed Functions, and the Azure SQL Database free tier.',
     'It is potentially $0 only while usage stays within current allowances, and Static Web Apps Free has no SLA.',
   ].join('\n');
 }
@@ -59,20 +61,36 @@ function rejectUnknown(values: Map<string, string>): void {
 
 async function init(args: readonly string[], command: Run): Promise<string> {
   const values = flags(args);
+  if (values.has('--location')) {
+    throw new Error('--location was replaced: pass --web-location <Static Web Apps region> and --data-location <region|same>');
+  }
   const name = take(values, '--name');
-  const location = take(values, '--location');
-  const environment = z.enum(['dev', 'test', 'prod']).parse(take(values, '--environment', 'prod'));
-  const resourceGroup = take(values, '--resource-group', `${name}-${environment}`);
+  const subscriptionId = take(values, '--subscription');
+  const webLocation = take(values, '--web-location');
+  const dataChoice = take(values, '--data-location');
+  const dataLocation = dataChoice === 'same' ? webLocation : dataChoice;
+  const environment = z.enum(['dev', 'test', 'prod']).parse(take(values, '--environment'));
+  const sharing = z.enum(['personal', 'team']).parse(take(values, '--sharing'));
+  const resourceGroup = take(values, '--resource-group');
+  const resourceGroupMode = z.enum(['new', 'existing']).parse(take(values, '--resource-group-mode'));
   const configPath = resolve(take(values, '--config', defaultConfig));
   rejectUnknown(values);
   const config = await initPersonalFreeConfig({
-    resourceGroup,
-    location,
-    environment,
     name,
+    subscriptionId,
+    webLocation,
+    dataLocation,
+    resourceGroup,
+    useExistingResourceGroup: resourceGroupMode === 'existing',
+    environment,
+    sharing,
   }, command);
   await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, { flag: 'wx' });
-  return `Created ${configPath}. No Azure resources were changed.\nRun "sql-apps publish plan" to review the deployment.`;
+  return [
+    `Created ${configPath}. No Azure resources were changed.`,
+    `Subscription: ${config.subscriptionName ?? config.subscriptionId}; web: ${config.webLocation}; data: ${config.dataLocation}; resource group: ${config.resourceGroup} (${config.existingResourceGroup ? 'existing' : 'new'}); environment: ${config.environment}; sharing: ${config.sharing}.`,
+    'Run "sql-apps publish plan" to review the creation card.',
+  ].join('\n');
 }
 
 async function plan(args: readonly string[]): Promise<string> {
@@ -145,7 +163,7 @@ async function status(args: readonly string[], command: Run): Promise<string> {
     state.staticWebAppHostname ? `Application: https://${state.staticWebAppHostname}` : undefined,
     'Cost guard: verified',
     `Static Web Apps: ${report.staticWebApp}`,
-    'Azure SQL: free offer, AutoPause at monthly limit',
+    'Azure SQL: free tier, AutoPause at monthly limit',
     'Cost posture: configured to stop rather than bill at free limits; personal-project tier; no Static Web Apps Free SLA.',
   ].filter(Boolean).join('\n');
 }

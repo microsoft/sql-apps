@@ -37,7 +37,7 @@ export async function planDevelopmentSql(home: string, value: unknown): Promise<
     `Subscription ${target.subscriptionId}; tenant ${target.tenantId}; resource group ${target.resourceGroup}; region ${request.location}.`,
     `${request.createResourceGroup ? 'Create the resource group if absent and create' : 'Reuse the existing resource group and create'} only a new SQL server ${target.server} and database ${target.database}. Existing servers without this plan's receipt are never adopted or reconfigured.`,
     `Enable the SQL public endpoint and a firewall rule for exactly ${request.clientIp}; no broad Azure or internet rule.`,
-    'Request the current Azure SQL free offer with AutoPause. Free capacity/eligibility is not guaranteed; never convert a refusal into paid provisioning or overage.',
+    'Request the current Azure SQL Database free tier with AutoPause. Free capacity/eligibility is not guaranteed; never convert a refusal into paid provisioning or overage.',
     'Configure the named Entra administrator and SQL authentication, protect the generated bootstrap credential locally, and later create a separate least-privilege app user after schema approval.',
     'No website/app publishing, hosted DAB, registry, telemetry or app registration. Resources persist; cleanup is separately approved.',
   ] };
@@ -113,7 +113,7 @@ export async function provisionDevelopmentSql(home: string, approved: Developmen
         await saveProtectedJson(path, { ...state, stage: 'ready' }, run);
         return { resourceGroupId: groupId, deploymentId };
       }
-      if (['Failed', 'Canceled'].includes(deployment.properties.provisioningState)) throw new Error('Azure SQL deployment did not succeed. Inspect its errors and free-offer/policy availability; resources are preserved and no paid retry was made.');
+      if (['Failed', 'Canceled'].includes(deployment.properties.provisioningState)) throw new Error('Azure SQL deployment did not succeed. Inspect its errors and free-tier/policy availability; resources are preserved and no paid retry was made.');
       await new Promise(done => setTimeout(done, 2000));
     }
     throw new Error('Azure SQL deployment is still pending; resources and receipt were preserved. Resume this exact reviewed plan after inspecting the deployment.');

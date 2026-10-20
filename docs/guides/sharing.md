@@ -7,15 +7,27 @@ Before moving a local app online, decide **who should use it** and **what inform
 The primary SQL Apps cloud target is:
 
 - Azure Static Web Apps **Free** for the site and managed Functions API;
-- the Azure SQL Database free offer;
+- the Azure SQL Database free tier;
 - explicitly invited Static Web Apps `owner` and, for a team, `member` roles (up to 25 invited people); and
 - a generated, least-privilege SQL login held in application settings and protected local deployment state.
 
 This is a personal-project tier with **no Static Web Apps SLA**. It can plausibly remain at **$0 Azure service cost** only while both services remain within their current free allowances. Eligibility and consumption are account-specific; free allowances are not a spending cap or availability promise.
 
+**Not production-ready as-is.** The free SQL database can pause when idle or
+when its monthly allowance runs out. Review security, compliance and
+data-protection requirements before storing real or regulated data. Invitation
+providers you choose (Microsoft Entra ID, GitHub or Google) have their own terms.
+Service limits and regional availability can change; official documentation and
+offer terms take precedence over this guide.
+
 The trade-off for the low fixed cost is deliberate: Azure SQL has a public endpoint, and its `0.0.0.0` firewall rule admits connections from Azure resources outside your subscription. SQL authentication remains enabled because Static Web Apps managed Functions do not provide the application a managed identity. Stored-procedure allowlisting, object-scoped grants, invited roles, encryption, and certificate validation limit the resulting access, but do not turn this into an enterprise private-network architecture.
 
 Use the [personal-free deployment reference](../reference/personal-free-deployment.md). The workflow is read-only until `deploy --approve` receives the approval code from the current plan.
+Before `init`, you choose the subscription, the web region (Static Web Apps
+supports only a few), whether the database lives in the same region or another
+one for data residency, a new or existing resource group, the environment, and
+personal or team sharing. `plan` then prints a creation card listing each
+resource's region, cost posture and undo command.
 Deployment applies `project=sql-apps`, the selected environment and
 `deployment=personal-free` tags to the resource group and each taggable
 application resource so usage and cost views can group this project.
@@ -29,7 +41,7 @@ application resource so usage and cost views can group this project.
 | Entra-only SQL or managed identity, intermittent use, scale-to-zero acceptable, possible charges accepted | Separately planned architecture with maintained Azure and Azure SQL skills; Container Apps Consumption with gateway/DAB is a candidate, not a bundled SQL Apps deployment |
 | No cloud deployment | Keep using the local application |
 | Enterprise SLA, private networking, organizational controls, or managed identity without accepting the conditions above | Plan a production architecture with maintained Azure and Azure SQL skills |
-Do not choose the Container Apps candidate when a guaranteed $0 bill, continuous availability, no cold starts/SQL resume delay, required hosting/networking prohibited by policy, or required permissions are unavailable. Verify current DAB authentication support, service availability, subscription-wide allowance usage and SQL free-offer eligibility before recommending it. The project ships no second cloud topology and does not provide a second deployer. Use maintained Azure preparation, validation and deployment skills to design, own and validate any separate architecture.
+Do not choose the Container Apps candidate when a guaranteed $0 bill, continuous availability, no cold starts/SQL resume delay, required hosting/networking prohibited by policy, or required permissions are unavailable. Verify current DAB authentication support, service availability, subscription-wide allowance usage and Azure SQL Database free-tier availability before recommending it. The project ships no second cloud topology and does not provide a second deployer. Use maintained Azure preparation, validation and deployment skills to design, own and validate any separate architecture.
 
 ### Plan a separate architecture
 

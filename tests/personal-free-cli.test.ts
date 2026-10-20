@@ -61,7 +61,7 @@ test('publish status verifies live free settings and fails closed on drift', asy
   await main(['status', '--config', configPath], message => messages.push(message), run);
   assert.match(messages.join('\n'), /Cost guard: verified/);
   assert.match(messages.join('\n'), /Static Web Apps: Free/);
-  assert.match(messages.join('\n'), /Azure SQL: free offer, AutoPause at monthly limit/);
+  assert.match(messages.join('\n'), /Azure SQL: free tier, AutoPause at monthly limit/);
 
   paid = true;
   await assert.rejects(
@@ -96,4 +96,44 @@ test('publish status verifies live free settings and fails closed on drift', asy
     /--role is required/,
   );
   assert.equal(invitations.length, 2);
+});
+
+test('publish init requires explicit region, subscription, resource group, environment and sharing choices', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'sql-apps-personal-free-init-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  process.env.SQL_APPS_PROJECT_HOME = root;
+  const { main } = await import('../src/personal-free-cli.js');
+  const subscriptionId = '11111111-1111-4111-8111-111111111111';
+  let groupExists = false;
+  const run: Run = async (_command, args) => {
+    if (args[0] === 'account') return JSON.stringify({
+      id: subscriptionId, name: 'Personal', tenantId: '22222222-2222-4222-8222-222222222222',
+      user: { name: 'owner@example.com', type: 'user' },
+    });
+    if (args[0] === 'group' && args[1] === 'exists') return groupExists ? 'true' : 'false';
+    if (args[0] === 'ad') return '33333333-3333-4333-8333-333333333333';
+    throw new Error(`unexpected ${args.join(' ')}`);
+  };
+  const base = (path: string) => ['init', '--name', 'tracker', '--subscription', subscriptionId,
+    '--web-location', 'westus2', '--data-location', 'same', '--resource-group', 'rg-tracker',
+    '--resource-group-mode', 'new', '--environment', 'prod', '--sharing', 'team', '--config', join(root, path)];
+  const replace = (args: string[], flag: string, value: string) => {
+    const copy = [...args];
+    copy[copy.indexOf(flag) + 1] = value;
+    return copy;
+  };
+
+  await assert.rejects(main(['init', '--name', 'tracker', '--location', 'eastus'], () => {}, run), /--location was replaced/);
+  await assert.rejects(main(base('a.json').filter((_, i, all) => all[i] !== '--sharing' && all[i - 1] !== '--sharing'), () => {}, run),
+    /--sharing is required/);
+  await assert.rejects(main(replace(base('b.json'), '--web-location', 'southcentralus'), () => {}, run),
+    /Static Web Apps region must be one of: westus2/);
+  await assert.rejects(main(replace(base('c.json'), '--subscription', '99999999-9999-4999-8999-999999999999'), () => {}, run),
+    /signed in to subscription Personal[\s\S]*az account set/);
+  groupExists = true;
+  await assert.rejects(main(base('d.json'), () => {}, run), /already exists[\s\S]*--resource-group-mode existing/);
+
+  const output: string[] = [];
+  await main(replace(base('e.json'), '--resource-group-mode', 'existing'), message => output.push(message), run);
+  assert.match(output[0]!, /web: westus2; data: westus2; resource group: rg-tracker \(existing\); environment: prod; sharing: team/);
 });

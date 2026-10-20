@@ -265,7 +265,7 @@ test('coordinator entry points use the local-first journey and retain sharing bo
     'the beginner entry point should defer hosting topology to the sharing guide');
   assert.match(readme, /docs\/guides\/sharing\.md/);
   const sharing = await readFile('docs/guides/sharing.md', 'utf8');
-  assert.match(sharing, /Static Web Apps.*Free.*managed Functions.*Azure SQL Database free offer/is);
+  assert.match(sharing, /Static Web Apps.*Free.*managed Functions.*Azure SQL Database free tier/is);
   assert.match(sharing, /potentially \$0|remain at \*\*\$0/is);
   assert.match(sharing, /no Static Web Apps SLA/i);
   assert.match(sharing, /ships no second cloud topology/i);

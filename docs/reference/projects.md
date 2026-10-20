@@ -9,6 +9,32 @@ This separation is a tooling contract, not permission to copy the foundation
 repository into every application. Generated projects must not include the
 foundation's plugins, examples, tests or runtime implementation source.
 
+## Create and manage projects
+
+Follow [Get started](../guides/getting-started.md) to select the foundation,
+review a creation plan and create your first application. Projects default to
+`%USERPROFILE%\SqlAppsProjects` on Windows and `~/SqlAppsProjects` elsewhere.
+Creation refuses to merge into an existing folder.
+
+Run project-management commands from the foundation checkout. To change the
+root for future projects, choose an absolute path before creating them:
+
+```powershell
+npm run projects -- root "D:\SqlAppsProjects"
+```
+
+List registered projects or register and open an existing application:
+
+```powershell
+npm run projects -- list
+npm run projects -- open "C:\path\to\project"
+```
+
+Keep `SQL_APPS_FOUNDATION_HOME` on the foundation and use the command printed by
+creation or opening to point `SQL_APPS_HOME` at the selected app. Open that app
+in your editor and restart your assistant there; the foundation is a tool source,
+not the application repository.
+
 ## Project manifest
 
 Every project root contains `.sql-apps-project.json`. The manifest is strict and

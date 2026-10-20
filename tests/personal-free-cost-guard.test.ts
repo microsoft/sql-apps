@@ -11,7 +11,10 @@ const config: PersonalFreeConfig = {
   sqlAdministratorObjectId: '33333333-3333-4333-8333-333333333333',
   sqlAdministratorName: 'owner@example.com',
   resourceGroup: 'rg-personal',
-  location: 'westus2',
+  existingResourceGroup: false,
+  webLocation: 'westus2',
+  dataLocation: 'westus2',
+  sharing: 'personal',
   environment: 'prod',
   name: 'personal-tracker',
 };

@@ -5,7 +5,7 @@ description: "Use when a user wants to publish, share, deploy, price, or assess 
 
 # Publish SQL Apps
 
-Sharing is optional. `personal-free`, the primary and only bundled cloud profile: **Static Web Apps Free + managed Functions + Azure SQL Database free offer**. **No Static Web Apps SLA**; **potentially $0 within current allowances**.
+Sharing is optional. `personal-free`, the primary and only bundled cloud profile: **Static Web Apps Free + managed Functions + Azure SQL Database free tier**. **No Static Web Apps SLA**; **potentially $0 within current allowances**.
 
 Resolve `../../scripts/sql-apps.mjs` relative to this skill, not cwd. Quote its
 absolute path; `home` selects the project containing input `docs/...`.
@@ -15,15 +15,15 @@ For SLA, private networking, organizational controls, over 25 invitees, extra ro
 
 ## When personal-free does not fit
 
-If only Entra-only SQL/managed identity is unmet, with cold starts and possible charges accepted, Container Apps Consumption (public gateway, localhost-only DAB) is a candidate—not a bundled profile. Guaranteed $0, continuous availability or blocked policy require production architecture. Verify DAB auth, availability and quotas with maintained skills; derive roles from validated identity.
+If only Entra-only SQL/managed identity is unmet, with cold starts and possible charges accepted, Container Apps Consumption (public gateway, localhost-only DAB) is a candidate—not a bundled profile. Guaranteed $0, continuous availability or blocked policy need production architecture. Verify DAB auth, availability and quotas with maintained skills.
 
 Hand infrastructure to `azure-prepare` → `azure-validate` → `azure-deploy`, never another publisher. Before writes, estimate supporting services; get separate approvals for spend, identity changes and interruption. Budgets are not spending caps. Validate shutdown and manual recovery disposably, keeping the database.
 
 ## Personal-free pipeline
 
 1. **Confirm the application contract.** `personal-free-api.json` must explicitly allowlist every route, procedure, parameter, and sign-in provider. No arbitrary forwarding. Teams: add `"roles": ["owner","member"]` to member routes, including readiness; procedures read `SESSION_CONTEXT(N'role')`.
-2. **Initialize local configuration.** `npm run publish -- init --name <name> --location <region> --environment prod` writes nonsecret configuration, not resources.
-3. **Plan.** `npm run publish -- plan`: report subscription/resource group, public SQL, credential storage, excluded services, allowances and no-SLA posture.
+2. **Ask, then Initialize local configuration.** Ask; never default: subscription; web region (`westus2|centralus|eastus2|westeurope|eastasia`); data in same region or elsewhere (residency, latency, tier availability); new or existing resource group; environment; personal or team. Pass each to `npm run publish -- init` (see `npm run publish -- help`).
+3. **Plan.** `npm run publish -- plan` prints the creation card (region, cost, undo); show it verbatim.
 4. **Get explicit approval.** Azure writes require the approval code from that exact plan. Never infer approval from a request to plan, estimate, or explain.
 5. **Deploy.** `npm run publish -- deploy --approve <code>` provisions resources with `project=sql-apps`, environment and `deployment=personal-free` tags, verifies free settings, publishes schema/grants, deploys and checks readiness.
 6. **Invite people.** `npm run publish -- invite --role owner|member --provider <provider> --user <identity>`. Up to 25 invitees.
@@ -31,17 +31,17 @@ Hand infrastructure to `azure-prepare` → `azure-validate` → `azure-deploy`, 
 
 ## Security and cost truth
 
-- Free limits stop rather than bill and can interrupt service. The cost guard fails closed unless the deployed Free SKU and SQL free-offer/AutoPause settings are proven.
+- Free limits stop rather than bill and can interrupt service. The cost guard fails closed unless the deployed Free SKU and Azure SQL Database free-tier/AutoPause settings are proven.
 - SQL is public; the `0.0.0.0` firewall rule admits Azure resources outside the subscription.
 - Managed Functions lack SQL managed identity. Generated credentials live in Static Web Apps settings and protected `.sql-apps/deployments/` state.
-- Runtime grants are only `CONNECT`, `EXECUTE` and `VIEW DEFINITION` on declared procedures.
+- Runtime grants: only `CONNECT`, `EXECUTE` and `VIEW DEFINITION` on declared procedures.
 - Ownership derives from provider plus immutable provider user ID, never email.
 
-The guard excludes manual additions, offer changes, GitHub Actions, domains and third parties. Never claim guaranteed free, private networking, passwordless, production-grade or highly available. Consult maintained current Azure cost/SQL skills before quoting limits, eligibility, regions or prices.
+The guard excludes manual additions, offer changes, GitHub Actions, domains and third parties. Never claim guaranteed free, private networking, passwordless, production-grade or highly available. Consult maintained Azure cost/SQL skills before quoting limits or prices.
 
 ## Evidence and approval
 
 For foundation publisher changes, run focused publisher, infrastructure, authentication and packaging tests; routine publishing does not assume them. Disclose unverified implementation or live canary checks.
 
-Use `sql-apps-validation`'s four-verdict report and state whether live Azure validation was performed. Deployment/invitation requires explicit target, region, resource-group, allowance/spend and owner approval.
-For an external architecture, report cost safeguards as configured, exercised, partial or blocked, and which live checks ran.
+Use `sql-apps-validation`'s four-verdict report and state whether live Azure validation was performed.
+For an external architecture, report cost safeguards as configured, exercised, partial, blocked.

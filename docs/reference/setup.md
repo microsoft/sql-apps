@@ -229,7 +229,7 @@ For a new server/database, `setup azure-plan <absolute-request.json>` accepts:
 `cost: "free-only"`. Review the returned plan before
 `setup azure-provision <absolute-reviewed-plan.json>`. These commands require a
 current build. Provisioning creates SQL-only resources, the named Entra
-administrator and an exact-client-IP firewall rule. It requests the free offer
+administrator and an exact-client-IP firewall rule. It requests the Azure SQL Database free tier
 with `AutoPause`; eligibility/capacity are not guaranteed. Failure never becomes
 paid provisioning or billable overage. There is no broad Azure-services rule,
 app deployment or automatic cleanup. Protected stage receipts resume the same

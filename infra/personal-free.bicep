@@ -7,7 +7,9 @@ param name string
 @allowed(['dev', 'test', 'prod'])
 param environment string = 'dev'
 
-param location string = resourceGroup().location
+@allowed(['westus2', 'centralus', 'eastus2', 'westeurope', 'eastasia'])
+param webLocation string
+param dataLocation string = resourceGroup().location
 param tenantId string
 param sqlAdministratorObjectId string
 param sqlAdministratorName string
@@ -34,7 +36,7 @@ var tags = {
 
 resource site 'Microsoft.Web/staticSites@2023-12-01' = {
   name: '${prefix}-${suffix}'
-  location: location
+  location: webLocation
   tags: tags
   sku: {
     name: 'Free'
@@ -47,7 +49,7 @@ resource site 'Microsoft.Web/staticSites@2023-12-01' = {
 
 resource sql 'Microsoft.Sql/servers@2023-08-01' = {
   name: sqlName
-  location: location
+  location: dataLocation
   tags: tags
   properties: {
     version: '12.0'
@@ -77,7 +79,7 @@ resource allowAzure 'Microsoft.Sql/servers/firewallRules@2023-08-01' = {
 resource database 'Microsoft.Sql/servers/databases@2023-08-01' = {
   parent: sql
   name: 'app'
-  location: location
+  location: dataLocation
   tags: tags
   sku: {
     name: 'GP_S_Gen5_2'

@@ -7,6 +7,7 @@ import type { Run } from './process.js';
 import {
   personalFreeConfigSchema,
   protectedDeploymentStateSchema,
+  staticWebAppRegions,
   type PersonalFreeConfig,
   type ProtectedDeploymentState,
 } from './personal-free-config.js';
@@ -17,30 +18,54 @@ import { toolingAsset, projectRoot } from './runtime-roots.js';
 
 export interface PersonalFreeInitOptions {
   name: string;
-  location: string;
+  subscriptionId: string;
+  webLocation: string;
+  dataLocation: string;
   resourceGroup: string;
-  environment?: 'dev' | 'test' | 'prod';
+  useExistingResourceGroup?: boolean;
+  environment: 'dev' | 'test' | 'prod';
+  sharing: 'personal' | 'team';
 }
 
 export async function initPersonalFreeConfig(
   options: PersonalFreeInitOptions,
   run: Run,
 ): Promise<PersonalFreeConfig> {
+  if (!(staticWebAppRegions as readonly string[]).includes(options.webLocation)) {
+    throw new Error(`Static Web Apps region must be one of: ${staticWebAppRegions.join(', ')}. Nothing was written.`);
+  }
   const account = z.object({
     id: z.string().uuid(),
+    name: z.string().min(1).max(128).optional(),
     tenantId: z.string().uuid(),
     user: z.object({ name: z.string().min(1), type: z.literal('user') }),
   }).parse(JSON.parse(await run('az', ['account', 'show', '-o', 'json'])));
+  if (account.id.toLowerCase() !== options.subscriptionId.toLowerCase()) {
+    throw new Error(`Azure CLI is signed in to subscription ${account.name ?? ''} (${account.id}), not ${options.subscriptionId}. ` +
+      `Run "az account set --subscription ${options.subscriptionId}" or pass the intended --subscription. Nothing was written.`);
+  }
+  const exists = (await run('az', ['group', 'exists', '--subscription', account.id,
+    '--name', options.resourceGroup, '-o', 'tsv'])).trim() === 'true';
+  if (exists && !options.useExistingResourceGroup) {
+    throw new Error(`Resource group ${options.resourceGroup} already exists.     Choose a new name, or confirm reuse with --resource-group-mode existing. Nothing was written.`);
+  }
+  if (!exists && options.useExistingResourceGroup) {
+        throw new Error(`Resource group ${options.resourceGroup} does not exist; use --resource-group-mode new to create it. Nothing was written.`);
+  }
   const operator = (await run('az', ['ad', 'signed-in-user', 'show', '--query', 'id', '-o', 'tsv'])).trim();
   return personalFreeConfigSchema.parse({
     profile: 'personal-free',
     subscriptionId: account.id,
+    ...(account.name ? { subscriptionName: account.name } : {}),
     tenantId: account.tenantId,
     sqlAdministratorObjectId: operator,
     sqlAdministratorName: account.user.name,
     resourceGroup: options.resourceGroup,
-    location: options.location,
-    environment: options.environment ?? 'dev',
+    existingResourceGroup: exists,
+    webLocation: options.webLocation,
+    dataLocation: options.dataLocation,
+    sharing: options.sharing,
+    environment: options.environment,
     name: deploymentName(options.name),
   });
 }
@@ -52,13 +77,36 @@ export interface PersonalFreePlan {
 
 export function planPersonalFreeDeployment(config: PersonalFreeConfig, sourceHash: string): PersonalFreePlan {
   const approval = createHash('sha256').update(JSON.stringify({ config, sourceHash })).digest('hex').slice(0, 12);
+  const prefix = `${config.name}-${config.environment}`;
+  const scope = `--subscription ${config.subscriptionId} --resource-group ${config.resourceGroup}`;
+  const card = [
+    ['Resource group', config.resourceGroup, config.existingResourceGroup ? '(existing, reused)' : config.dataLocation,
+      'no charge', config.existingResourceGroup ? 'kept; delete the resources below individually'
+        : `az group delete --subscription ${config.subscriptionId} --name ${config.resourceGroup}`],
+    ['Static Web App', `${prefix}-<id>`, config.webLocation, 'Free SKU; $0 within allowances; no SLA',
+      `az staticwebapp delete ${scope} --name <name>`],
+    ['Azure SQL server', `${prefix}-<id>`, config.dataLocation, 'no charge for the server itself',
+      `az sql server delete ${scope} --name <name> (also deletes the database)`],
+    ['Azure SQL database', 'app', config.dataLocation, 'free tier (GP_S_Gen5_2, 32 GB, AutoPause on exhaustion); verify tier availability in this region',
+      'deleted with the server'],
+  ].map(([type, name, where, cost, undo]) => `- ${type}: ${name} | region: ${where} | cost: ${cost} | undo: ${undo}`);
+  const regionNote = config.webLocation === config.dataLocation
+    ? `Regions: web and data both in ${config.dataLocation}.`
+    : `Regions: web in ${config.webLocation}, data in ${config.dataLocation}. Data stays in ${config.dataLocation}; API calls cross regions and add latency.`;
   return {
     approval,
     summary: [
       'Target: personal-free (Azure Static Web Apps Free; no SLA).',
+      `Subscription: ${config.subscriptionName ? `${config.subscriptionName} ` : ''}(${config.subscriptionId}), tenant ${config.tenantId}. Environment: ${config.environment}.`,
+      regionNote,
+      'Creation card (<id> is assigned at deployment):',
+      ...card,
       'Cost: potentially $0 only while Static Web Apps and Azure SQL remain inside current free allowances.',
       'Network: Azure SQL uses a public endpoint. The 0.0.0.0 firewall rule admits all resources inside the Azure boundary, including other subscriptions.',
-      'Authentication: explicitly invited owner and member roles (up to 25 invited people on Static Web Apps Free); generated least-privilege SQL credentials are stored outside source.',
+      config.sharing === 'team'
+        ? 'Sharing: team. Invite owners and members (up to 25 invited people on Static Web Apps Free; each invitation expires within 168 hours); routes must declare member access.'
+        : 'Sharing: personal. Only invited owners can use the app; switch to team later by re-running init with --sharing team.',
+      'Authentication: generated least-privilege SQL credentials are stored outside source.',
       'Not created: DAB, Container Apps, ACR, VNet, private endpoint, private DNS, Log Analytics, Application Insights, or Key Vault.',
     ].join('\n'),
   };
@@ -111,7 +159,11 @@ export function personalFreeStatePath(config: PersonalFreeConfig): string {
   }
 
   export async function readPersonalFreeConfig(path: string): Promise<PersonalFreeConfig> {
-    return personalFreeConfigSchema.parse(JSON.parse(await readFile(path, 'utf8')));
+    const parsed = personalFreeConfigSchema.safeParse(JSON.parse(await readFile(path, 'utf8')));
+    if (!parsed.success) {
+      throw new Error(`${path} is not a valid personal-free config: ${parsed.error.issues.map(issue => issue.message).join('; ')}`);
+    }
+    return parsed.data;
   }
 
   const outputsSchema = z.object({
@@ -130,7 +182,8 @@ export function personalFreeStatePath(config: PersonalFreeConfig): string {
       parameters: {
         name: { value: config.name },
         environment: { value: config.environment },
-        location: { value: config.location },
+        webLocation: { value: config.webLocation },
+        dataLocation: { value: config.dataLocation },
         tenantId: { value: config.tenantId },
         sqlAdministratorObjectId: { value: config.sqlAdministratorObjectId },
         sqlAdministratorName: { value: config.sqlAdministratorName },
@@ -187,8 +240,10 @@ export function personalFreeStatePath(config: PersonalFreeConfig): string {
     config: PersonalFreeConfig,
     run: Run,
   ): Promise<void> {
-    await run('az', ['group', 'create', '--subscription', config.subscriptionId,
-      '--name', config.resourceGroup, '--location', config.location, '-o', 'none']);
+    if (!config.existingResourceGroup) {
+      await run('az', ['group', 'create', '--subscription', config.subscriptionId,
+        '--name', config.resourceGroup, '--location', config.dataLocation, '-o', 'none']);
+    }
     await run('az', ['group', 'update', '--subscription', config.subscriptionId,
       '--name', config.resourceGroup,
       '--set',

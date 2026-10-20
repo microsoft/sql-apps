@@ -4,7 +4,7 @@ Choose a guide for what you want to do. Command details and contributor contract
 
 ## Build and use your app
 
-1. [Get started](guides/getting-started.md): prepare your computer and select container, Azure SQL or last-resort Express without a preview-access dead end.
+1. [Get started](guides/getting-started.md): check prerequisites, install assistant guidance, create a project and select container, Azure SQL or last-resort Express.
 2. [Build your app](guides/build-your-app.md): describe an idea, build a first version and make it yours.
 3. [Run locally](guides/run-locally.md): choose a startup path, stop and resume.
 4. [Sharing your app](guides/sharing.md): deploy the personal-free default or choose an explicitly justified production architecture.
@@ -27,7 +27,7 @@ To try something already implemented, use the [Todo reference app](../examples/t
 - [SQL Apps plugin](reference/plugins.md): assistant support, installation, binding and native loader verification.
 - [Guide command](reference/guide.md): saved brief and checkpoint format.
 - [Monitor usage and growth](reference/monitor-growth.md): free Database Hub preview setup, read-only SQL diagnostics and capacity decisions.
-- [Personal-free Azure deployment](reference/personal-free-deployment.md): primary Static Web Apps Free, managed Functions and Azure SQL free-offer workflow.
+- [Personal-free Azure deployment](reference/personal-free-deployment.md): primary Static Web Apps Free, managed Functions and Azure SQL Database free-tier workflow.
 
 ## Contribute and maintain
 

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { run } from '../dist/src/process.js';
 
-test('personal-free template contains only SWA Free and Azure SQL free-offer resources', async t => {
+test('personal-free template contains only SWA Free and Azure SQL free-tier resources', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'sql-apps-personal-free-infra-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const output = join(directory, 'main.json');
@@ -31,6 +31,10 @@ test('personal-free template contains only SWA Free and Azure SQL free-offer res
   assert.equal(firewall.properties.endIpAddress, '0.0.0.0');
   const database = template.resources.find(resource => resource.type === 'Microsoft.Sql/servers/databases');
   assert.equal(database.properties.useFreeLimit, true);
+  assert.deepEqual(template.parameters.webLocation.allowedValues, ['westus2', 'centralus', 'eastus2', 'westeurope', 'eastasia']);
+  assert.equal(site.location, "[parameters('webLocation')]");
+  assert.equal(server.location, "[parameters('dataLocation')]");
+  assert.equal(database.location, "[parameters('dataLocation')]");
   assert.equal(database.properties.freeLimitExhaustionBehavior, 'AutoPause');
   assert.equal(database.properties.maxSizeBytes, 34359738368);
   assert.equal(database.properties.requestedBackupStorageRedundancy, 'Local');

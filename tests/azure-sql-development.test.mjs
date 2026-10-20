@@ -87,7 +87,7 @@ test('database provisioning resumes its exact deployment without duplicate resou
   assert.equal(f.calls.filter(Array.isArray).flat().some(value => value.includes(password) || value.includes('synthetic-management-token')), false);
 });
 
-test('free-offer refusal is surfaced without paid fallback or automatic resource deletion', async t => {
+test('free-tier refusal is surfaced without paid fallback or automatic resource deletion', async t => {
   const f = await fixture(t);
   const fetcher = (url, options) => options.method === 'PUT'
     ? Response.json({ error: { code: 'FreeOfferNotAvailable' } }, { status: 400 }) : f.fetcher(url, options);

@@ -2,23 +2,31 @@
 
 ## Start locally
 
-Building and running SQL Apps locally does not create an Azure usage bill. You
-still need the required tools, downloads, and Azure SQL Database container
-private-preview access. Docker Desktop and your chosen AI provider have their
-own licensing, account, and pricing conditions.
+Building and running SQL Apps with a local container or Express database does
+not create an Azure usage bill. You still need the required tools and downloads;
+the container route also needs private-preview access unless a usable image is
+cached. Choosing Azure SQL directly can incur Azure charges even when the app
+runs on your computer. Docker Desktop and your chosen AI provider have their own
+licensing, account, and pricing conditions.
 
 You do not need to deploy to Azure to build, test, or keep using a local app.
 
 ## Review Azure costs when you choose to share
 
+**You are responsible for your Azure bill.** Microsoft controls free allowances,
+eligibility, regional availability and offer end dates, and can change them.
+Check [Azure pricing](https://azure.microsoft.com/pricing) and Cost Management
+for your subscription before relying on a service being free. Official
+documentation and offer terms take precedence over this repository.
+
 Use the maintained **Azure Cost** plugin for current regional and account-aware
 price estimates, actual spend analysis, forecasts, optimization, and governance.
 Use `azure-app-onboard` when comparing Azure architectures. A cost estimate is
 not a quote, spending cap, deployment approval, or proof that a resource is
-eligible for a free offer.
+eligible for the Azure SQL Database free tier.
 
 The primary personal-project target is Static Web Apps Free with managed
-Functions and the Azure SQL Database free offer. It can plausibly remain at
+Functions and the Azure SQL Database free tier. It can plausibly remain at
 **$0 Azure service cost** while both services remain within their current
 allowances. Static Web Apps Free has no SLA. Eligibility, regional availability
 and usage are account-specific, and a free allowance is not a spending cap.
@@ -32,7 +40,7 @@ Web Apps Free and does not create Service Bus or a separate App Service plan.
 
 The bundled resources are configured to stop rather than bill when their free
 limits are exhausted. Static Web Apps Free has no bandwidth overage path, and
-Azure SQL uses the free offer's `AutoPause` behavior instead of paid overage.
+Azure SQL uses the free tier's `AutoPause` behavior instead of paid overage.
 Quota exhaustion can therefore interrupt the site or database until the
 allowance resets; $0 cost does not mean uninterrupted availability.
 
@@ -45,6 +53,11 @@ that moment. It does not guarantee future Azure terms or cover resources added
 or upgraded manually. GitHub Actions, custom domains, developer tools, AI
 providers, and third-party services are outside the Azure resources created by
 this profile and have their own terms.
+
+`publish status` checks only the resources managed by the bundled publisher.
+It does not discover unrelated resources created in the Azure portal, with
+`azd`, through GitHub Actions or with Azure CLI. Budgets send alerts; they do not
+stop spending. Treat the cost guard as a safety net, not a guarantee.
 
 The publisher tags the resource group, Static Web App, SQL server and database
 with `project=sql-apps`, the selected environment and
