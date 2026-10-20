@@ -37,6 +37,7 @@ test('personal-free init is read-only and plan binds warnings to approval', asyn
     webLocation: 'westus2',
     dataLocation: 'westus2',
     sharing: 'personal',
+    deploymentClientIp: '203.0.113.10',
     resourceGroup: 'rg-personal',
     environment: 'dev',
   }, run);
@@ -67,7 +68,7 @@ test('personal-free init is read-only and plan binds warnings to approval', asyn
 test('personal-free init refuses a mismatched subscription and an unconfirmed existing resource group', async () => {
   const options = {
     name: 'Personal Tracker', subscriptionId, webLocation: 'westus2', dataLocation: 'westus2',
-    sharing: 'personal' as const, resourceGroup: 'rg-personal', environment: 'dev' as const,
+    sharing: 'personal' as const, deploymentClientIp: '203.0.113.10', resourceGroup: 'rg-personal', environment: 'dev' as const,
   };
   const run = (exists: boolean): Run => async (_command, args) => {
     if (args[0] === 'account') return JSON.stringify({ id: subscriptionId, tenantId, user: { name: 'o@example.com', type: 'user' } });
@@ -118,6 +119,7 @@ test('personal-free resource group carries the project tracking tag', async () =
     webLocation: 'westus2',
     dataLocation: 'westus2',
     sharing: 'personal',
+    deploymentClientIp: '203.0.113.10',
     resourceGroup: 'rg-personal',
     environment: 'prod',
   }, async (_command, args) => args[0] === 'account'
@@ -223,4 +225,17 @@ test('personal-free readiness uses a bounded request', async () => {
   };
   await verifyPersonalFreeReadiness('personal-tracker.azurestaticapps.net', fetcher);
   assert.ok(signal instanceof AbortSignal);
+});
+
+test('personal-free readiness rejects HTML, empty bodies and non-ready JSON', async () => {
+  for (const response of [
+    new Response('<html>fallback</html>', { headers: { 'content-type': 'text/html' } }),
+    new Response(null, { status: 204 }),
+    Response.json({ status: 'not-ready' }),
+    Response.json({}),
+    new Response('{broken', { headers: { 'content-type': 'application/json' } }),
+    Response.json({ status: 'ready' }, { status: 503 }),
+  ]) {
+    await assert.rejects(verifyPersonalFreeReadiness('site.example', async () => response), /readiness/i);
+  }
 });

@@ -45,6 +45,7 @@ export class SqlConnectionDiscardedError extends Error {
 interface RuntimeDependencies {
   driver?: SqlRuntimeDriver;
   sleep?: (milliseconds: number) => Promise<void>;
+  readinessProcedure?: string;
 }
 
 const identifier = z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,127}$/);
@@ -69,56 +70,59 @@ function inputType(type: ProcedureParameterType):
   return sql.DateTime2;
 }
 
+export function sqlProcedureConnection(pool: sql.ConnectionPool): SqlRuntimeConnection {
+  return {
+    async execute(subject, role, procedure, values, definition) {
+      const transaction = new sql.Transaction(pool);
+      let contextSet = false;
+      let cleanupError: unknown;
+      await transaction.begin();
+      try {
+        contextSet = true;
+        await new sql.Request(transaction)
+          .input('owner_oid', sql.NVarChar(36), subject)
+          .input('app_role', sql.NVarChar(16), role)
+          .query("EXEC sys.sp_set_session_context @key=N'oid', @value=@owner_oid, @read_only=0;\n" +
+            "EXEC sys.sp_set_session_context @key=N'scp', @value=N'access_as_user', @read_only=0;\n" +
+            "EXEC sys.sp_set_session_context @key=N'role', @value=@app_role, @read_only=0;");
+        const request = new sql.Request(transaction);
+        for (const [name, type] of Object.entries(definition.parameters)) {
+          request.input(name, inputType(type), values[name]);
+        }
+        const result = await request.execute(procedure);
+        await new sql.Request(transaction)
+          .query("EXEC sys.sp_set_session_context @key=N'scp', @value=NULL, @read_only=0;\n" +
+            "EXEC sys.sp_set_session_context @key=N'oid', @value=NULL, @read_only=0;\n" +
+            "EXEC sys.sp_set_session_context @key=N'role', @value=NULL, @read_only=0;");
+        contextSet = false;
+        await transaction.commit();
+        return result.recordset ?? [];
+      } catch (error) {
+        if (contextSet) {
+          try {
+            await new sql.Request(transaction)
+              .query("EXEC sys.sp_set_session_context @key=N'scp', @value=NULL, @read_only=0;\n" +
+                "EXEC sys.sp_set_session_context @key=N'oid', @value=NULL, @read_only=0;\n" +
+                "EXEC sys.sp_set_session_context @key=N'role', @value=NULL, @read_only=0;");
+          } catch (cleanup) {
+            cleanupError = cleanup;
+          }
+        }
+        await transaction.rollback().catch(() => {});
+        if (cleanupError) {
+          await pool.close();
+          throw new SqlConnectionDiscardedError(cleanupError);
+        }
+        throw error;
+      }
+    },
+    async close() { await pool.close(); },
+  };
+}
+
 const mssqlDriver: SqlRuntimeDriver = {
   async connect(config) {
-    const pool = await new sql.ConnectionPool(config).connect();
-    return {
-      async execute(subject, role, procedure, values, definition) {
-        const transaction = new sql.Transaction(pool);
-        let contextSet = false;
-        let cleanupError: unknown;
-        await transaction.begin();
-        try {
-          contextSet = true;
-          await new sql.Request(transaction)
-            .input('owner_oid', sql.NVarChar(36), subject)
-            .input('app_role', sql.NVarChar(16), role)
-            .query("EXEC sys.sp_set_session_context @key=N'oid', @value=@owner_oid, @read_only=0;\n" +
-              "EXEC sys.sp_set_session_context @key=N'scp', @value=N'access_as_user', @read_only=0;\n" +
-              "EXEC sys.sp_set_session_context @key=N'role', @value=@app_role, @read_only=0;");
-          const request = new sql.Request(transaction);
-          for (const [name, type] of Object.entries(definition.parameters)) {
-            request.input(name, inputType(type), values[name]);
-          }
-          const result = await request.execute(procedure);
-          await new sql.Request(transaction)
-            .query("EXEC sys.sp_set_session_context @key=N'scp', @value=NULL, @read_only=0;\n" +
-              "EXEC sys.sp_set_session_context @key=N'oid', @value=NULL, @read_only=0;\n" +
-              "EXEC sys.sp_set_session_context @key=N'role', @value=NULL, @read_only=0;");
-          contextSet = false;
-          await transaction.commit();
-          return result.recordset ?? [];
-        } catch (error) {
-          if (contextSet) {
-            try {
-              await new sql.Request(transaction)
-                .query("EXEC sys.sp_set_session_context @key=N'scp', @value=NULL, @read_only=0;\n" +
-                  "EXEC sys.sp_set_session_context @key=N'oid', @value=NULL, @read_only=0;\n" +
-              "EXEC sys.sp_set_session_context @key=N'role', @value=NULL, @read_only=0;");
-            } catch (cleanup) {
-              cleanupError = cleanup;
-            }
-          }
-          await transaction.rollback().catch(() => {});
-          if (cleanupError) {
-            await pool.close();
-            throw new SqlConnectionDiscardedError(cleanupError);
-          }
-          throw error;
-        }
-      },
-      async close() { await pool.close(); },
-    };
+    return sqlProcedureConnection(await new sql.ConnectionPool(config).connect());
   },
 };
 
@@ -171,8 +175,7 @@ export function createProcedureRuntime(
       }
     }
   };
-  return {
-    async execute(subject: string, role: AppRole, procedure: string, values: Record<string, string | boolean | number | null>) {
+  const execute = async (subject: string, role: AppRole, procedure: string, values: Record<string, string | boolean | number | null>) => {
       ownerId.parse(subject);
       if (!appRoles.includes(role)) throw new Error('SQL caller role is not an application role');
       const definition = definitions.get(procedure);
@@ -186,8 +189,20 @@ export function createProcedureRuntime(
         if (error instanceof SqlConnectionDiscardedError) connection = undefined;
         throw error;
       }
+  };
+  return {
+    execute,
+    async ready() {
+      const procedure = dependencies.readinessProcedure ?? 'AppReady';
+      const definition = definitions.get(procedure);
+      if (!definition || Object.keys(definition.parameters).length) {
+        throw new Error('SQL readiness requires a declared procedure with no parameters');
+      }
+      const rows = await execute('00000000-0000-4000-8000-000000000000', 'owner', procedure, {});
+      if (rows.length !== 1 || !z.object({ ready: z.literal(true) }).safeParse(rows[0]).success) {
+        throw new Error('SQL readiness procedure returned an invalid readiness result');
+      }
     },
-    async ready() { await connect(); },
     async close() {
       if (connection) await (await connection).close();
       connection = undefined;

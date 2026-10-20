@@ -93,7 +93,7 @@ test('stages publishable package metadata with synchronized exact runtime depend
 
   for (const candidate of [source, pkg]) {
     assert.equal(candidate.name, '@microsoft/sql-apps');
-    assert.equal(candidate.version, '0.2.3');
+    assert.equal(candidate.version, '0.2.4');
     assert.equal(candidate.type, 'module');
     assert.deepEqual(candidate.bin, { 'sql-apps': 'bin/sql-apps.mjs' });
     assert.equal(Object.hasOwn(candidate, 'private'), false);
@@ -167,6 +167,8 @@ test('bin help is project-independent and its validated command map targets pack
     const bin = join(staged, 'bin', 'sql-apps.mjs');
     const result = await runNode([bin, '--help'], { cwd: empty });
     assert.match(result.stdout, /Usage: sql-apps <command>/);
+    assert.match(result.stdout, /publish.*personal-free.*fallback/i);
+    assert.doesNotMatch(result.stdout, /Primary personal-project Azure path/);
     assert.equal(result.stderr, '');
 
     const module = await import(`${pathToFileURL(bin).href}?test=${Date.now()}`);
@@ -235,7 +237,7 @@ test('bin dispatches from the project root when invoked in a nested directory', 
       starter: 'data',
       profile: 'role-based-data',
       scaffoldVersion: 1,
-      tooling: { package: '@microsoft/sql-apps', version: '0.2.3' },
+      tooling: { package: '@microsoft/sql-apps', version: '0.2.4' },
     })}\n`),
   ]);
 

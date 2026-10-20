@@ -179,3 +179,18 @@ test('personal-free API admits team members only on routes that list the member 
     { role: 'owner', procedure: 'DeleteLoan' },
   ]);
 });
+
+test('anonymous SQL readiness failures are logged without exposing database details', async () => {
+  const failures: unknown[] = [];
+  const handler = createPersonalFreeHandler([], {
+    async execute() { throw new Error('not an API call'); },
+    async ready() { throw new Error('Missing private schema dbo.PrivateLedger'); },
+  }, error => failures.push(error));
+  const response = await handler({
+    method: 'GET', url: 'https://example.test/api/health/ready', headers: new Headers(),
+  });
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { status: 'not-ready' });
+  assert.equal(failures.length, 1);
+  assert.match(String(failures[0]), /PrivateLedger/);
+});

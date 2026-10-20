@@ -98,7 +98,7 @@ test('publish status verifies live free settings and fails closed on drift', asy
   assert.equal(invitations.length, 2);
 });
 
-test('publish init requires explicit region, subscription, resource group, environment and sharing choices', async t => {
+test('publish init requires explicit region, subscription, resource group, environment, sharing and client IP choices', async t => {
   const root = await mkdtemp(join(tmpdir(), 'sql-apps-personal-free-init-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   process.env.SQL_APPS_PROJECT_HOME = root;
@@ -116,7 +116,8 @@ test('publish init requires explicit region, subscription, resource group, envir
   };
   const base = (path: string) => ['init', '--name', 'tracker', '--subscription', subscriptionId,
     '--web-location', 'westus2', '--data-location', 'same', '--resource-group', 'rg-tracker',
-    '--resource-group-mode', 'new', '--environment', 'prod', '--sharing', 'team', '--config', join(root, path)];
+    '--resource-group-mode', 'new', '--environment', 'prod', '--sharing', 'team',
+    '--client-ip', '203.0.113.10', '--config', join(root, path)];
   const replace = (args: string[], flag: string, value: string) => {
     const copy = [...args];
     copy[copy.indexOf(flag) + 1] = value;
@@ -126,6 +127,10 @@ test('publish init requires explicit region, subscription, resource group, envir
   await assert.rejects(main(['init', '--name', 'tracker', '--location', 'eastus'], () => {}, run), /--location was replaced/);
   await assert.rejects(main(base('a.json').filter((_, i, all) => all[i] !== '--sharing' && all[i - 1] !== '--sharing'), () => {}, run),
     /--sharing is required/);
+  await assert.rejects(main(base('missing-ip.json').filter((_, i, all) => all[i] !== '--client-ip' && all[i - 1] !== '--client-ip'), () => {}, run),
+    /--client-ip is required/);
+  await assert.rejects(main(replace(base('invalid-ip.json'), '--client-ip', '0.0.0.0'), () => {}, run),
+    /Deployment client IP must identify one operator/);
   await assert.rejects(main(replace(base('b.json'), '--web-location', 'southcentralus'), () => {}, run),
     /Static Web Apps region must be one of: westus2/);
   await assert.rejects(main(replace(base('c.json'), '--subscription', '99999999-9999-4999-8999-999999999999'), () => {}, run),

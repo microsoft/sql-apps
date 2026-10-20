@@ -8,26 +8,26 @@ test('personal-free publishing is the only bundled Azure deployment command', as
   assert.doesNotMatch(source, /azure:\s*'dist\/src\/cli\.js'/);
 });
 
-test('cloud guidance names the free personal target and its limits', async () => {
+test('cloud guidance orders free-first candidates without promoting the personal-free fallback', async () => {
   const skill = await readFile('plugins/sql-apps/skills/sql-apps-cloud-preview/SKILL.md', 'utf8');
-  assert.match(skill, /primary[\s\S]*Static Web Apps Free/i);
+  assert.match(skill, /App Service first[\s\S]*Container Apps second[\s\S]*SWA last/i);
   assert.match(skill, /personal project/i);
   assert.match(skill, /no .*SLA/i);
   assert.match(skill, /potentially \$0/i);
-  assert.match(skill, /cost guard/i);
-  assert.match(skill, /stop rather than bill/i);
-  assert.doesNotMatch(skill, /legacy|compatibility path/i);
-  assert.match(skill, /Container Apps[^.]*candidate—not a bundled profile/i);
+  assert.match(skill, /guard fails closed unless Free SKU and SQL free-tier\/AutoPause/i);
+  assert.match(skill, /complete required setup fits Free/i);
+  assert.match(skill, /candidate, not a bundled profile/i);
+  assert.match(skill, /Preferences are not spending consent/i);
 });
 
 test('cost guidance distinguishes the zero-cost profile from almost-free architectures', async () => {
   const costs = await readFile('docs/guides/costs.md', 'utf8');
-  assert.match(costs, /Service Bus Basic[\s\S]*billable/i);
-  assert.match(costs, /managed Functions/i);
-  assert.match(costs, /App Service/i);
+  assert.match(costs, /App Service Free[\s\S]*first[\s\S]*Container Apps Consumption second[\s\S]*SWA Free as the last fallback/i);
+  assert.match(costs, /managed\s+Functions/i);
   assert.match(costs, /no\s+always-billable Azure service/i);
-  assert.match(costs, /quota exhaustion[\s\S]*interrupt/i);
-  assert.match(costs, /GitHub Actions[\s\S]*outside/i);
+  assert.match(costs, /Exhaustion can interrupt[\s\S]*until allowances reset/i);
+  assert.match(costs, /GitHub Actions[\s\S]*separate terms/i);
+  assert.match(costs, /Budgets send delayed alerts; they do not stop spending/i);
 
   const deployment = await readFile('docs/reference/personal-free-deployment.md', 'utf8');
   assert.match(deployment, /Cost guard: verified/);

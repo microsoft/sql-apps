@@ -2,9 +2,39 @@
 
 Before moving a local app online, decide **who should use it** and **what information it contains**. A public URL is not access control.
 
-## Default for a personal project or small team
+## App Service, then Container Apps
 
-The primary SQL Apps cloud target is:
+Assess App Service Free (`F1`) first for compatible static frontends, web apps
+and APIs. Verify runtime, OS, region, quotas and required authentication.
+F1 is for development/testing, has no SLA and can stop requests at quota limits;
+never upgrade to a paid plan silently.
+
+If Free is unsuitable or declined, assess Container Apps Consumption second.
+Keep required DAB on ACA with managed identity to the Azure SQL free offer,
+normally with frontend/gateway and localhost-only DAB in one app. Do not remove
+DAB or split hosting merely to put App Service first. A static-only site needs
+no DAB or database.
+
+Use the [App Service-first, free-first reference](../reference/free-first.md) to
+infer reasonable proposed defaults and show one review card. Ask only about
+material ambiguity, requirements and consent, not every infrastructure flag.
+Maintained Azure preparation, validation and deployment skills own this
+app-specific infrastructure; it is not a bundled SQL Apps deployment.
+
+ACA can remain inside free allowances for light use, but its subscription-wide
+grants are not a spending cap: overage and supporting resources can bill.
+Explicit cost-risk acceptance is required before provisioning. A strict-zero
+preference keeps local use available; it does not authorize metered services.
+
+## SWA only as a free fallback
+
+Consider a new Static Web Apps deployment last, only when App Service and ACA are
+unsuitable or declined and the **complete required setup fits Free**. Do not
+drop DAB, managed identity or access requirements to make it fit. SWA's native
+ACA backend integration requires Standard and fails this test.
+
+Existing `personal-free` deployments remain supported without automatic
+migration. For a compatible, explicitly selected free fallback, this publisher uses:
 
 - Azure Static Web Apps **Free** for the site and managed Functions API;
 - the Azure SQL Database free tier;
@@ -23,10 +53,12 @@ offer terms take precedence over this guide.
 The trade-off for the low fixed cost is deliberate: Azure SQL has a public endpoint, and its `0.0.0.0` firewall rule admits connections from Azure resources outside your subscription. SQL authentication remains enabled because Static Web Apps managed Functions do not provide the application a managed identity. Stored-procedure allowlisting, object-scoped grants, invited roles, encryption, and certificate validation limit the resulting access, but do not turn this into an enterprise private-network architecture.
 
 Use the [personal-free deployment reference](../reference/personal-free-deployment.md). The workflow is read-only until `deploy --approve` receives the approval code from the current plan.
-Before `init`, you choose the subscription, the web region (Static Web Apps
-supports only a few), whether the database lives in the same region or another
-one for data residency, a new or existing resource group, the environment, and
-personal or team sharing. `plan` then prints a creation card listing each
+Before `init`, infer proposed subscription, supported web/data regions,
+dedicated resource group, environment and sharing values from validated context
+and the brief; display them for approval rather than asking a question per flag.
+Respect residency and the subscription's existing free SQL region. Pass every
+required argument explicitly; an existing group is never reused silently.
+`plan` then prints a creation card listing each
 resource's region, cost posture and undo command.
 Deployment applies `project=sql-apps`, the selected environment and
 `deployment=personal-free` tags to the resource group and each taggable
@@ -36,12 +68,13 @@ application resource so usage and cost views can group this project.
 
 | Need | Path |
 | --- | --- |
-| One owner, light personal use, potentially $0, no SLA | Primary `personal-free` publisher |
-| A small team (up to 25 invited people) with owner and member access, potentially $0, no SLA | Same `personal-free` publisher: mark member-callable routes with `"roles": ["owner", "member"]` and invite with `--role member` |
-| Entra-only SQL or managed identity, intermittent use, scale-to-zero acceptable, possible charges accepted | Separately planned architecture with maintained Azure and Azure SQL skills; Container Apps Consumption with gateway/DAB is a candidate, not a bundled SQL Apps deployment |
+| Compatible static frontend, web app or API | Assess App Service Free first; verify full feature/quota fit and omit unneeded SQL/DAB |
+| App Service Free unsuitable or declined; containers or required DAB, possible charges accepted | Container Apps Consumption second; keep required gateway/DAB and managed identity, planned with maintained Azure/SQL skills |
+| App Service and ACA unsuitable or declined; complete setup fits Free and accepts credential-based SQL if needed | SWA last as a qualifying fallback; the compatible `personal-free` publisher supports up to 25 invited owner/member users |
+| Existing personal-free deployment | Keep the publisher and its live guard; no automatic migration |
 | No cloud deployment | Keep using the local application |
 | Enterprise SLA, private networking, organizational controls, or managed identity without accepting the conditions above | Plan a production architecture with maintained Azure and Azure SQL skills |
-Do not choose the Container Apps candidate when a guaranteed $0 bill, continuous availability, no cold starts/SQL resume delay, required hosting/networking prohibited by policy, or required permissions are unavailable. Verify current DAB authentication support, service availability, subscription-wide allowance usage and Azure SQL Database free-tier availability before recommending it. The project ships no second cloud topology and does not provide a second deployer. Use maintained Azure preparation, validation and deployment skills to design, own and validate any separate architecture.
+Do not choose the Container Apps candidate when a guaranteed $0 bill, continuous availability, no cold starts/SQL resume delay, required hosting/networking prohibited by policy, or required permissions are unavailable. A blocked ACA path does not automatically qualify SWA. Verify current DAB authentication support, service availability, subscription-wide allowance usage and Azure SQL Database free-tier availability before provisioning. The project ships no second cloud topology and does not provide a second deployer. Use maintained Azure preparation, validation and deployment skills to design, own and validate the container architecture.
 
 ### Plan a separate architecture
 

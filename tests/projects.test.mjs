@@ -108,6 +108,8 @@ test('the plugin can guide an unrestored project through its explicit foundation
   const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-bootstrap-')));
   t.after(() => rm(userHome, { recursive: true, force: true }));
   const created = await projects.createProject(process.cwd(), 'Bootstrap App', { userHome, initializeGit: false });
+  assert.equal(await readFile(join(created.path, 'docs', 'reference', 'free-first.md'), 'utf8'),
+    await readFile(resolve('docs', 'reference', 'free-first.md'), 'utf8'));
   const copilotHome = join(userHome, 'copilot');
   await mkdir(copilotHome);
   await writeFile(join(copilotHome, 'sql-apps-local.json'), JSON.stringify({ version: 1, home: process.cwd() }));

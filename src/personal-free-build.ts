@@ -2,7 +2,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { copyFile, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
-import { toolingRoot } from './runtime-roots.js';
+import { parseBrowserConfig } from './browser-config.js';
+import { run as execute, type Run } from './process.js';
+import { toolingAsset, toolingRoot } from './runtime-roots.js';
 
 const parameterType = z.enum(['nvarchar', 'uniqueidentifier', 'bit', 'int', 'datetime2']);
 const routeSchema = z.strictObject({
@@ -57,7 +59,34 @@ async function files(directory: string, base = directory): Promise<string[]> {
 
 const digest = (value: Buffer | string) => createHash('sha256').update(value).digest('hex');
 
-export async function buildPersonalFreeArtifact(root: string, destination: string): Promise<PersonalFreeBuildManifest> {
+async function snapshots(directory: string) {
+  const paths = (await files(directory)).filter(path => path !== 'personal-free-build.json');
+  return Promise.all(paths.map(async path => ({
+    path, sha256: digest(await readFile(join(directory, path))),
+  })));
+}
+
+export async function verifyPersonalFreeArtifact(directory: string): Promise<PersonalFreeBuildManifest> {
+  const manifest = z.strictObject({
+    version: z.literal(1),
+    sourceHash: z.string().regex(/^[a-f0-9]{64}$/),
+    files: z.array(z.strictObject({ path: z.string(), sha256: z.string().regex(/^[a-f0-9]{64}$/) })),
+  }).parse(JSON.parse(await readFile(join(directory, 'personal-free-build.json'), 'utf8')));
+  const actual = await snapshots(directory);
+  if (JSON.stringify(actual) !== JSON.stringify(manifest.files) ||
+      digest(JSON.stringify(actual)) !== manifest.sourceHash ||
+      !['deployment/database.dacpac', 'deployment/template.json', 'deployment/api.json']
+        .every(path => actual.some(file => file.path === path))) {
+    throw new Error('Approved personal-free artifact is incomplete or changed; run plan again');
+  }
+  return manifest;
+}
+
+export async function buildPersonalFreeArtifact(
+  root: string,
+  destination: string,
+  run: Run = execute,
+): Promise<PersonalFreeBuildManifest> {
   root = resolve(root);
   destination = resolve(destination);
   const api = apiSchema.parse(JSON.parse(await readFile(join(root, 'personal-free-api.json'), 'utf8')));
@@ -80,8 +109,17 @@ export async function buildPersonalFreeArtifact(root: string, destination: strin
       await mkdir(dirname(target), { recursive: true });
       await copyFile(join(publicRoot, name), target);
     }
-    const readinessRoute = api.routes.find(route => route.method === 'GET');
-    if (!readinessRoute) throw new Error('Personal-free API requires at least one GET route for readiness');
+    const readinessRoute = api.routes.find(route => {
+      if (route.method !== 'GET' || Object.keys(route.procedure.parameters).length) return false;
+      try {
+        parseBrowserConfig({ mode: 'static-web-apps', provider: api.authenticationProvider, readinessPath: route.path });
+        return true;
+      } catch (error) {
+        if (!(error instanceof Error && error.message === 'Invalid browser readiness path')) throw error;
+        return false;
+      }
+    });
+    if (!readinessRoute) throw new Error('Personal-free API requires a browser-compatible, no-parameter GET readiness route');
     const readinessPath = readinessRoute.path;
     if (api.routes.some(route => route.roles?.includes('member')) &&
         !(readinessRoute.roles ?? ['owner']).includes('member')) {
@@ -99,7 +137,9 @@ export async function buildPersonalFreeArtifact(root: string, destination: strin
 import { createPersonalFreeHandler, parsePersonalFreeBody } from './personal-free-app.js';
 import { createProcedureRuntime } from './sql-procedure-runtime.js';
 const routes = ${JSON.stringify(api.routes)};
-const runtime = createProcedureRuntime(process.env, routes.map(route => route.procedure));
+const runtime = createProcedureRuntime(process.env, routes.map(route => route.procedure), {
+  readinessProcedure: ${JSON.stringify(readinessRoute.procedure.name)},
+});
 const handler = createPersonalFreeHandler(routes, runtime);
 app.http('sqlAppsApi', {
   route: '{*path}',
@@ -139,15 +179,20 @@ app.http('sqlAppsApi', {
         zod: '4.6.5',
       },
     }, null, 2)}\n`);
-    const delivered = await files(temporary);
-    const snapshots = await Promise.all(delivered.map(async path => ({
-      path,
-      sha256: digest(await readFile(join(temporary, path))),
-    })));
+    const deployment = join(temporary, 'deployment');
+    const sqlOutput = join(temporary, 'sql-build');
+    await mkdir(deployment);
+    await writeFile(join(deployment, 'api.json'), `${JSON.stringify(api)}\n`);
+    await run('dotnet', ['build', join(root, 'sql', 'personal-free.sqlproj'), '--output', sqlOutput]);
+    await copyFile(join(sqlOutput, 'personal-free.dacpac'), join(deployment, 'database.dacpac'));
+    await rm(sqlOutput, { recursive: true, force: true });
+    await run('az', ['bicep', 'build', '--file', toolingAsset('infra', 'personal-free.bicep'),
+      '--outfile', join(deployment, 'template.json')]);
+    const delivered = await snapshots(temporary);
     const manifest: PersonalFreeBuildManifest = {
       version: 1,
-      sourceHash: digest(JSON.stringify({ api, snapshots })),
-      files: snapshots,
+      sourceHash: digest(JSON.stringify(delivered)),
+      files: delivered,
     };
     await writeFile(join(temporary, 'personal-free-build.json'), `${JSON.stringify(manifest, null, 2)}\n`);
     await mkdir(dirname(destination), { recursive: true });

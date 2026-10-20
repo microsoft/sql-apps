@@ -42,6 +42,19 @@ The brief is a scope decision, not a switch that composes services. Apps use the
 
 Optional `costPreference` is `zero-azure-spend` or `review-paid-costs`. It is never spending consent.
 
+When sharing is requested, [assess App Service first, Container Apps second and SWA last](free-first.md),
+without unnecessary SQL/DAB for static frontends. Keep required DAB on ACA with
+managed identity. App Service Free requires full runtime/feature/quota fit and
+is for development/testing, not production. The guide only points to this
+workflow: it does not contact Azure or authorize deployment. Infer proposed
+settings from validated context, then review the exact resource/cost/access card.
+ACA grants can be exhausted and bill; a strict-zero preference keeps local use
+available or permits assessment of compatible App Service Free, then a fully
+qualifying SWA Free fallback if ACA cannot fit the constraints.
+Never silently change saved preferences, drop required managed identity, or
+convert historical evidence into spending approval. Missing preference still
+means `zero-azure-spend`.
+
 The report's `profile` is `role-based-data` when `role-based-data.json` exists in the checkout, otherwise `null`. `suggestedProfile` is always `role-based-data`, the only profile. Cloud cost review routes to the Azure Cost plugin. The suggestion is advice, not configuration: it still needs `role-based-data.json`, which `setup plan` reports.
 
 ## Record historical evidence

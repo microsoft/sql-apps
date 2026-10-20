@@ -31,7 +31,7 @@ services or topology.
 - `sql-apps-local`: prerequisites, approval and lifecycle.
 - `sql-apps-validation`: checks and evidence.
 - `sql-apps-diagnostics`: an existing failure or slow read.
-- `sql-apps-cloud-preview`: requested publishing, pricing or cloud readiness; owns the bundled publisher.
+- `sql-apps-cloud-preview`: requested publishing, pricing or cloud readiness; assesses App Service, then Container Apps, then qualifying SWA Free fallback.
 
 Load only the needed stage; stop gathering context once its command or blocker is known.
 

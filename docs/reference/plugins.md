@@ -141,7 +141,7 @@ selection, `SQL_APPS_HOME` can select a foundation for creation only; an app is
 not a project factory. The local installer below remains a Copilot alternative
 and creates a persistent foundation binding.
 
-Generated applications pin exactly `@microsoft/sql-apps@0.2.3`. Plugin installation does not distribute that package. Use an explicitly [bound release archive](projects.md#install-from-a-release-archive), or a configured npm feed that serves the pin. A missing feed package blocks the registry route; never silently change sources. A verified archive release requires no npm publishing rights but is not evidence of npm publication. See the [release prerequisites](progressive-creation.md).
+Generated applications pin exactly `@microsoft/sql-apps@0.2.4`. Plugin installation does not distribute that package. Use an explicitly [bound release archive](projects.md#install-from-a-release-archive), or a configured npm feed that serves the pin. A missing feed package blocks the registry route; never silently change sources. A verified archive release requires no npm publishing rights but is not evidence of npm publication. See the [release prerequisites](progressive-creation.md).
 
 ## Install from your checkout
 
@@ -190,7 +190,7 @@ These companion plugins are not prerequisites for local-only development. Instal
 
 ## Use the GitHub Copilot App
 
-Restart the App or create a **fresh session** after installation. In **Customize -> Plugins**, look for **sql-apps**, marketplace **sql-apps-skills**, version **0.2.3**, enabled. Its skills should appear under **Skills**:
+Restart the App or create a **fresh session** after installation. In **Customize -> Plugins**, look for **sql-apps**, marketplace **sql-apps-skills**, version **0.2.4**, enabled. Its skills should appear under **Skills**:
 
 | Skill | Example prompt |
 | --- | --- |
@@ -198,7 +198,7 @@ Restart the App or create a **fresh session** after installation. In **Customize
 | `sql-apps-local` | Start SQL Apps locally; reuse it if it is already running. |
 | `sql-apps-diagnostics` | Diagnose a failed SQL Apps workflow or slow read without changing services. |
 | `sql-apps-validation` | Run SQL Apps unit tests and typecheck; do not restart services. |
-| `sql-apps-cloud-preview` | Assess whether personal-free fits; hand separately planned architectures to maintained Azure skills and explain their cost, access and interruption trade-offs. |
+| `sql-apps-cloud-preview` | Assess App Service first, Container Apps second and SWA last as a qualifying complete-free-setup fallback, with explicit cost/access acceptance and maintained Azure infrastructure ownership. |
 | `sql-apps-application` | Build a domain-specific application without copying the Todo example; verify source, build, API and database boundaries. |
 | `sql-apps-design` | Apply intentional visual direction to every new user-facing app and meaningful UI change, then review its rendered desktop and narrow-width experience. |
 
@@ -318,7 +318,7 @@ node "C:\git\sql-apps\plugins\sql-apps\scripts\sql-apps.mjs" setup-check
 
 `guide` is also dependency-free and available before the runtime is built. It returns JSON with the four stages, saved brief, suggested next action and explicitly historical progress; it does not probe live services. `guide-save "<absolute-brief.json>"` validates and saves the agreed brief in `.sql-apps/guide.json` in the bound checkout. Both enforce the same runtime-home mismatch checks. Source changes flag saved progress for local re-verification. See [the brief contract](guide.md); do not include credentials or actual data.
 
-The guide also introduces cost awareness progressively; optional saved `costPreference` is not spending approval. The cloud-preview skill confirms the `role-based-data` application first. Azure estimates and spend analysis route to the Azure Cost plugin. The launcher exposes the [role-based-data](role-based-data.md) `app`/`serve` commands and their `role-based-app`/`role-based-serve` aliases. Budgets are alerts, not spending caps. See [costs and paid growth](../guides/costs.md).
+The guide also introduces cost awareness progressively; optional saved `costPreference` is not spending approval. The cloud-preview skill confirms the `role-based-data` application first and uses the [App Service-first, free-first contract](free-first.md): App Service, then Container Apps, then qualifying SWA Free. Required DAB stays on ACA with SQL managed identity. Infer proposed settings, but obtain acceptance of the exact inventory and risks before writes. The existing personal-free publisher remains available for existing deployments and qualifying SWA Free fallbacks, not as the default integration. Azure estimates and spend analysis route to the Azure Cost plugin. The launcher exposes the [role-based-data](role-based-data.md) `app`/`serve` commands and their `role-based-app`/`role-based-serve` aliases. Budgets are alerts, not spending caps. See [costs and paid growth](../guides/costs.md).
 
 If the active checkout differs from the installed binding, runtime execution is refused until you explicitly select the intended home. This also applies when the active worktree lacks the uncommitted foundation. Review the report, then select one checkout for this terminal/session:
 

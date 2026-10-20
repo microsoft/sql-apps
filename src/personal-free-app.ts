@@ -89,7 +89,8 @@ export function createPersonalFreeHandler(
       try {
         await runtime.ready();
         return Response.json({ status: 'ready' });
-      } catch {
+      } catch (error) {
+        reportError(error);
         return Response.json({ status: 'not-ready' }, { status: 503 });
       }
     }

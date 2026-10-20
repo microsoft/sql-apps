@@ -56,9 +56,17 @@ In the personal-free profile, **Give access** means creating a time-limited Stat
 
 ## Static Web Apps boundary
 
-The primary personal profile uses Static Web Apps built-in authentication and managed Functions. The browser reads `/.auth/me`; sign-in and sign-out use the platform `/.auth` routes. The Functions boundary strictly parses `x-ms-client-principal`, rejects malformed or oversized principals, and requires exactly the invited `owner` role. Caller-submitted platform identity headers are stripped before request adaptation.
+The existing personal-free profile uses Static Web Apps built-in authentication and managed Functions. The browser reads `/.auth/me`; sign-in and sign-out use the platform `/.auth` routes. The Functions boundary strictly parses `x-ms-client-principal`, rejects malformed or oversized principals, and requires exactly the invited `owner` role. Caller-submitted platform identity headers are stripped before request adaptation.
 
 Do not copy the Static Web Apps principal model outside its hosting boundary or claim that it supplies a managed identity for Azure SQL.
+
+New hosting recommendations assess [App Service, then Container Apps, then SWA](free-first.md), retaining
+real token validation, application access and ownership rather than adopting
+SWA headers outside SWA. DAB-to-SQL managed identity authenticates the workload;
+it does not replace browser-user authorization. Required DAB stays on ACA;
+verify App Service Free's required auth capabilities before selecting it.
+SWA is a qualifying free
+fallback, never a reason to drop required identity controls.
 
 The SWA CLI is a deployment dependency for the personal-free artifact. Local preview continues to use SQL Apps' local session model; an SWA CLI authentication simulation is not production acceptance.
 

@@ -17,7 +17,7 @@ by all routes; check the additional requirements for your chosen database.
 | .NET SDK 8 or later | Build and publish the SQL schema. Choose SDK, not just Runtime. |
 | Docker with Linux containers | Preferred container route only; endpoint fallbacks use host DAB without Docker. |
 | Azure SQL Database container private-preview access | Preferred first-use route, unless cached. If unavailable, offer Azure SQL directly, then SQL Server 2025 Express on Windows x64. |
-| Access to the pinned SQL Apps package | Use the matching release archive, or a configured npm feed that serves `@microsoft/sql-apps@0.2.3`. |
+| Access to the pinned SQL Apps package | Use the matching release archive, or a configured npm feed that serves `@microsoft/sql-apps@0.2.4`. |
 
 **Check package access before attempting application restore.** Installing the
 assistant plugin does not make the runtime package available. If your configured

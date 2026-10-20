@@ -4,6 +4,12 @@ Use this workflow after deploying to **Azure SQL Database**: observe a real app 
 
 SQL Apps deployment checks are readiness checks, not live usage monitoring; use the Azure Cost plugin for actual spend and forecasts. This page does not provide an alternative provisioning path.
 
+For new hosting, use [App Service-first, free-first planning](free-first.md):
+App Service, Container Apps, then qualifying SWA Free fallback. App Service F1
+quota stops do not authorize paid upgrades. ACA metering
+and SQL allowance/idle behavior are separate checks: zero replicas does not
+prove the database paused, and a budget alert does not cap spending.
+
 ## 1. Connect Database Hub for free monitoring
 
 [Database Hub in Microsoft Fabric](https://learn.microsoft.com/fabric/database/hub/overview) brings together existing database resources without moving their data into Fabric.

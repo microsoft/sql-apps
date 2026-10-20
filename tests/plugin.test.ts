@@ -46,7 +46,7 @@ test('SQL Apps identity is consistent across packages, platform manifests and ma
     assert.equal(manifest.name, 'sql-apps', path);
     assert.equal(manifest.homepage, repository, path);
     assert.equal(manifest.repository, repository, path);
-    assert.equal(manifest.version, '0.2.3', path);
+    assert.equal(manifest.version, '0.2.4', path);
     assert.deepEqual(manifest.author, { name: 'Microsoft SQL team (mssql)', url: 'https://github.com/microsoft' }, path);
   }
   for (const path of ['.github/plugin/marketplace.json', '.claude-plugin/marketplace.json', '.agents/plugins/marketplace.json']) {
@@ -294,6 +294,45 @@ test('publisher guidance scopes maintainer checks without weakening deployment g
   ]) assert.match(cloud, requirement);
 });
 
+test('cloud reference orders App Service, Container Apps and complete-free-setup SWA fallback', async () => {
+  const reference = await readFile('docs/reference/free-first.md', 'utf8');
+  const selection = reference.split('## Selection order')[1]?.split('\n## ')[0];
+  assert.ok(selection, 'Keep an explicit hosting selection order');
+  assert.match(selection, /App Service first[\s\S]*Container Apps second[\s\S]*SWA last/i);
+  assert.match(selection, /F1/);
+  assert.match(selection, /DAB.*ACA/i);
+  assert.match(reference, /60 CPU minutes.*day/i);
+  assert.match(reference, /HTTP 403/);
+  assert.match(reference, /never automatically upgrade/i);
+  assert.match(reference, /runtime.*OS.*region/i);
+  for (const requirement of [
+    /App Service/i, /static.*frontend/is, /no DAB or database/i,
+    /SWA.*fallback/is, /complete.*Free/is, /Standard/i,
+    /zero-azure-spend/, /review-paid-costs/, /not spending consent/i,
+    /managed identity/i, /localhost/i, /object-scoped/i,
+    /immutable/i, /not.*public.*images/is, /private GHCR/i,
+    /subscription-wide/i, /unknown/i, /not.*spending cap/i,
+    /re-plan/i, /manual recovery/i, /source.*hash|fingerprint/i,
+    /no sessions/i, /liveness/i, /non-idempotent/i,
+    /authentication-managed-identity/, /mhyon\/azurefree/,
+  ]) assert.match(reference, requirement);
+});
+
+test('cloud skill loads the free-first reference without making the local entry point cloud-dependent', async () => {
+  const cloud = await readFile('plugins/sql-apps/skills/sql-apps-cloud-preview/SKILL.md', 'utf8');
+  assert.match(cloud, /App Service first[\s\S]*Container Apps second[\s\S]*SWA last/i);
+  assert.match(cloud, /F1/);
+  assert.match(cloud, /DAB.*ACA/i);
+  assert.match(cloud, /docs\/reference\/free-first\.md/);
+  assert.match(cloud, /infer/i);
+  assert.match(cloud, /complete.*Free/is);
+  assert.match(cloud, /zero-azure-spend/);
+  assert.doesNotMatch(cloud, /Ask; never default/);
+  const entry = await readFile('plugins/sql-apps/skills/sql-apps-getting-started/SKILL.md', 'utf8');
+  assert.match(entry, /requested publishing/i);
+  assert.doesNotMatch(entry, /azure-prepare|az account show|free-first\.md/);
+});
+
 test('diagnostics establishes local evidence before specialist routing', async () => {
   const diagnostics = await readFile(resolve('plugins/sql-apps/skills/sql-apps-diagnostics/SKILL.md'), 'utf8');
   const local = diagnostics.indexOf('## Diagnose the selected app');
@@ -410,13 +449,13 @@ test('agent guidance stays concise, stack-neutral and script-led', async () => {
   assert.match(cloud, /npm run publish -- init[\s\S]*npm run publish -- plan[\s\S]*npm run publish -- deploy/);
   assert.match(cloud, /no Static Web Apps SLA[\s\S]*potentially \$0|potentially \$0[\s\S]*no Static Web Apps SLA/i);
   assert.match(cloud, /only bundled cloud profile/i);
-  assert.match(cloud, /Container Apps Consumption[\s\S]*candidate—not a bundled profile/i);
+  assert.match(cloud, /Container Apps Consumption[\s\S]*candidate, not a bundled profile/i);
   assert.match(cloud, /azure-prepare[\s\S]*azure-validate[\s\S]*azure-deploy/);
   assert.match(cloud, /budgets are not spending caps/i);
   assert.match(cloud, /manual recovery/i);
   assert.doesNotMatch(cloud, /npm run publish -- (?:container|aca)/i, 'SQL Apps must not add a second cloud deployer');
   assert.doesNotMatch(cloud, /For an SLA, managed identity/, 'Managed identity must not route to both production and Container Apps');
-  assert.match(cloud, /unsupported managed identity|managed identity that does not meet the conditions below/i);
+  assert.match(cloud, /preserve.*managed identity|managed identity.*preserve/is);
   assert.match(sharing, /only the gateway has public ingress[\s\S]*DAB is reachable over localhost/i);
   assert.match(sharing, /managed identity[\s\S]*object-scoped permissions/i);
   assert.match(sharing, /not a bundled SQL Apps deployment/i);

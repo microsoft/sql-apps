@@ -51,7 +51,9 @@ export async function createGateway(config: RuntimeConfig, dependencies: Gateway
         await dependencies.ready();
         return { status: 'ready' };
       }
-      const response = await dependencies.fetch(new URL('/health', config.dabUrl), { signal: AbortSignal.timeout(5_000) });
+      const response = await dependencies.fetch(new URL('/', config.dabUrl), {
+        redirect: 'error', signal: AbortSignal.timeout(5_000),
+      });
       if (!response.ok) return reply.code(503).send({ status: 'not-ready' });
       return { status: 'ready' };
     } catch (error) {

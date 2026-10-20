@@ -21,6 +21,7 @@ const currentConfigSchema = z.strictObject({
   }),
   dataLocation: region,
   sharing: z.enum(['personal', 'team']).default('personal'),
+  deploymentClientIp: z.ipv4().refine(ip => ip !== '0.0.0.0', 'Deployment client IP must identify one operator, not all Azure services').optional(),
   environment: z.enum(['dev', 'test', 'prod']),
   name: z.string().regex(/^[a-z][a-z0-9-]{2,19}$/),
 });
@@ -29,7 +30,8 @@ export function legacyLocationMessage(location: string): string {
   return `This config uses the retired single "location" (${location}), which Static Web Apps does not support, ` +
     `so its web app could not have been deployed. Move the config aside and rerun "npm run publish -- init" with the same ` +
     `--name, --environment and --resource-group, --web-location <${staticWebAppRegions.join('|')}> and ` +
-    `--data-location ${location} to keep the data region; use --resource-group-mode existing if the group was created.`;
+    `--data-location ${location} to keep the data region, and --client-ip <public-ipv4> for temporary SQL publishing access; ` +
+    `use --resource-group-mode existing if the group was created.`;
 }
 
 function migrateLegacyLocation(value: unknown, context: z.RefinementCtx): unknown {

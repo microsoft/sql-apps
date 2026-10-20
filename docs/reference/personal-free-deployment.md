@@ -1,6 +1,12 @@
 # Personal-free Azure deployment
 
-`personal-free` is the primary SQL Apps cloud profile for a small, private application used by one owner or a small invited team. It deploys Azure Static Web Apps Free with a managed Functions API and an Azure SQL Database configured for the free tier.
+`personal-free` is the existing bundled publisher for a small, private application used by one owner or a small invited team. It deploys Azure Static Web Apps Free with a managed Functions API and an Azure SQL Database configured for the free tier.
+
+For new web deployments, [assess App Service, then Container Apps, then SWA](free-first.md). Use this
+publisher for existing deployments or as an explicitly selected fallback only
+when the complete required setup fits Free. It does not host DAB or provide SQL
+managed identity; do not weaken those requirements to make this route fit.
+Existing deployments are not automatically migrated.
 
 This profile has no Static Web Apps SLA. It is **potentially $0**, not guaranteed free: the subscription must be eligible and usage must remain within current allowances.
 
@@ -14,6 +20,15 @@ the application until the allowance resets.
 The profile intentionally creates only a Static Web App and Azure SQL server/database.
 
 Azure SQL uses a public endpoint and the Azure-services firewall rule. The application uses a generated `sql_apps_runtime` login that receives `CONNECT` plus object-scoped `EXECUTE` and `VIEW DEFINITION` only for procedures declared in `personal-free-api.json`. Secrets are stored under `.sql-apps/deployments/`, which generated projects exclude from Git.
+
+Publishing SQL from outside Azure additionally needs the operator's public IPv4
+address. Initialize with `--client-ip <public-ipv4>`; existing configs must add
+`deploymentClientIp` before planning. The creation card binds that exact address
+to approval. Deployment and rotation create a uniquely named, single-address
+firewall rule only around their SQL work and remove it on success or failure.
+Cleanup errors fail the command and print the exact manual removal command.
+A forced process termination can bypass cleanup; inspect and remove any leftover
+`sql-apps-deploy-*` rules before retrying. An address change requires a new plan.
 
 The resource group, Static Web App, SQL server and SQL database carry
 `project=sql-apps`, `environment=<dev|test|prod>` and
@@ -38,11 +53,27 @@ Each route is owner-only unless it lists roles. To let invited team members call
   "procedure": { "name": "ListLoans", "parameters": {} } }
 ```
 
-When any route admits members, the first GET route (the browser readiness check) must admit them too; the build fails otherwise. Every call sets `SESSION_CONTEXT(N'oid')` to the caller's opaque ID and `SESSION_CONTEXT(N'role')` to `owner` or `member`. Each procedure decides whether its rows are shared by the team or scoped to the caller; the route roles control who may call it, not which rows it returns.
+The first GET route with no parameters and a browser-compatible
+`/api/<single-segment>` path is the readiness route; the build fails if none
+exists. Its procedure must be read-only, check the schema/access the app needs,
+and return exactly one row with a SQL `bit` column `ready` set to `1`
+(`true` in JSON). The default `AppReady` satisfies that response contract.
+Anonymous `/api/health/ready` executes this procedure with a reserved synthetic
+identity, never an invited user's identity, and returns HTTP 503 on failure.
+It must not depend on one user's records.
+
+When any route admits members, the selected readiness route must admit them
+too; the build fails otherwise. Every call sets `SESSION_CONTEXT(N'oid')` to the
+caller's opaque ID and `SESSION_CONTEXT(N'role')` to `owner` or `member`. Each
+procedure decides whether its rows are shared by the team or scoped to the
+caller; the route roles control who may call it, not which rows it returns.
 
 ## Plan and deploy
 
-Before `init`, decide each of these; none has a silent default:
+Before `init`, infer proposed values from validated project/account context and
+the saved brief, then display them together for review. Ask only for material
+ambiguity or consent. The CLI still requires every argument below explicitly;
+inference is not permission to reuse resources, move data or write to Azure.
 
 | Question | Flag | Notes |
 | --- | --- | --- |
@@ -52,13 +83,14 @@ Before `init`, decide each of these; none has a silent default:
 | New or existing resource group? | `--resource-group <name> --resource-group-mode new\|existing` | An existing group is never reused silently; it is kept on undo. |
 | Environment? | `--environment dev\|test\|prod` | Part of resource names and tags. |
 | Personal or team? | `--sharing personal\|team` | Team uses owner and member roles (above). |
+| Operator's public IPv4 address? | `--client-ip <public-ipv4>` | Approves temporary, exact-address SQL publishing access; never a wildcard range. |
 
 Sign in with Azure CLI as the person who will administer the database:
 
 ```powershell
 az login
 npm run publish -- init --name my-app --subscription <id> --web-location westeurope --data-location same `
-  --resource-group my-app-prod --resource-group-mode new --environment prod --sharing personal
+  --resource-group my-app-prod --resource-group-mode new --environment prod --sharing personal --client-ip <public-ipv4>
 npm run publish -- plan
 ```
 
@@ -66,11 +98,29 @@ npm run publish -- plan
 
 Deploy only after reviewing that output:
 
+Planning also builds the SQL database package and compiles the infrastructure
+template locally, so .NET and the Azure CLI Bicep compiler must be available.
+The site, API, SQL package, infrastructure JSON and SQL procedure allowlist are
+stored together under `.sql-apps/deployments/` and fingerprinted as one artifact.
+Deployment verifies and uses a private copy of that exact approved artifact.
+It does not rebuild or read changed application SQL, API declarations or
+infrastructure source. Run `plan` again after edits; do not edit approved output.
+Missing, incomplete or modified artifacts are rejected before Azure writes.
+
 ```powershell
 npm run publish -- deploy --approve <approval-code>
 ```
 
-Deployment creates the resource group, applies Bicep through a temporary protected parameter file, publishes `sql/personal-free.sqlproj`, creates the least-privilege runtime user, deploys the Static Web Apps artifact, and verifies database-backed readiness. The state file records completed stages so a failed deployment can be run again with the same approved build.
+Deployment creates the resource group, applies the approved compiled template
+through a temporary protected parameter file, publishes the approved SQL
+package, creates the least-privilege runtime user, deploys the Static Web Apps
+artifact using its installed Node CLI, and verifies database-backed readiness.
+The final check requires a JSON response with `status: ready`, not an HTML page
+or merely HTTP 200. The state file records completed stages so a failed
+deployment can be run again with the same approved build.
+
+Deployments planned by older tooling must run `plan` and then `deploy` once to
+establish these approved snapshots before using secret rotation.
 
 Check status without printing secrets:
 
@@ -98,6 +148,11 @@ Rotate the runtime SQL secret using the current deployment approval code:
 ```powershell
 npm run publish -- rotate-secret --approve <approval-code>
 ```
+
+Rotation saves the pending password and an in-progress stage before changing
+SQL. If interrupted, rerun the same command: it reuses that saved password,
+updates application settings and verifies readiness before recording `ready`.
+Do not delete protected state as a recovery step.
 
 ## Invite people
 

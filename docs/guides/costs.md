@@ -11,91 +11,98 @@ licensing, account, and pricing conditions.
 
 You do not need to deploy to Azure to build, test, or keep using a local app.
 
-## Review Azure costs when you choose to share
+## App Service first when you choose to share
 
 **You are responsible for your Azure bill.** Microsoft controls free allowances,
 eligibility, regional availability and offer end dates, and can change them.
-Check [Azure pricing](https://azure.microsoft.com/pricing) and Cost Management
-for your subscription before relying on a service being free. Official
-documentation and offer terms take precedence over this repository.
+Official documentation and offer terms take precedence over this repository.
 
-Use the maintained **Azure Cost** plugin for current regional and account-aware
-price estimates, actual spend analysis, forecasts, optimization, and governance.
-Use `azure-app-onboard` when comparing Azure architectures. A cost estimate is
-not a quote, spending cap, deployment approval, or proof that a resource is
-eligible for the Azure SQL Database free tier.
+Assess **App Service Free (`F1`) first**, **Container Apps Consumption second**,
+then **SWA Free as the last fallback**. Verify that the complete required setup
+fits each option rather than silently selecting a paid App Service plan.
+F1 is quota-limited, intended for development/testing and has no SLA; CPU or
+bandwidth exhaustion stops requests until reset. Supporting services can bill.
 
-The primary personal-project target is Static Web Apps Free with managed
-Functions and the Azure SQL Database free tier. It can plausibly remain at
-**$0 Azure service cost** while both services remain within their current
-allowances. Static Web Apps Free has no SLA. Eligibility, regional availability
-and usage are account-specific, and a free allowance is not a spending cap.
+Keep required DAB on ACA with managed identity to SQL, normally alongside the
+web gateway/frontend in one app; do not remove DAB or split services to force
+App Service first. Omit DAB/SQL for a static-only site. These are separately
+planned candidates, not new bundled publishers or guaranteed-free deployments.
 
-Unlike architectures described as "almost free," this profile creates no
-always-billable Azure service. For example, [Dan George's .NET 8 and React
-architecture](https://medium.com/@dangeorge35/deploy-a-full-stack-net-8-react-app-to-azure-for-almost-free-4fedc36820d3)
-adds Service Bus Basic, whose operations are billable, and runs the API on App
-Service F1. SQL Apps instead uses the managed Functions included with Static
-Web Apps Free and does not create Service Bus or a separate App Service plan.
+Use the [App Service-first, free-first reference](../reference/free-first.md) for
+proposed defaults, current offer sources, the complete resource inventory and
+approval boundaries. Maintained Azure skills own infrastructure preparation,
+validation and deployment. Free-oriented recommendations must preserve the
+application's access and data requirements.
 
-The bundled resources are configured to stop rather than bill when their free
-limits are exhausted. Static Web Apps Free has no bandwidth overage path, and
-Azure SQL uses the free tier's `AutoPause` behavior instead of paid overage.
-Quota exhaustion can therefore interrupt the site or database until the
-allowance resets; $0 cost does not mean uninterrupted availability.
+ACA grants are shared across a subscription; usage beyond them bills.
+Scale-to-zero, one maximum replica and one active revision reduce exposure,
+not cumulative spend. Include all containers, overlapping revisions, SQL,
+registry/builds, logging, networking, automation and notifications in the
+estimate. Do not silently create ACR or a monitoring workspace. Current GHCR
+container-image storage/bandwidth terms may avoid a paid registry, but builds,
+publication permissions and credentials remain separate.
 
-See Microsoft's current [Static Web Apps quotas](https://learn.microsoft.com/azure/static-web-apps/quotas)
-and [Azure SQL Database free-offer FAQ](https://learn.microsoft.com/azure/azure-sql/database/free-offer-faq)
-for the service limits and exhaustion behavior.
+Use maintained **Azure Cost** guidance for current regional/account-aware
+estimates, actual spend, forecasts and governance. An estimate is not a quote,
+spending cap, deployment approval or proof of free-offer eligibility.
+Missing permissions or delayed metering mean unknown, not zero.
 
-A passing live cost guard proves the deployed SKU and exhaustion settings at
-that moment. It does not guarantee future Azure terms or cover resources added
-or upgraded manually. GitHub Actions, custom domains, developer tools, AI
-providers, and third-party services are outside the Azure resources created by
-this profile and have their own terms.
+`zero-azure-spend` and `review-paid-costs` are preferences, not spending consent.
+The strict-zero preference cannot authorize allowance-metered ACA on an
+assumption of $0. Assess compatible App Service Free first, keep local use
+available or consider SWA last only if the complete required setup qualifies
+for Free. Required DAB/managed identity must not be
+dropped to make that fallback fit.
 
-`publish status` checks only the resources managed by the bundled publisher.
-It does not discover unrelated resources created in the Azure portal, with
-`azd`, through GitHub Actions or with Azure CLI. Budgets send alerts; they do not
-stop spending. Treat the cost guard as a safety net, not a guarantee.
+Before any provisioning, obtain explicit acceptance of the exact resource plan
+and cost risk, with separate acknowledgments for identity/firewall changes,
+third-party publication and any automated interruption. Re-plan changes to
+resources, regions, images/source, permissions or cost posture.
 
-The publisher tags the resource group, Static Web App, SQL server and database
-with `project=sql-apps`, the selected environment and
-`deployment=personal-free`. Use those tags to group usage and cost data; tags
-identify resources but do not impose a budget or spending cap.
+## SWA only as a qualifying free fallback
 
-The personal-free profile creates no container registry, private network,
-private endpoint, private DNS or monitoring workspace. Read
-[Sharing your app](sharing.md) and the
-[personal-free deployment reference](../reference/personal-free-deployment.md)
-before approving it. Use the Azure Cost plugin to confirm current account and
-regional facts rather than treating this documentation as a quote.
+Static Web Apps is not the default web integration. A new SWA fallback must
+satisfy the **complete required setup on Free**, not just a free frontend.
+Native ACA backend linking requires SWA Standard and does not qualify.
+Do not silently upgrade SWA or add paid services.
 
-## Keep the application contract
+The existing `personal-free` publisher remains supported for current deployments
+and explicitly selected compatible fallbacks. It creates SWA Free with managed
+Functions and the Azure SQL Database free tier. This can be **potentially $0**
+within current account-specific allowances, with **no Static Web Apps SLA**.
+It creates no always-billable Azure service, registry or monitoring workspace.
 
-The low-cost profile makes an explicit networking trade-off: public Azure SQL
-with the Azure-services firewall rule and a generated least-privilege SQL
-credential. Do not describe it as private networking or managed identity.
-If those controls or an SLA are requirements, select and price a production
-architecture instead of quietly adding services to the personal default.
+Its bundled resources stop rather than bill at their free limits: SWA Free has
+no bandwidth overage path, and SQL uses `AutoPause` instead of paid continuation.
+Exhaustion can interrupt the application until allowances reset; $0 does not
+mean uninterrupted availability.
 
-### Separately planned Container Apps candidate
+The trade-off is public SQL, the Azure-services `0.0.0.0` firewall rule and a
+generated least-privilege SQL credential. This is not hosted DAB, passwordless
+SQL access or private networking. See [sharing](sharing.md) and the
+[publisher reference](../reference/personal-free-deployment.md).
 
-When Entra-only SQL or managed identity is required and scale-to-zero is
-acceptable, maintained Azure and Azure SQL skills may determine that a
-Container Apps Consumption gateway/DAB topology fits. This is not a second
-SQL Apps profile, a guaranteed-free route, or a spending-capped design. Confirm
-current allowances and subscription-wide usage; include SQL, registry,
-logging, networking, automation and notification costs in the estimate.
+`publish status` verifies only that publisher's managed resources. A passing
+live guard proves the Free SKU and SQL settings at that moment, not future
+terms, ACA safeguards or unrelated resources. Its tags (`project=sql-apps`,
+environment and `deployment=personal-free`) group costs; they impose no cap.
+Manual upgrades/additions, GitHub Actions, domains, tools, AI providers and
+third parties have separate terms.
 
-Replica limits constrain consumption rate, not cumulative spend. Budgets are
-delayed notifications, and shutdown has latency and does not stop supporting
-service charges. Use early usage monitoring where available, and exercise any
-approved shutdown and manual recovery operation in a disposable deployment.
-Never report these safeguards as proof of $0 cost.
+## Monitor and grow deliberately
 
-Recheck the current [Container Apps billing](https://learn.microsoft.com/azure/container-apps/billing)
-and [Azure budget guidance](https://learn.microsoft.com/azure/cost-management-billing/costs/tutorial-acm-create-budgets)
-when planning; subscription-wide free grants and metering change. For Entra-only
-SQL, verify the [Data API Builder managed identity requirements](https://learn.microsoft.com/azure/data-api-builder/quickstart/managed-identity)
-for the pinned DAB version instead of assuming the authentication boundary.
+Budgets send delayed alerts; they do not stop spending. Automated shutdown also
+has latency and does not stop all supporting-service charges. It requires
+separate approval and a disposable test of failure notification, data
+preservation and manual recovery before it can be described as exercised.
+Never describe these safeguards as guaranteed $0.
+
+Verify real SQL idle auto-pause and scale-from-zero/resume rather than relying
+on minimum-replica settings. Persistent SQL sessions and health polling can
+consume the allowance while nobody uses the app.
+
+Use [usage and growth](../reference/monitor-growth.md) to investigate observed
+pressure before buying capacity. If uploads, background work, AI, private
+networking, compliance or continuous availability exceed the free setup,
+maintained Azure skills should explain the smallest required paid delta and
+obtain fresh acceptance, not silently expand the personal default.

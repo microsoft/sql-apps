@@ -66,6 +66,10 @@ launch URL alone does not prove your app works.
 - **Sharing is optional, and charges may apply.** You are responsible for your
   Azure bill. Free allowances and cost guards are not a guarantee of no charges;
   budgets alert rather than stop spending. See [costs and safeguards](docs/guides/costs.md).
+- **App Service, then containers, then SWA.** Assess compatible App Service Free
+  first, then Container Apps with explicit acceptance of possible charges.
+  Keep DAB on ACA with managed identity; SWA is only a fallback when the complete
+  required setup fits Free. See [cloud planning](docs/reference/free-first.md).
 - **Your assistant acts with real permissions.** Review plans and approvals,
   keep backups and do not bypass permissions. See [setup safety](docs/guides/getting-started.md#2-select-the-foundation-and-assistant-guidance).
 - **Not production-ready as-is.** A working local app is not production

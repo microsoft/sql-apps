@@ -149,6 +149,24 @@ test('dependency errors are explicit; readiness fails closed', async t => {
   assert.equal(response.body.includes('dependency secret'), false);
 });
 
+test('production readiness probes public DAB liveness, not its protected health report', async t => {
+  const requests: string[] = [];
+  const app = await createGateway(config, dependencies({
+    fetch: async (input, options) => {
+      const url = new URL(String(input));
+      requests.push(url.pathname);
+      assert.ok(options?.signal instanceof AbortSignal);
+      assert.equal(new Headers(options.headers).get('authorization'), null);
+      return new Response(null, { status: url.pathname === '/health' ? 403 : 200 });
+    },
+  }));
+  t.after(() => app.close());
+  const response = await app.inject('/health/ready');
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), { status: 'ready' });
+  assert.deepEqual(requests, ['/']);
+});
+
 test('readiness exposes only a safe dependency identifier and never its private cause', async t => {
   const app = await createGateway(config, dependencies({
     ready: async () => { throw new DependencyReadinessError('data', new Error('synthetic private credential')); },

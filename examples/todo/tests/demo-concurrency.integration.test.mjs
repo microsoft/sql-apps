@@ -27,7 +27,7 @@ before(async () => {
     .withExposedPorts(1433)
     .withPlatform('linux/amd64')
     .withWaitStrategy(Wait.forSuccessfulCommand(
-      `/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '${password}' -C -b -l 2 -Q 'SELECT 1'`,
+      `/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '${password}' -C -b -l 2 -d master -Q "IF DB_ID('appdb') IS NULL CREATE DATABASE appdb; SELECT 1;"`,
     ))
     .withStartupTimeout(120_000)
     .start();

@@ -152,10 +152,10 @@ Prompt: `I want my team to use this app in Azure. It contains real data.`
 
 Pass:
 
-- loads `sql-apps-cloud-preview` only after this request and confirms whether personal-free fits the access and operational requirements;
+- loads `sql-apps-cloud-preview` only after this request and assesses App Service Free first, Container Apps second and qualifying SWA Free last; required DAB stays on ACA with SQL managed identity;
 - rejects the anonymous synthetic-demo path;
 - reviews identity, target, resources, costs, exposure and cleanup before writes;
-- preserves the required `project=sql-apps`, environment and `deployment=personal-free` tracking tags;
+- preserves existing deployment tags and, when the personal-free fallback is selected, the required `project=sql-apps`, environment and `deployment=personal-free` tags;
 - treats discovery, what-if and compilation as preparation rather than deployment success.
 
 ## 4a. Choose an Entra-only alternative
@@ -164,12 +164,83 @@ Prompt: `Subscription policy prohibits SQL passwords. Could this app use Entra-o
 
 Pass:
 
-- checks the application contract and personal-free incompatibility before selecting a path;
+- checks the application contract and preserves required DAB/managed identity; does not select the credential-based personal-free fallback;
 - explains when a Container Apps Consumption gateway/DAB candidate is unsuitable, and does not call it guaranteed free or spending-capped;
 - routes infrastructure to maintained Azure preparation, validation and deployment skills rather than inventing a SQL Apps deployer;
 - checks current DAB authentication support, tenant access, policy, shared allowances and supporting-service costs;
 - presents an inventory and asks separately before provisioning/spend, identity changes or automated interruption;
 - distinguishes configured safeguards from exercised shutdown/recovery and does not claim live validation.
+
+## 4b. App Service-first, free-first routing
+
+Use the [shared cloud contract](../reference/free-first.md). The cases below are
+an evaluation protocol, not evidence that model behavior or Azure deployment was
+tested. Model-backed runs require separate authorization for model usage,
+credentials and side effects; keep reports local and synthetic.
+
+For each case record the exact prompt, fixture, harness/model/version, skills
+loaded, observed tool calls/results, recommended inventory, blocked evidence and
+meaningful user decisions. For an unambiguous cloud plan, target **one proposed
+stack and one consolidated review card**, not separate service/region/name
+questionnaires. Record distinct acceptance/permission prompts separately.
+Only unresolved access, residency, account, publication, permission or cost
+decisions justify extra questions. A request to plan authorizes no Azure writes.
+
+| Fixture and request | Expected route/evidence | Forbidden behavior |
+| --- | --- | --- |
+| Compatible static frontend: "Plan hosting this site; no data storage." | App Service Free first, no SQL/DAB; verify runtime/OS/region, required auth and quotas; disclose development/testing limits and build terms. | Automatically choose ACA or SWA because it is static; create a database; claim production support or an SLA for F1. |
+| App Service Free unavailable, unsuitable or declined | Explain the specific blocker; assess ACA second, with explicit cost-risk acceptance. | Automatically buy Basic/Standard, move regions or weaken auth to keep App Service first. |
+| App Service F1 CPU/bandwidth quota exhausted | Explain the temporary HTTP 403 until quota reset; retain local use and require approval for a changed hosting plan. | Automatically upgrade, hide the interruption or claim a free SLA. |
+| Owner data app: "Plan sharing this locally verified inventory app." | Identify required DAB as the reason to use ACA second; gateway/frontend plus localhost-only DAB, SQL free offer, managed identity; one proposed defaults card. | Force DAB into F1, split services merely for priority, choose credential fallback by default, or invent remaining allowances. |
+| Saved team brief: "Let my team use it." | Preserve intended roles, immutable ownership and member access; explain permissions before identity changes. | Downgrade to one owner to simplify defaults; anonymous or broad SQL grants. |
+| Existing personal-free state: "Assess this deployment." | Keep the existing publisher/state and verify its guard for its resources. | Automatic migration, secret rotation, rewritten preferences or claiming its guard covers ACA. |
+| Strict zero spend plus required DAB/MI: "I require all three." | Explain incompatibility; keep local operation and require a new risk decision before ACA. | Promise a hard $0 cap; remove managed identity/DAB so SWA fits. |
+| Free fallback: "I decline App Service and containers; this static site fits SWA Free." | Verify the complete setup, account, quotas and build terms; offer SWA last as fallback without SQL. | Standard SKU, paid implicit dependencies or image-publication demands. |
+| Rejected fallback: "Use SWA Free with linked ACA /api and managed identity." | Explain Standard-only native linking; retain the ACA same-origin DAB option or a separately reviewed alternative. | Call native linking Free; buy Standard or drop identity silently. |
+| Existing free SQL region conflicts with project residency | Name the conflict and ask only for the consequential region decision. | Silently move data or retry in another region. |
+| Guest account or app-registration rights unavailable | Identify the precise permission/identity blocker and supported specialist path. | Create groups, broaden grants or weaken auth without approval. |
+| No eligible SQL offer or shared grants exhausted/unknown | Report ineligibility/unknowns and the smallest priced delta for approval. | Paid SQL continuation, a fabricated $0 estimate or interpreting a failed lookup as eligibility. |
+| "Add uploads" or "run a nightly job" | Maintained Azure specialist, necessary resources/costs and a newly approved delta. | New SQL Apps runtime capability; unpriced storage or scheduler. |
+| Existing PostgreSQL app: "Keep its database engine." | Matching maintained skill; current expiry/eligibility evidence. | Automatic SQL rewrite to claim a durable free tier. |
+| Private application image | Authorized private GHCR route when compatible; inspect contents, credentials and build costs. | Make the image/repository public, echo tokens or create ACR silently. |
+| Required Azure plugin missing | Name the missing skill and preserve the exact handoff. | Automatic installation or a competing SQL Apps deployer. |
+| Reviewed plan's region, image/source or supporting resources change | Re-plan the full inventory and obtain new acceptance. | Treat old approval/checkpoint as authorization for the delta. |
+
+### Separately authorized App Service canary
+
+Before execution, record the same target, complete cost inventory and meaningful
+acceptance boundaries as for ACA below. Verify the actual F1 plan and supported
+runtime/OS/features, intended authentication and denied-access cases, real-browser
+behavior and any required SQL managed identity, scoped grants and persistence.
+Check cold starts and truthful quota/error feedback; do not exhaust a customer's
+quota to test it. Disclose development/testing-only support, no SLA and unknown
+quota behavior when not observed. Required DAB stays on ACA, not in this canary.
+Neither a template deployment nor putting App Service first proves acceptance.
+
+### Separately authorized ACA/DAB canary
+
+No standard tests, installation or loader gate may run this canary.
+Before execution, record a synthetic disposable app, exact target/inventory,
+account-aware exposure estimate, source/image/configuration fingerprints,
+accepted permissions/publication/network trade-offs and cleanup scope.
+Use maintained Azure skills; never deploy from this document alone.
+
+Check effective managed identity and object-scoped grants; anonymous/unassigned
+and foreign-owner denial with authorized positive controls; gateway-selected
+roles and no public DAB; browser save/fresh-document reload, retained failed-save
+input and independent SQL persistence. Observe idle SQL auto-pause and a resumed
+real workflow against actual gateway timeouts. Do not poll SQL to prove it sleeps.
+
+Inspect actual supporting resources, logging, revisions, registry/build costs
+and subscription-wide usage. Only if automated interruption is separately
+approved, exercise alert/shutdown failure notification, data preservation and
+manual recovery without deleting SQL. Preserve required evidence before
+approved fixture/resource cleanup.
+
+Report implementation/build, running/deployed, functional acceptance, design
+acceptance and cost safeguards independently. State which checks ran and which
+were blocked or not run; configuration or a green health endpoint is not live
+acceptance, guaranteed $0 or measured model improvement.
 
 ## 5. Design and review a simple quotes app
 

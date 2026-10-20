@@ -7,7 +7,7 @@ Choose a guide for what you want to do. Command details and contributor contract
 1. [Get started](guides/getting-started.md): check prerequisites, install assistant guidance, create a project and select container, Azure SQL or last-resort Express.
 2. [Build your app](guides/build-your-app.md): describe an idea, build a first version and make it yours.
 3. [Run locally](guides/run-locally.md): choose a startup path, stop and resume.
-4. [Sharing your app](guides/sharing.md): deploy the personal-free default or choose an explicitly justified production architecture.
+4. [Sharing your app](guides/sharing.md): assess App Service first, Container Apps second and qualifying SWA Free last; approve the exact cloud plan.
 5. [Costs and growth](guides/costs.md): understand local costs and route Azure estimates/analysis to the Azure Cost plugin.
 
 To try something already implemented, use the [Todo reference app](../examples/todo/README.md).
@@ -27,7 +27,8 @@ To try something already implemented, use the [Todo reference app](../examples/t
 - [SQL Apps plugin](reference/plugins.md): assistant support, installation, binding and native loader verification.
 - [Guide command](reference/guide.md): saved brief and checkpoint format.
 - [Monitor usage and growth](reference/monitor-growth.md): free Database Hub preview setup, read-only SQL diagnostics and capacity decisions.
-- [Personal-free Azure deployment](reference/personal-free-deployment.md): primary Static Web Apps Free, managed Functions and Azure SQL Database free-tier workflow.
+- [App Service-first, free-first planning](reference/free-first.md): App Service, Container Apps and complete-free-setup SWA fallback, proposed defaults, consent and Azure handoff.
+- [Personal-free Azure deployment](reference/personal-free-deployment.md): existing publisher and qualifying SWA Free fallback, with managed Functions and the Azure SQL Database free tier.
 
 ## Contribute and maintain
 

@@ -5,43 +5,78 @@ description: "Use when a user wants to publish, share, deploy, price, or assess 
 
 # Publish SQL Apps
 
-Sharing is optional. `personal-free`, the primary and only bundled cloud profile: **Static Web Apps Free + managed Functions + Azure SQL Database free tier**. **No Static Web Apps SLA**; **potentially $0 within current allowances**.
+Sharing is optional: **App Service first**, **Container Apps second**, **SWA last**
+as a qualifying free fallback. Omit unnecessary DAB/SQL. Follow
+`docs/reference/free-first.md` for defaults, approvals and acceptance.
 
 Resolve `../../scripts/sql-apps.mjs` relative to this skill, not cwd. Quote its
 absolute path; `home` selects the project containing input `docs/...`.
-Run `workspace-check` before changes.
+Run `workspace-check` before changes. Missing reference/specialist: name the
+blocker; never invent guidance or install companions automatically.
 
-For SLA, private networking, organizational controls, over 25 invitees, extra roles, or unsupported managed identity, use maintained Azure/SQL skills; never add a bundled topology.
+## App Service-first planning
 
-## When personal-free does not fit
+Infer settings from validated context/brief; present one recommendation/review
+card. Ask only about ambiguity, requirements or consent, not infrastructure flags.
+Preserve deployments/access rules.
 
-If only Entra-only SQL/managed identity is unmet, with cold starts and possible charges accepted, Container Apps Consumption (public gateway, localhost-only DAB) is a candidate—not a bundled profile. Guaranteed $0, continuous availability or blocked policy need production architecture. Verify DAB auth, availability and quotas with maintained skills.
+Verify App Service Free (`F1`) runtime, OS, region, quotas and auth. Disclose
+development/testing limits, quota stops and no SLA; never silently upgrade.
+If unsuitable/declined, assess ACA. DAB stays on ACA; do not remove it or split
+services merely for priority.
 
-Hand infrastructure to `azure-prepare` → `azure-validate` → `azure-deploy`, never another publisher. Before writes, estimate supporting services; get separate approvals for spend, identity changes and interruption. Budgets are not spending caps. Validate shutdown and manual recovery disposably, keeping the database.
+Container Apps Consumption pairs frontend/gateway with localhost-only DAB and
+SQL managed identity: a candidate, not a bundled profile. Preserve required
+DAB, managed identity, immutable ownership and object-scoped grants. Verify pinned
+DAB authentication, policy, eligibility, shared allowances and supporting costs.
 
-## Personal-free pipeline
+SWA is a fallback only when the complete required setup fits Free. Never upgrade
+to Standard or weaken access/identity. With `zero-azure-spend`, never assume metered
+ACA costs $0; assess compatible App Service Free, local use or a qualifying fallback.
+Preferences are not spending consent. Guaranteed $0/continuous availability or
+policy can block cloud.
 
-1. **Confirm the application contract.** `personal-free-api.json` must explicitly allowlist every route, procedure, parameter, and sign-in provider. No arbitrary forwarding. Teams: add `"roles": ["owner","member"]` to member routes, including readiness; procedures read `SESSION_CONTEXT(N'role')`.
-2. **Ask, then Initialize local configuration.** Ask; never default: subscription; web region (`westus2|centralus|eastus2|westeurope|eastasia`); data in same region or elsewhere (residency, latency, tier availability); new or existing resource group; environment; personal or team. Pass each to `npm run publish -- init` (see `npm run publish -- help`).
-3. **Plan.** `npm run publish -- plan` prints the creation card (region, cost, undo); show it verbatim.
-4. **Get explicit approval.** Azure writes require the approval code from that exact plan. Never infer approval from a request to plan, estimate, or explain.
-5. **Deploy.** `npm run publish -- deploy --approve <code>` provisions resources with `project=sql-apps`, environment and `deployment=personal-free` tags, verifies free settings, publishes schema/grants, deploys and checks readiness.
-6. **Invite people.** `npm run publish -- invite --role owner|member --provider <provider> --user <identity>`. Up to 25 invitees.
-7. **Validate live.** `npm run publish -- status` must report `Cost guard: verified`. Test anonymous, owner, member (if used) and signed-in-uninvited states, a browser write and SQL persistence after reload. ARM deployment is not acceptance.
+Hand infrastructure to `azure-prepare` -> `azure-validate` -> `azure-deploy`,
+never another publisher. Review all resources before writes; obtain separate
+explicit approval for provisioning/cost risk, identity/firewall changes,
+publication and optional interruption. Re-plan changed inputs/paid additions;
+obtain fresh acceptance.
+Budgets are not spending caps. Verify idle SQL pause, resume and approved
+shutdown/manual recovery disposably, keeping data.
 
-## Security and cost truth
+## Personal-free fallback
 
-- Free limits stop rather than bill and can interrupt service. The cost guard fails closed unless the deployed Free SKU and Azure SQL Database free-tier/AutoPause settings are proven.
-- SQL is public; the `0.0.0.0` firewall rule admits Azure resources outside the subscription.
-- Managed Functions lack SQL managed identity. Generated credentials live in Static Web Apps settings and protected `.sql-apps/deployments/` state.
-- Runtime grants: only `CONNECT`, `EXECUTE` and `VIEW DEFINITION` on declared procedures.
-- Ownership derives from provider plus immutable provider user ID, never email.
+`personal-free` remains the only bundled cloud profile: **Static Web Apps Free +
+managed Functions + Azure SQL Database free tier**. **No Static Web Apps SLA**;
+**potentially $0 within current allowances**. Existing deployments are supported;
+new ones must pass the complete-free-setup check, accepting SQL credentials.
 
-The guard excludes manual additions, offer changes, GitHub Actions, domains and third parties. Never claim guaranteed free, private networking, passwordless, production-grade or highly available. Consult maintained Azure cost/SQL skills before quoting limits or prices.
+1. **Confirm the API contract.** `personal-free-api.json` allowlists every route,
+   procedure, parameter and sign-in provider. Teams declare member routes,
+   including readiness; procedures read `SESSION_CONTEXT(N'role')`.
+2. **Initialize local configuration.** Infer/review subscription, supported web/data
+   regions, resource group, environment and sharing; pass required flags to
+   `npm run publish -- init`. Never silently reuse/move data.
+3. **Plan.** Show the `npm run publish -- plan` creation card verbatim.
+4. **Approve.** Azure writes require explicit approval using that exact plan's code.
+5. **Deploy.** `npm run publish -- deploy --approve <code>` applies
+   `project=sql-apps`, environment and `deployment=personal-free` tags, verifies
+   free settings and publishes the application.
+6. **Invite/verify.** Up to 25 owner/member invitees; `npm run publish -- status`
+   must report `Cost guard: verified`. Test authorized/denied users, browser
+   save/reload and SQL persistence; deployment is not acceptance.
 
-## Evidence and approval
+The fallback guard fails closed unless Free SKU and SQL free-tier/AutoPause
+settings are proven. SQL is public; `0.0.0.0` admits Azure resources outside this
+subscription. Generated credentials stay in settings/protected state. Grants:
+`CONNECT`, `EXECUTE`, `VIEW DEFINITION` on declared procedures. Ownership uses
+provider plus immutable user ID, never email. The guard excludes other resources.
 
-For foundation publisher changes, run focused publisher, infrastructure, authentication and packaging tests; routine publishing does not assume them. Disclose unverified implementation or live canary checks.
+## Evidence
 
-Use `sql-apps-validation`'s four-verdict report and state whether live Azure validation was performed.
-For an external architecture, report cost safeguards as configured, exercised, partial, blocked.
+For foundation publisher changes, run regressions; routine publishing need not.
+Disclose unverified implementation or live canary checks.
+Use `sql-apps-validation`'s four-verdict report. Report live Azure validation and
+cost safeguards: configured, exercised, partial or blocked.
+Estimates/settings/builds/loaders never prove guaranteed free, private networking
+or live certification.

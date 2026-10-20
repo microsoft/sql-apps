@@ -51,7 +51,7 @@ has this shape:
   "scaffoldVersion": 1,
   "tooling": {
     "package": "@microsoft/sql-apps",
-    "version": "0.2.3"
+    "version": "0.2.4"
   }
 }
 ```
@@ -126,7 +126,7 @@ From the foundation checkout, select **absolute** paths and review a read-only
 binding plan:
 
 ```powershell
-npm run tooling:bind -- --project "C:\SqlAppsProjects\my-app" --archive "C:\Downloads\microsoft-sql-apps-0.2.3.tgz"
+npm run tooling:bind -- --project "C:\SqlAppsProjects\my-app" --archive "C:\Downloads\microsoft-sql-apps-0.2.4.tgz"
 ```
 
 Run the same command with `--approve <approval-id>` only after reviewing the

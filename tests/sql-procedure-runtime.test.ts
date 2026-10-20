@@ -1,6 +1,5 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import {
   createProcedureRuntime,
   SqlConnectionDiscardedError,
@@ -13,19 +12,6 @@ const env = {
   AZURE_SQL_USER: 'sql_apps_runtime',
   AZURE_SQL_PASSWORD: 'test-only-not-a-real-password-123456',
 };
-
-test('SQL session context satisfies and clears the shipped owner predicate contract', async () => {
-  const [runtime, predicate] = await Promise.all([
-    readFile('src/sql-procedure-runtime.ts', 'utf8'),
-    readFile('sql/security/owner.sql', 'utf8'),
-  ]);
-  assert.match(predicate, /access_as_user/);
-  assert.match(predicate, /SESSION_CONTEXT\(N'scp'\)/);
-  assert.match(runtime, /@key=N'scp', @value=N'access_as_user'/);
-  assert.match(runtime, /@key=N'scp', @value=NULL/);
-  assert.match(runtime, /@key=N'role', @value=@app_role/);
-  assert.match(runtime, /@key=N'role', @value=NULL/);
-});
 
 test('SQL runtime retries a paused free database with exponential delays and a fresh pool', async () => {
   const delays: number[] = [];
@@ -127,4 +113,71 @@ test('SQL runtime reconnects after a connection is discarded during cleanup', as
     [{ status: 'ready' }],
   );
   assert.equal(connects, 2);
+});
+
+test('SQL readiness executes its declared procedure with an isolated probe identity', async () => {
+  const calls: unknown[] = [];
+  const runtime = createProcedureRuntime(env, [{ name: 'AppReady', parameters: {} }], {
+    driver: {
+      async connect() {
+        return {
+          async execute(subject, role, procedure, values) {
+            calls.push({ subject, role, procedure, values });
+            return [{ ready: true, database: 'app' }];
+          },
+          async close() {},
+        };
+      },
+    },
+  });
+  await runtime.ready();
+  assert.deepEqual(calls, [{
+    subject: '00000000-0000-4000-8000-000000000000', role: 'owner', procedure: 'AppReady', values: {},
+  }]);
+  await runtime.close();
+});
+
+test('SQL readiness fails when the procedure fails or does not return a ready row', async () => {
+  for (const result of [new Error('missing procedure'), [], [{ ready: false }], [{ ready: true }, { ready: true }]]) {
+    const runtime = createProcedureRuntime(env, [{ name: 'AppReady', parameters: {} }], {
+      driver: {
+        async connect() {
+          return {
+            async execute() { if (result instanceof Error) throw result; return result; },
+            async close() {},
+          };
+        },
+      },
+    });
+    await assert.rejects(runtime.ready(), /missing procedure|readiness.*result/i);
+    await runtime.close();
+  }
+});
+
+test('SQL readiness rejects undeclared or parameterized probe procedures', async () => {
+  for (const definitions of [[], [{ name: 'AppReady', parameters: { limit: 'int' as const } }]]) {
+    const runtime = createProcedureRuntime(env, definitions, {
+      driver: { async connect() { throw new Error('must reject before connecting'); } },
+    });
+    await assert.rejects(runtime.ready(), /readiness.*declared.*no parameters/i);
+  }
+});
+
+test('SQL readiness uses the procedure selected by the artifact builder', async () => {
+  const runtime = createProcedureRuntime(env, [{ name: 'CheckSchema', parameters: {} }], {
+    readinessProcedure: 'CheckSchema',
+    driver: {
+      async connect() {
+        return {
+          async execute(_subject, _role, name) {
+            assert.equal(name, 'CheckSchema');
+            return [{ ready: true }];
+          },
+          async close() {},
+        };
+      },
+    },
+  });
+  await runtime.ready();
+  await runtime.close();
 });

@@ -28,7 +28,7 @@ async function fixture(t) {
   t.after(() => rm(home, { recursive: true, force: true }));
   for (const folder of ['src', 'sql', 'public', 'dab', '.config']) await mkdir(join(home, folder), { recursive: true });
   await writeFile(join(home, 'package.json'), JSON.stringify({
-    name: 'fixture', dependencies: { '@microsoft/sql-apps': '0.2.3' },
+    name: 'fixture', dependencies: { '@microsoft/sql-apps': '0.2.4' },
   }));
   await writeFile(join(home, 'package-lock.json'), JSON.stringify({ lockfileVersion: 3 }));
   await writeFile(join(home, 'tsconfig.json'), JSON.stringify({ compilerOptions: {} }));
@@ -36,7 +36,7 @@ async function fixture(t) {
   await writeFile(join(home, '.sql-apps-project.json'), JSON.stringify({
     version: 1, id: 'b91d4857-9570-4d4b-a740-918471ca7e26', name: 'Fixture',
     slug: 'fixture', starter: 'data', profile: 'role-based-data', scaffoldVersion: 1,
-    tooling: { package: '@microsoft/sql-apps', version: '0.2.3' },
+    tooling: { package: '@microsoft/sql-apps', version: '0.2.4' },
   }));
   await writeFile(join(home, 'application.json'), JSON.stringify({ name: 'fixture', selectedExamples: [] }));
   await writeFile(join(home, 'role-based-data.json'), JSON.stringify({
@@ -79,14 +79,14 @@ test('guide routes run-locally through setup plan and suggests the profile that 
   assert.equal(report.suggestedProfile, 'role-based-data', 'every brief uses the single data profile');
   assert.match(report.nextAction, /setup plan/);
   assert.doesNotMatch(report.nextAction, /setup-check/, 'the coordinator, not the raw readiness check, orders approvals');
-  assert.match(report.cost.reviewCommand, /npm run publish -- plan/);
+  assert.match(report.cost.reviewCommand, /free-first\.md/);
   assert.doesNotMatch(report.nextAction, /node scripts\//, 'generated projects have no scripts directory');
   await writeFile(join(home, 'role-based-data.json'), '{}');
   report = await readGuide(home);
   assert.equal(report.profile, 'role-based-data');
   assert.equal(report.suggestedProfile, 'role-based-data', 'a configured profile wins over the brief');
   assert.match(report.nextAction, /setup plan/);
-  assert.match(report.cost.reviewCommand, /npm run publish -- plan/);
+  assert.match(report.cost.reviewCommand, /free-first\.md/);
   assert.doesNotMatch(report.cost.reviewCommand, /demo-cost|role-based-cost/);
 });
 
@@ -199,12 +199,37 @@ test('sharing reveals cost blockers without converting a saved preference into s
   assert.equal(report.cost.preference, 'review-paid-costs');
   assert.equal(report.cost.spendingAuthorized, false);
   assert.equal(report.cost.usageStatus, 'not-queried');
-  assert.match(report.cost.message, /potentially \$0/);
-  assert.match(report.cost.message, /no Static Web Apps SLA/);
-  assert.match(report.nextAction, /npm run publish -- init/);
-  assert.match(report.cloud.note, /personal-free publisher/);
+  assert.match(report.cost.message, /Container Apps.*charges/i);
+  assert.match(report.cost.message, /fallback.*complete.*Free/i);
+  assert.match(report.nextAction, /App Service.*Container Apps.*SWA/i);
+  assert.match(report.nextAction, /free-first\.md/);
+  assert.match(report.cloud.note, /App Service.*Container Apps.*SWA/i);
+  assert.match(report.cloud.note, /personal-free publisher.*fallback/i);
+  assert.match(report.cost.message, /App Service Free.*quotas/i);
   assert.match(report.cost.scaleGuidance, /not.*scaling threshold/);
   assert.equal(report.cloud.authorized, false);
+});
+
+test('cloud recommendations preserve every saved cost preference and never grant historical spending consent', async t => {
+  for (const preference of [undefined, 'zero-azure-spend', 'review-paid-costs']) {
+    const home = await fixture(t);
+    const input = { ...brief(),
+      ...(preference === undefined ? {} : { costPreference: preference }),
+      checkpoint: { stage: 'make-it-yours', summary: 'Saved a loan', evidence: ['Historical browser and SQL check'] } };
+    await saveBrief(home, input);
+    const state = await readFile(join(home, '.sql-apps', 'guide.json'), 'utf8');
+    const report = await readGuide(home);
+    assert.equal(report.nextStage, 'share-optionally');
+    assert.equal(report.cost.preference, preference ?? 'zero-azure-spend');
+    assert.deepEqual(report.brief, input);
+    assert.equal(await readFile(join(home, '.sql-apps', 'guide.json'), 'utf8'), state);
+    assert.equal(report.cloud.authorized, false);
+    assert.equal(report.cost.spendingAuthorized, false);
+    assert.equal(report.cost.usageStatus, 'not-queried');
+    assert.match(report.nextAction, /App Service.*Container Apps.*SWA/i);
+    assert.match(report.cost.message, /zero-azure-spend.*local|local.*zero-azure-spend/i);
+    assert.match(report.cost.message, /not spending consent/i);
+  }
 });
 
 test('actual guide and plugin CLIs save/resume before build and reject invalid requests', async t => {

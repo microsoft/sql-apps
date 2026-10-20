@@ -2,7 +2,7 @@
 
 `role-based-data` is the only SQL Apps profile, locally and in the cloud. Use it for an implemented domain application that needs SQL/DAB/browser access restricted to users assigned the required role. File storage and background jobs are outside SQL Apps; add them with maintained Azure skills such as `azure-storage`, `azure-prepare` and `azure-deploy`. It is a runtime/deployment path, not an application generator. Keep the original foundation checkout and unrelated databases unchanged; use the intended application checkout.
 
-> **Cloud publishing:** The bundled cloud target is the [personal-free profile](personal-free-deployment.md). This reference describes the local DAB data contract; it is not a second cloud deployment profile.
+> **Cloud publishing:** [Assess App Service, then Container Apps, then SWA](free-first.md), with maintained Azure skills owning infrastructure. Required DAB stays on ACA with SQL managed identity, so do not force it onto App Service. The [personal-free publisher](personal-free-deployment.md) remains for existing deployments and qualifying complete-free-setup SWA fallbacks. This reference describes the local DAB data contract; it is not a second cloud deployment profile.
 
 This is application role-based access control: Entra authenticates users, the gateway requires the configured application role, and DAB enforces procedure permissions. It is not Azure resource-management RBAC and does not automatically provide row-level security (RLS). Implement row/owner restrictions separately where the application requires them. `AppUser` is an example role; choose a role appropriate to your application.
 
@@ -27,6 +27,12 @@ Configure `dab/dab-config.json` with explicit stored-procedure entities and role
 Implement the procedure in the app's SQL project before startup. Other authorized procedures can expose approved GET/POST operations. DAB defaults procedures to POST, so explicitly enable GET on the read-only readiness procedure. Permission grants are generated only for the validated procedures (`EXECUTE` and object-scoped `VIEW DEFINITION` for DAB metadata); no schema-wide execute or database-owner grant is added.
 
 For cloud delivery, preserve production `AzureAD` DAB authentication, `/api` REST routing, and JWT settings `@env('API_CLIENT_ID')` / `@env('ENTRA_ISSUER')`. The local launcher generates a separately saved AppService simulation configuration; never deploy that configuration. The gateway serves only the browser app, authentication routes and the authorized `/api` and `/graphql` proxy.
+
+The standalone production gateway's public `/health/ready` checks DAB process
+liveness through its public `/` endpoint, not the role-protected detailed
+`/health` report. It is not a SQL or user-access verdict: verify the configured
+readiness procedure through the signed-in, role-authorized API. The local
+launcher supplies a separate database-backed readiness probe before listening.
 
 ## Local startup and acceptance
 

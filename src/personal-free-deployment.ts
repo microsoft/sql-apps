@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdir, open, readFile, rename, rm } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { cp, mkdir, mkdtemp, open, readFile, rename, rm } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { createRequire } from 'node:module';
 import { z } from 'zod';
 import sql from 'mssql';
 import type { Run } from './process.js';
@@ -12,9 +13,9 @@ import {
   type ProtectedDeploymentState,
 } from './personal-free-config.js';
 import { deploymentName } from './deployment-name.js';
-import { buildPersonalFreeArtifact } from './personal-free-build.js';
+import { verifyPersonalFreeArtifact } from './personal-free-build.js';
 import { verifyPersonalFreeCostGuard } from './personal-free-cost-guard.js';
-import { toolingAsset, projectRoot } from './runtime-roots.js';
+import { projectRoot, toolingRoot } from './runtime-roots.js';
 
 export interface PersonalFreeInitOptions {
   name: string;
@@ -25,6 +26,7 @@ export interface PersonalFreeInitOptions {
   useExistingResourceGroup?: boolean;
   environment: 'dev' | 'test' | 'prod';
   sharing: 'personal' | 'team';
+  deploymentClientIp?: string;
 }
 
 export async function initPersonalFreeConfig(
@@ -65,6 +67,7 @@ export async function initPersonalFreeConfig(
     webLocation: options.webLocation,
     dataLocation: options.dataLocation,
     sharing: options.sharing,
+    ...(options.deploymentClientIp ? { deploymentClientIp: options.deploymentClientIp } : {}),
     environment: options.environment,
     name: deploymentName(options.name),
   });
@@ -76,6 +79,9 @@ export interface PersonalFreePlan {
 }
 
 export function planPersonalFreeDeployment(config: PersonalFreeConfig, sourceHash: string): PersonalFreePlan {
+  if (!config.deploymentClientIp) {
+    throw new Error('Set deploymentClientIp to the operator public IPv4 address in the config, or initialize with --client-ip, before planning');
+  }
   const approval = createHash('sha256').update(JSON.stringify({ config, sourceHash })).digest('hex').slice(0, 12);
   const prefix = `${config.name}-${config.environment}`;
   const scope = `--subscription ${config.subscriptionId} --resource-group ${config.resourceGroup}`;
@@ -103,6 +109,7 @@ export function planPersonalFreeDeployment(config: PersonalFreeConfig, sourceHas
       ...card,
       'Cost: potentially $0 only while Static Web Apps and Azure SQL remain inside current free allowances.',
       'Network: Azure SQL uses a public endpoint. The 0.0.0.0 firewall rule admits all resources inside the Azure boundary, including other subscriptions.',
+      `Temporary SQL access: allow only deployment client ${config.deploymentClientIp}/32 while publishing SQL or rotating credentials; remove the deployment-owned rule afterward.`,
       config.sharing === 'team'
         ? 'Sharing: team. Invite owners and members (up to 25 invited people on Static Web Apps Free; each invitation expires within 168 hours); routes must declare member access.'
         : 'Sharing: personal. Only invited owners can use the app; switch to team later by re-running init with --sharing team.',
@@ -262,12 +269,22 @@ export function personalFreeStatePath(config: PersonalFreeConfig): string {
       signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) throw new Error(`Personal-free readiness failed with HTTP ${response.status}`);
+    if (response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() !== 'application/json') {
+      throw new Error('Personal-free readiness did not return application/json');
+    }
+    let body: unknown;
+    try { body = await response.json(); }
+    catch (cause) { throw new Error('Personal-free readiness returned invalid JSON', { cause }); }
+    if (!z.object({ status: z.literal('ready') }).safeParse(body).success) {
+      throw new Error('Personal-free readiness did not report ready');
+    }
   }
 
   async function applyInfrastructure(
     config: PersonalFreeConfig,
     state: ProtectedDeploymentState,
     run: Run,
+    artifact: string,
   ) {
     const parameters = await secureParametersFile(config, state);
     try {
@@ -275,7 +292,7 @@ export function personalFreeStatePath(config: PersonalFreeConfig): string {
         'deployment', 'group', 'create', '--subscription', config.subscriptionId,
         '--resource-group', config.resourceGroup,
         '--name', `${config.name}-${config.environment}-personal-free`,
-        '--template-file', toolingAsset('infra', 'personal-free.bicep'),
+        '--template-file', join(artifact, 'deployment', 'template.json'),
         '--parameters', `@${parameters}`, '--query', 'properties.outputs', '-o', 'json',
       ], { redact: [state.sqlAdministratorPassword, state.runtimePassword] }));
     } finally {
@@ -283,13 +300,10 @@ export function personalFreeStatePath(config: PersonalFreeConfig): string {
     }
   }
 
-  async function publishPersonalSchema(config: PersonalFreeConfig, server: string, run: Run): Promise<void> {
-    const project = resolve(projectRoot, 'sql', 'personal-free.sqlproj');
-    const output = resolve(projectRoot, 'dist', 'sql-personal-free');
-    await run('dotnet', ['build', project, '--output', output]);
+  async function publishPersonalSchema(config: PersonalFreeConfig, server: string, run: Run, artifact: string): Promise<void> {
     await run('dotnet', ['tool', 'run', 'sqlpackage', '--',
       '/Action:Publish',
-      `/SourceFile:${join(output, 'personal-free.dacpac')}`,
+      `/SourceFile:${join(artifact, 'deployment', 'database.dacpac')}`,
       `/TargetConnectionString:Server=tcp:${server},1433;Database=app;Encrypt=True;TrustServerCertificate=False;Authentication=Active Directory Default;`,
       '/p:BlockOnPossibleDataLoss=True',
       '/p:DropObjectsNotInSource=False',
@@ -301,6 +315,7 @@ export function personalFreeStatePath(config: PersonalFreeConfig): string {
     state: ProtectedDeploymentState,
     server: string,
     run: Run,
+    artifact: string,
   ): Promise<void> {
     const token = z.object({ accessToken: z.string().min(1) }).parse(JSON.parse(await run('az', [
       'account', 'get-access-token', '--subscription', config.subscriptionId,
@@ -323,7 +338,7 @@ export function personalFreeStatePath(config: PersonalFreeConfig): string {
   GRANT CONNECT TO [sql_apps_runtime];`);
       const api = z.object({ routes: z.array(z.object({
         procedure: z.object({ name: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,127}$/) }),
-      })) }).parse(JSON.parse(await readFile(join(projectRoot, 'personal-free-api.json'), 'utf8')));
+      })) }).parse(JSON.parse(await readFile(join(artifact, 'deployment', 'api.json'), 'utf8')));
       for (const name of new Set(api.routes.map(route => route.procedure.name))) {
         await pool.request().query(
           `GRANT EXECUTE ON OBJECT::[dbo].[${name}] TO [sql_apps_runtime];\n` +
@@ -334,15 +349,69 @@ export function personalFreeStatePath(config: PersonalFreeConfig): string {
     }
   }
 
-  export async function deployPersonalFree(
+async function withApprovedArtifact<T>(
+  config: PersonalFreeConfig,
+  approval: string,
+  action: (artifact: string) => Promise<T>,
+): Promise<T> {
+  const directory = join(projectRoot, '.sql-apps', 'deployments');
+  await mkdir(directory, { recursive: true });
+  const snapshot = await mkdtemp(join(directory, `${config.name}-${config.environment}-deploy-`));
+  try {
+    try {
+      await cp(join(directory, `${config.name}-${config.environment}-plan`), snapshot, { recursive: true });
+    } catch (cause) {
+      if (!(cause instanceof Error && 'code' in cause && cause.code === 'ENOENT')) throw cause;
+      throw new Error('Approved personal-free artifact is missing; run plan and review its approval code before deployment', { cause });
+    }
+    const manifest = await verifyPersonalFreeArtifact(snapshot);
+    if (planPersonalFreeDeployment(config, manifest.sourceHash).approval !== approval) {
+      throw new Error('Deployment approval is stale; run plan again and review the current target and artifact');
+    }
+    return await action(snapshot);
+  } finally {
+    await rm(snapshot, { recursive: true, force: true });
+  }
+}
+
+async function withPersonalFreeSqlAccess<T>(
+  config: PersonalFreeConfig,
+  server: string,
+  run: Run,
+  action: () => Promise<T>,
+): Promise<T> {
+  const address = config.deploymentClientIp;
+  if (!address) throw new Error('Temporary SQL access requires deploymentClientIp in the approved config');
+  const name = `sql-apps-deploy-${randomBytes(8).toString('hex')}`;
+  const scope = [
+    '--subscription', config.subscriptionId, '--resource-group', config.resourceGroup,
+    '--server', server.replace(/\.database\.windows\.net$/, ''), '--name', name,
+  ];
+  let failure: unknown;
+  try {
+    await run('az', ['sql', 'server', 'firewall-rule', 'create', ...scope,
+      '--start-ip-address', address, '--end-ip-address', address, '-o', 'none']);
+    return await action();
+  } catch (error) {
+    failure = error;
+    throw error;
+  } finally {
+    try {
+      await run('az', ['sql', 'server', 'firewall-rule', 'delete', ...scope]);
+    } catch (cause) {
+      const message = `Could not remove temporary SQL firewall rule ${name}; remove it explicitly with az sql server firewall-rule delete ${scope.join(' ')}`;
+      if (failure) throw new AggregateError([failure, cause], message);
+      throw new Error(message, { cause });
+    }
+  }
+}
+
+export async function deployPersonalFree(
     config: PersonalFreeConfig,
     approval: string,
     run: Run,
   ): Promise<ProtectedDeploymentState> {
-    const artifact = join(projectRoot, '.sql-apps', 'deployments', `${config.name}-${config.environment}-artifact`);
-    const manifest = await buildPersonalFreeArtifact(projectRoot, artifact);
-    const plan = planPersonalFreeDeployment(config, manifest.sourceHash);
-    if (approval !== plan.approval) throw new Error('Deployment approval is stale; run plan again and review the current target');
+  return withApprovedArtifact(config, approval, async artifact => {
     const statePath = personalFreeStatePath(config);
     let state: ProtectedDeploymentState;
     try {
@@ -358,7 +427,7 @@ export function personalFreeStatePath(config: PersonalFreeConfig): string {
     await requireProviders(config, run);
     await createPersonalFreeResourceGroup(config, run);
     {
-      const outputs = await applyInfrastructure(config, state, run);
+      const outputs = await applyInfrastructure(config, state, run, artifact);
       state = await verifyPersonalFreeInfrastructure(
         config,
         state,
@@ -366,19 +435,23 @@ export function personalFreeStatePath(config: PersonalFreeConfig): string {
         run,
         prepared => saveProtectedDeploymentState(statePath, prepared),
       );
-      await publishPersonalSchema(config, outputs.sqlServer, run);
-      state = { ...state, stage: 'schema' };
-      await saveProtectedDeploymentState(statePath, state);
-      await configureRuntimeUser(config, state, outputs.sqlServer, run);
-      state = { ...state, stage: 'runtime-user' };
-      await saveProtectedDeploymentState(statePath, state);
+      await withPersonalFreeSqlAccess(config, outputs.sqlServer, run, async () => {
+        await publishPersonalSchema(config, outputs.sqlServer, run, artifact);
+        state = { ...state, stage: 'schema' };
+        await saveProtectedDeploymentState(statePath, state);
+        await configureRuntimeUser(config, state, outputs.sqlServer, run, artifact);
+        state = { ...state, stage: 'runtime-user' };
+        await saveProtectedDeploymentState(statePath, state);
+      });
       const deploymentToken = (await run('az', ['staticwebapp', 'secrets', 'list',
         '--subscription', config.subscriptionId, '--resource-group', config.resourceGroup,
         '--name', outputs.staticWebAppName, '--query', 'properties.apiKey', '-o', 'tsv'],
       { sensitiveOutput: true })).trim();
       if (!deploymentToken) throw new Error('Static Web Apps deployment token was not returned');
-      await run(process.platform === 'win32' ? 'npx.cmd' : 'npx', [
-        'swa', 'deploy', join(artifact, 'static'), '--api-location', join(artifact, 'api'), '--env', 'production',
+      const require = createRequire(join(toolingRoot, 'package.json'));
+      await run(process.execPath, [
+        require.resolve('@azure/static-web-apps-cli/dist/cli/bin.js'),
+        'deploy', join(artifact, 'static'), '--api-location', join(artifact, 'api'), '--env', 'production',
       ], { env: { SWA_CLI_DEPLOYMENT_TOKEN: deploymentToken }, sensitiveOutput: true });
       state = { ...state, stage: 'application' };
       await saveProtectedDeploymentState(statePath, state);
@@ -387,6 +460,7 @@ export function personalFreeStatePath(config: PersonalFreeConfig): string {
       await saveProtectedDeploymentState(statePath, state);
       return state;
     }
+  });
 }
 
 export async function rotatePersonalFreeRuntimeSecret(
@@ -394,20 +468,24 @@ export async function rotatePersonalFreeRuntimeSecret(
     approval: string,
     run: Run,
 ): Promise<ProtectedDeploymentState> {
+  return withApprovedArtifact(config, approval, async artifact => {
     const statePath = personalFreeStatePath(config);
     let state = protectedDeploymentStateSchema.parse(JSON.parse(await readFile(statePath, 'utf8')));
     if (state.approval !== approval) throw new Error('Rotation approval does not match this deployment');
-    if (!state.sqlServer || !state.staticWebAppName) throw new Error('Deploy the application before rotating its runtime secret');
+    if (!state.sqlServer || !state.staticWebAppName || !state.staticWebAppHostname) {
+      throw new Error('Deploy the application before rotating its runtime secret');
+    }
     const server = state.sqlServer;
     state = protectedDeploymentStateSchema.parse({
       ...state,
-      runtimePassword: secret(),
+      runtimePassword: state.stage === 'ready' ? secret() : state.runtimePassword,
       stage: 'schema',
     });
-    await configureRuntimeUser(config, state, server, run);
+    await saveProtectedDeploymentState(statePath, state);
+    await withPersonalFreeSqlAccess(config, server, run, () => configureRuntimeUser(config, state, server, run, artifact));
     state = { ...state, stage: 'runtime-user' };
     await saveProtectedDeploymentState(statePath, state);
-    const outputs = await applyInfrastructure(config, state, run);
+    const outputs = await applyInfrastructure(config, state, run, artifact);
     state = await verifyPersonalFreeInfrastructure(
       config,
       state,
@@ -415,7 +493,9 @@ export async function rotatePersonalFreeRuntimeSecret(
       run,
       prepared => saveProtectedDeploymentState(statePath, prepared),
     );
+    await verifyPersonalFreeReadiness(outputs.staticWebAppHostname);
     state = { ...state, stage: 'ready' };
     await saveProtectedDeploymentState(statePath, state);
     return state;
+  });
 }

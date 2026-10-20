@@ -25,7 +25,7 @@ function help() {
     '',
     `Commands: ${Object.keys(COMMANDS).join(', ')}`,
     '',
-    '  publish  Primary personal-project Azure path (potentially $0 within allowances; no SLA)',
+    '  publish  Supported personal-free publisher (existing deployments or qualifying free fallback; no SLA)',
   ].join('\n');
 }
 

@@ -139,7 +139,7 @@ export async function readGuide(home) {
       `Source changed since the saved checkpoint, so its evidence is historical. Run ${setupPlan} to rebuild with approval, then verify the actual app locally again.` :
       `Run ${setupPlan} first. It orders setup checks and names each approval before installations, downloads, workspace selection or schema/startup changes.`,
     'make-it-yours': 'Recheck the intended running app, then make the saved nextChange. Verify browser validation, SQL save/reload and existing behavior before recording evidence.',
-    'share-optionally': 'You can stop here with a useful local app. To share, review data/access, choose subscription, web and data regions, resource group, environment and personal or team sharing, then run npm run publish -- init, npm run publish -- plan (review its creation card) and deploy only with its approval code; a saved checkpoint never authorizes deployment.',
+    'share-optionally': 'You can stop here with a useful local app. For sharing, assess App Service Free first, Container Apps second and SWA last as a qualifying free fallback; use docs/reference/free-first.md to infer proposed settings, review the complete resource/cost/access card and obtain explicit acceptance before Azure writes. DAB stays on ACA with managed identity; a saved checkpoint never authorizes deployment.',
   };
   return {
     home: source.home, application: source.application, profile, suggestedProfile, brief: state?.brief ?? null,
@@ -151,15 +151,15 @@ export async function readGuide(home) {
       origin: runtime.mode === 'legacy-unselected' ? null : runtime.origins.app },
     localServices: ['SQL', 'Data API', 'Browser/API'],
     cloud: { authorized: false, optional: true,
-      note: 'Cloud sharing uses the bundled personal-free publisher (npm run publish -- init, plan, deploy --approve, then invite people). Use maintained Azure Skills only for services outside that profile.' },
+      note: 'Assess App Service Free first, Container Apps second and SWA last, with maintained Azure skills owning infrastructure. Keep required DAB on ACA with SQL managed identity. The existing personal-free publisher is a fallback only when the complete required setup fits Free; it does not host DAB or provide SQL managed identity. See docs/reference/free-first.md.' },
     cost: {
       preference: state?.brief.costPreference ?? 'zero-azure-spend',
       phase: nextStage === 'share-optionally' ? 'deployment-cost-review' :
         nextStage === 'make-it-yours' ? 'capability-cost-awareness' : 'local-cost-awareness',
       message: nextStage === 'share-optionally' ?
-        'The personal-free publisher targets Static Web Apps Free and the Azure SQL Database free tier: potentially $0 only while the subscription is eligible and usage stays within allowances, with no Static Web Apps SLA. It pauses rather than bills at free limits, and npm run publish -- status verifies that guard; never fall back to paid resources without a separate decision.' :
+        'App Service Free has development/testing quotas and no SLA; never automatically upgrade. Container Apps grants are subscription-wide; overages and supporting services can cause charges. SWA is a fallback only when the complete required setup fits Free. With zero-azure-spend, assess compatible App Service Free, keep local use or verify that fallback; never assume metered services cost $0. Saved preferences are not spending consent.' :
         'Local operation has no Azure usage bill; tool/access/licensing conditions still apply. Review cloud costs only when sharing, not during initial design.',
-      reviewCommand: 'Review the resources and cost boundary printed by npm run publish -- plan before approving deployment.',
+      reviewCommand: 'Use docs/reference/free-first.md to review the complete resource inventory and acceptance boundaries. For a qualifying personal-free fallback, review npm run publish -- plan and its exact approval code.',
       usageStatus: 'not-queried',
       spendingAuthorized: false,
       scaleGuidance: 'Review actual remaining allowances, latency and availability needs before paying for capacity. User count is not a scaling threshold. Budgets are alerts, not hard spending caps.',

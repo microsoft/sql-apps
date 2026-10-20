@@ -51,6 +51,16 @@ fixtures, and derive ports, names, database users, and origins from `runtimeFor(
 Mocked isolated Docker inspections must include the matching workspace, image,
 and loopback port bindings; do not reset `.sql-apps` to make tests pass.
 
+For changes to SQL identity context, transactions or connection cleanup, build
+the runtime and run `npm run test:sql-integration`. This opt-in suite needs
+Docker and access to the Azure SQL Database private-preview image. It starts
+and removes its own containers, waits for user-database provisioning (not only
+`SELECT 1`), verifies EngineEdition 5, and tests real pooled owner isolation,
+success/error cleanup, aborted transactions and the optional Todo limits.
+Its local runtime identity is a least-privilege login mapped to a database user;
+the container does not support the cloud publisher's contained SQL user.
+Do not report mocked tests as equivalent to this real-engine check.
+
 Keep end-user walkthroughs in `docs/guides`, detailed commands in `docs/reference`, and contributor contracts in `docs/maintainers`. See the [documentation index](docs/README.md) and [application boundaries](docs/maintainers/application-boundary.md).
 
 ### Releasing the runtime package
@@ -68,7 +78,7 @@ a fresh generated-project restore with an empty cache, and uploads the archive,
 pack metadata and `SHA256SUMS` as the `runtime-archive-release` Actions artifact:
 
 ```powershell
-gh workflow run package-runtime.yml --ref main -f version=0.2.3
+gh workflow run package-runtime.yml --ref main -f version=0.2.4
 ```
 
 Use the actual manifest version for later releases. After a successful run,
@@ -84,8 +94,8 @@ npm test
 npm run tooling:build
 npm run tooling:check
 npm pack .\dist\tooling-package --ignore-scripts --pack-destination .\dist
-npm run tooling:verify-archive -- "C:\git\sql-apps\dist\microsoft-sql-apps-0.2.3.tgz"
-Get-FileHash .\dist\microsoft-sql-apps-0.2.3.tgz -Algorithm SHA256
+npm run tooling:verify-archive -- "C:\git\sql-apps\dist\microsoft-sql-apps-0.2.4.tgz"
+Get-FileHash .\dist\microsoft-sql-apps-0.2.4.tgz -Algorithm SHA256
 ```
 
 The archive verifier uses a temporary generated project and an empty npm cache,

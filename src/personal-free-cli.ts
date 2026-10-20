@@ -23,7 +23,7 @@ function usage(): string {
     'Usage:',
     '  sql-apps publish init --name <name> --subscription <id> --web-location <westus2|centralus|eastus2|westeurope|eastasia>',
     '      --data-location <region|same> --resource-group <name> --resource-group-mode <new|existing>',
-    '      --environment <dev|test|prod> --sharing <personal|team>',
+    '      --environment <dev|test|prod> --sharing <personal|team> --client-ip <public-ipv4>',
     '  sql-apps publish plan [--config <path>]',
     '  sql-apps publish deploy --approve <code> [--config <path>]',
     '  sql-apps publish invite --role <owner|member> --provider <aad|github|google> --user <email-or-handle> [--config <path>]',
@@ -71,6 +71,7 @@ async function init(args: readonly string[], command: Run): Promise<string> {
   const dataLocation = dataChoice === 'same' ? webLocation : dataChoice;
   const environment = z.enum(['dev', 'test', 'prod']).parse(take(values, '--environment'));
   const sharing = z.enum(['personal', 'team']).parse(take(values, '--sharing'));
+  const deploymentClientIp = take(values, '--client-ip');
   const resourceGroup = take(values, '--resource-group');
   const resourceGroupMode = z.enum(['new', 'existing']).parse(take(values, '--resource-group-mode'));
   const configPath = resolve(take(values, '--config', defaultConfig));
@@ -84,6 +85,7 @@ async function init(args: readonly string[], command: Run): Promise<string> {
     useExistingResourceGroup: resourceGroupMode === 'existing',
     environment,
     sharing,
+    deploymentClientIp,
   }, command);
   await writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`, { flag: 'wx' });
   return [
@@ -93,13 +95,13 @@ async function init(args: readonly string[], command: Run): Promise<string> {
   ].join('\n');
 }
 
-async function plan(args: readonly string[]): Promise<string> {
+async function plan(args: readonly string[], command: Run): Promise<string> {
   const values = flags(args);
   const configPath = resolve(take(values, '--config', defaultConfig));
   rejectUnknown(values);
   const config = await readPersonalFreeConfig(configPath);
   const artifact = join(projectRoot, '.sql-apps', 'deployments', `${config.name}-${config.environment}-plan`);
-  const manifest = await buildPersonalFreeArtifact(projectRoot, artifact);
+  const manifest = await buildPersonalFreeArtifact(projectRoot, artifact, command);
   const result = planPersonalFreeDeployment(config, manifest.sourceHash);
   return `${result.summary}\n\nApproval: ${result.approval}\nDeploy with: sql-apps publish deploy --approve ${result.approval} --config ${JSON.stringify(configPath)}`;
 }
@@ -190,7 +192,7 @@ export async function main(
   }
   const handlers: Record<string, () => Promise<string>> = {
     init: () => init(rest, command),
-    plan: () => plan(rest),
+    plan: () => plan(rest, command),
     deploy: () => deploy(rest, command),
     invite: () => invite(rest, command),
     'invite-owner': () => invite(rest, command, 'owner'),
