@@ -3,6 +3,11 @@
   "version": "0.2.3",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/microsoft/sql-apps.git",
+    "directory": "packages/sql-apps"
+  },
   "engines": {
     "node": ">=22 <23 || >=24 <25"
   },

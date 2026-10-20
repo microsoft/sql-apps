@@ -53,6 +53,61 @@ and loopback port bindings; do not reset `.sql-apps` to make tests pass.
 
 Keep end-user walkthroughs in `docs/guides`, detailed commands in `docs/reference`, and contributor contracts in `docs/maintainers`. See the [documentation index](docs/README.md) and [application boundaries](docs/maintainers/application-boundary.md).
 
+### Releasing the runtime package
+
+Merging source and installing the assistant plugin do not publish
+`@microsoft/sql-apps`. The supported release route is a versioned `.tgz` archive
+with a SHA-256 checksum, distributed as a GitHub release asset. It does **not**
+require npm publishing rights or membership in the Microsoft npm organization.
+The package name is retained inside the archive; applications still pin its
+exact semantic version.
+
+The manually dispatched [runtime packaging workflow](.github/workflows/package-runtime.yml)
+builds and tests `main`, checks the package inventory, packs the archive, proves
+a fresh generated-project restore with an empty cache, and uploads the archive,
+pack metadata and `SHA256SUMS` as the `runtime-archive-release` Actions artifact:
+
+```powershell
+gh workflow run package-runtime.yml --ref main -f version=0.2.3
+```
+
+Use the actual manifest version for later releases. After a successful run,
+download the artifact, review the checksum and create a GitHub release at
+that run's exact commit, attaching the tarball and `SHA256SUMS`. Do not overwrite
+an existing released version or asset. The workflow itself does not create a
+public release, publish to npm or run automatically on a push.
+
+For the same checks locally:
+
+```powershell
+npm test
+npm run tooling:build
+npm run tooling:check
+npm pack .\dist\tooling-package --ignore-scripts --pack-destination .\dist
+npm run tooling:verify-archive -- "C:\git\sql-apps\dist\microsoft-sql-apps-0.2.3.tgz"
+Get-FileHash .\dist\microsoft-sql-apps-0.2.3.tgz -Algorithm SHA256
+```
+
+The archive verifier uses a temporary generated project and an empty npm cache,
+binds the explicitly selected archive, runs `npm ci` with lifecycle scripts
+disabled, validates the installed pin and starts the packaged CLI's help command.
+It cleans up only its temporary directory, without changing the user's npm
+settings, applications or databases. Other dependencies still use the configured
+npm registry. This proves installation and CLI startup, **not** a running
+application, SQL persistence or rendered design acceptance.
+
+Users must explicitly [bind the release archive](docs/reference/projects.md#install-from-a-release-archive)
+before the first approved restore. A successful source merge or plugin install
+does not make a package available. Do not silently swap a failed registry restore
+to a tarball.
+
+Registry distribution remains a separate optional route if an authorized npm
+maintainer later publishes the exact version. To verify that route, use
+`npm run tooling:verify-feed -- --registry <registry-url>` against each intended
+feed. Archive acceptance does not establish npm publication or mirror availability;
+an E404 remains a blocker for the registry route, not for an explicitly bound
+and verified archive release.
+
 ## Commit Messages
 
 This repo uses [Conventional Commits](https://www.conventionalcommits.org/).

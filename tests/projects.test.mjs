@@ -306,6 +306,110 @@ test('a fresh generated project installs its exact tooling version with npm ci f
   assert.equal(shared.version, '1.0.0', 'a tooling runtime dependency must not be pruned as an app dev dependency');
   const cli = await execute(process.execPath, [join(created.path, 'node_modules', '@microsoft', 'sql-apps', 'cli.mjs')]);
   assert.equal(cli.stdout.trim(), 'fixture tooling 1.2.3');
+
+  const { verifyToolingFeed } = await import('../scripts/verify-tooling-feed.mjs');
+  const verified = await verifyToolingFeed(source, registry);
+  assert.equal(verified.name, '@microsoft/sql-apps');
+  assert.equal(verified.version, '1.2.3');
+  assert.equal(verified.registry, registry);
+  assert.equal(verified.cliOutput.trim(), 'fixture tooling 1.2.3');
+});
+
+test('release feed verification fails on a missing package without changing the source or npm configuration', async t => {
+  const source = await sourceFixture(t);
+  const original = await readFile(join(source, 'package.json'), 'utf8');
+  const server = createServer((_request, response) => response.writeHead(404).end('missing'));
+  await new Promise(done => server.listen(0, '127.0.0.1', done));
+  t.after(() => new Promise(done => server.close(done)));
+  const { verifyToolingFeed } = await import('../scripts/verify-tooling-feed.mjs');
+  await assert.rejects(verifyToolingFeed(source, `http://127.0.0.1:${server.address().port}`), /E404/);
+  assert.equal(await readFile(join(source, 'package.json'), 'utf8'), original);
+  await assert.rejects(access(join(source, '.npmrc')), { code: 'ENOENT' });
+  await assert.rejects(access(join(source, 'node_modules')), { code: 'ENOENT' });
+});
+
+async function archiveFixture(t) {
+  const source = await sourceFixture(t);
+  const directory = join(source, 'packages', 'sql-apps');
+  await writeFile(join(directory, 'package.json'), JSON.stringify({
+    name: '@microsoft/sql-apps', version: '1.2.3', bin: { 'sql-apps': 'cli.mjs' },
+  }));
+  await writeFile(join(directory, 'cli.mjs'), '#!/usr/bin/env node\nconsole.log("archive tooling 1.2.3");\n');
+  await writeFile(join(source, 'Dockerfile'), 'FROM node:22\nCOPY package*.json ./\nRUN npm ci\n');
+  const packed = JSON.parse((await runNpm(['pack', '--ignore-scripts', '--json'], directory)).stdout)[0];
+  const archive = join(directory, packed.filename);
+  const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-archive-project-')));
+  t.after(() => rm(userHome, { recursive: true, force: true }));
+  const created = await projects.createProject(source, 'Archive app', { userHome, initializeGit: false });
+  return { source, archive, directory, project: created.path, userHome };
+}
+
+test('archive binding is reviewed and portable, preserving the exact pin and bypassing registry publication', async t => {
+  const fixture = await archiveFixture(t);
+  const { planToolingArchive, bindToolingArchive } = await import('../scripts/bind-tooling-archive.mjs');
+  const originalPackage = await readFile(join(fixture.project, 'package.json'), 'utf8');
+  const originalLock = await readFile(join(fixture.project, 'package-lock.json'), 'utf8');
+  const plan = await planToolingArchive(fixture.project, fixture.archive);
+  assert.match(plan.approval, /^[a-f0-9]{12}$/);
+  assert.equal(await readFile(join(fixture.project, 'package-lock.json'), 'utf8'), originalLock);
+  await assert.rejects(access(join(fixture.project, 'tooling')), { code: 'ENOENT' });
+  await assert.rejects(bindToolingArchive(fixture.project, fixture.archive, '000000000000'), /approval/);
+  await bindToolingArchive(fixture.project, fixture.archive, plan.approval);
+  assert.equal(await readFile(join(fixture.project, 'package.json'), 'utf8'), originalPackage);
+  const lock = JSON.parse(await readFile(join(fixture.project, 'package-lock.json'), 'utf8'));
+  assert.equal(lock.packages[''].dependencies['@microsoft/sql-apps'], '1.2.3');
+  const tooling = lock.packages['node_modules/@microsoft/sql-apps'];
+  assert.match(tooling.resolved, /^file:tooling\/microsoft-sql-apps-1\.2\.3-[a-f0-9]{16}\.tgz$/);
+  assert.equal(tooling.integrity, `sha512-${createHash('sha512').update(await readFile(fixture.archive)).digest('base64')}`);
+  assert.match(await readFile(join(fixture.project, 'Dockerfile'), 'utf8'), /COPY tooling\/ \.\/tooling\/\nRUN npm ci/);
+
+  const moved = join(fixture.userHome, 'moved-app');
+  await cp(fixture.project, moved, { recursive: true });
+  const requests = [];
+  const server = createServer((request, response) => { requests.push(request.url); response.writeHead(404).end(); });
+  await new Promise(done => server.listen(0, '127.0.0.1', done));
+  t.after(() => new Promise(done => server.close(done)));
+  const { verifyToolingFeed } = await import('../scripts/verify-tooling-feed.mjs');
+  const verified = await verifyToolingFeed(fixture.source, `http://127.0.0.1:${server.address().port}`, fixture.archive);
+  assert.equal(verified.archive, fixture.archive);
+  assert.equal(verified.cliOutput.trim(), 'archive tooling 1.2.3');
+  await rm(fixture.archive);
+  const result = await runNpm(['ci', '--ignore-scripts', '--no-audit', '--no-fund',
+    '--cache', '.npm-cache', `--registry=http://127.0.0.1:${server.address().port}`], moved);
+  assert.equal(result.code, undefined, `${result.stdout}\n${result.stderr}`);
+  assert.deepEqual(requests, [], 'The bound runtime must not need a registry entry.');
+  const cli = await execute(process.execPath, [join(moved, 'node_modules', '@microsoft', 'sql-apps', 'cli.mjs')]);
+  assert.equal(cli.stdout.trim(), 'archive tooling 1.2.3');
+});
+
+test('archive binding refuses a changed approval, package mismatch and dependency drift', async t => {
+  const fixture = await archiveFixture(t);
+  const { planToolingArchive, bindToolingArchive } = await import('../scripts/bind-tooling-archive.mjs');
+  const plan = await planToolingArchive(fixture.project, fixture.archive);
+  const lockPath = join(fixture.project, 'package-lock.json');
+  const lock = JSON.parse(await readFile(lockPath, 'utf8'));
+  lock.name = 'changed-after-review';
+  await writeFile(lockPath, JSON.stringify(lock));
+  await assert.rejects(bindToolingArchive(fixture.project, fixture.archive, plan.approval), /approval/);
+  for (const metadata of [
+    { name: 'another-package', version: '1.2.3' },
+    { name: '@microsoft/sql-apps', version: '1.2.4' },
+    { name: '@microsoft/sql-apps', version: '1.2.3', dependencies: { unexpected: '1.0.0' } },
+  ]) {
+    await writeFile(join(fixture.directory, 'package.json'), JSON.stringify(metadata));
+    const packed = JSON.parse((await runNpm(['pack', '--ignore-scripts', '--json'], fixture.directory)).stdout)[0];
+    await assert.rejects(planToolingArchive(fixture.project, join(fixture.directory, packed.filename)), /match|dependencies/);
+  }
+  await assert.rejects(access(join(fixture.project, 'tooling')), { code: 'ENOENT' });
+});
+
+test('archive binding rejects linked project archive directories before mutation', async t => {
+  const fixture = await archiveFixture(t);
+  const { planToolingArchive } = await import('../scripts/bind-tooling-archive.mjs');
+  const lock = await readFile(join(fixture.project, 'package-lock.json'), 'utf8');
+  await symlink(fixture.directory, join(fixture.project, 'tooling'), process.platform === 'win32' ? 'junction' : 'dir');
+  await assert.rejects(planToolingArchive(fixture.project, fixture.archive), /linked/);
+  assert.equal(await readFile(join(fixture.project, 'package-lock.json'), 'utf8'), lock);
 });
 
 test('create scaffolds an independent named project and records it as active', async t => {

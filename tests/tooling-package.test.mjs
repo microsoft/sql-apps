@@ -99,6 +99,11 @@ test('stages publishable package metadata with synchronized exact runtime depend
     assert.equal(Object.hasOwn(candidate, 'private'), false);
     assert.deepEqual(candidate.files, ['bin', 'dist', 'assets']);
     assert.equal(candidate.license, 'MIT');
+    assert.deepEqual(candidate.repository, {
+      type: 'git',
+      url: 'git+https://github.com/microsoft/sql-apps.git',
+      directory: 'packages/sql-apps',
+    });
     assert.deepEqual(candidate.engines, { node: '>=22 <23 || >=24 <25' });
     assert.deepEqual(candidate.exports, {
       './project-contract': './dist/src/project-contract.mjs',

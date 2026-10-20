@@ -17,9 +17,11 @@ Node package resolution, including dependencies hoisted beside the installed
 tooling package. A CLI dependency is checked through its declared executable;
 subpath-only exports do not require a root library export. These checks do not
 prove the pinned tooling version is available from the configured npm feed.
-Release acceptance still requires a clean independent generated project to
-install that exact version from its intended feed. A local tarball or vendored
-binary is development evidence, not a substitute for that install check.
+Release acceptance requires a clean independent generated project to install
+that exact version from its explicitly selected source: a
+[reviewed release archive](projects.md#install-from-a-release-archive) or the
+intended npm feed. An archive build alone is insufficient; prove a clean restore
+with an empty cache. Archive acceptance is not npm publication evidence.
 
 ## Plan before changes
 

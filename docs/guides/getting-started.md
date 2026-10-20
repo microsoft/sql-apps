@@ -17,12 +17,16 @@ by all routes; check the additional requirements for your chosen database.
 | .NET SDK 8 or later | Build and publish the SQL schema. Choose SDK, not just Runtime. |
 | Docker with Linux containers | Preferred container route only; endpoint fallbacks use host DAB without Docker. |
 | Azure SQL Database container private-preview access | Preferred first-use route, unless cached. If unavailable, offer Azure SQL directly, then SQL Server 2025 Express on Windows x64. |
-| Access to the pinned SQL Apps npm package | Generated apps restore `@microsoft/sql-apps@0.2.3` from your configured npm feed. |
+| Access to the pinned SQL Apps package | Use the matching release archive, or a configured npm feed that serves `@microsoft/sql-apps@0.2.3`. |
 
 **Check package access before attempting application restore.** Installing the
 assistant plugin does not make the runtime package available. If your configured
-feed cannot resolve the pinned version, restoration is blocked; see
-[package availability](../reference/plugins.md#install-from-github).
+feed cannot resolve the pinned version, explicitly
+[bind a matching release archive](../reference/projects.md#install-from-a-release-archive)
+before restore. This is a distribution issue, not a project-directory error.
+Archive installation does not require npm publishing rights; other dependencies
+still use your configured feed. Do not repeatedly recreate the app or silently
+change registries, versions or installation sources.
 
 Initial npm packages, SQL tools and container images require internet and disk space. Docker Desktop has [license conditions](https://docs.docker.com/subscription/desktop-license/) and is not free for every organization. Azure CLI is needed only when choosing Azure SQL directly. Endpoint routes restore pinned host DAB under the services approval; host sqlcmd is not required.
 
@@ -143,7 +147,8 @@ for launcher details.
 Review the plan and approve only the intended operations. Bootstrap setup stops
 after restoring dependencies: re-plan through the app's installed pinned
 tooling before authorizing build or startup. A missing package in your npm feed
-is a blocker, not permission to substitute foundation runtime code.
+blocks that source until fixed or until you explicitly bind a matching release
+archive. Neither permits substituting foundation runtime code.
 
 After restore, check requirements from the generated project folder:
 

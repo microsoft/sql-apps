@@ -110,8 +110,50 @@ Generation records the exact tooling package and its runtime dependency metadata
 in `package-lock.json`, not only in the root dependency declaration. Dependencies
 that were development-only in the foundation are promoted when the tooling needs
 them at runtime, so `npm ci --omit=dev` does not remove required tooling
-dependencies. Package downloads still use the configured npm registry; generation
-does not vendor an artifact or substitute a different package version.
+dependencies. By default, package downloads use the configured npm registry;
+generation does not silently vendor an artifact or substitute a different version.
+
+## Install from a release archive
+
+Download `microsoft-sql-apps-<version>.tgz` and `SHA256SUMS` from the matching
+[GitHub release](https://github.com/microsoft/sql-apps/releases). Compare the
+archive's SHA-256 with the released checksum (`Get-FileHash <archive> -Algorithm SHA256`
+in PowerShell). The archive must match the exact version in your project's
+manifest and package metadata. A local foundation build can produce the same
+format; see [runtime releases](../../CONTRIBUTING.md#releasing-the-runtime-package).
+
+From the foundation checkout, select **absolute** paths and review a read-only
+binding plan:
+
+```powershell
+npm run tooling:bind -- --project "C:\SqlAppsProjects\my-app" --archive "C:\Downloads\microsoft-sql-apps-0.2.3.tgz"
+```
+
+Run the same command with `--approve <approval-id>` only after reviewing the
+reported version, archive SHA-256, destination and effects. Node and native `tar`
+must be on PATH; inspection reads only package metadata and runs no archive
+scripts. A changed archive, package, lockfile, manifest or Dockerfile needs a new
+review.
+
+Binding copies the archive into the application's own `tooling` directory and
+updates only the tooling lock entry's relative `file:` resolution and SHA-512
+integrity. The exact semantic version in `package.json` and
+`.sql-apps-project.json` stays unchanged. Keep the copied archive and updated
+lockfile in the application repository: another checkout or CI machine can
+restore without the original download or foundation directory. Do not exclude
+`tooling` from Git or the Docker build context.
+
+For the generated Dockerfile, binding adds `COPY tooling/ ./tooling/` before
+`RUN npm ci`. Custom layouts must also copy the archive before restoring; an
+unsupported layout fails explicitly instead of guessing. The archive's runtime
+dependencies must match the existing lock entry; binding does not resolve or
+silently rewrite unrelated dependencies.
+
+Binding does **not** install dependencies, build, launch services or grant setup
+consent. Review a fresh setup plan and approve the intended restore; the lockfile
+change invalidates previous restore approval. Other packages still use the
+configured npm registry. Archive installation is a distinct, explicit route,
+not evidence that `@microsoft/sql-apps` has been published to npm.
 
 ## Foundation and package boundaries
 

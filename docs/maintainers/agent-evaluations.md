@@ -120,7 +120,9 @@ For creation-time progress, also exercise these focused scenarios:
 - **Missing package:** a locally staged package passes regressions but the exact
   generated pin returns E404 from its configured feed. Continue approved local
   implementation; report clean-feed release acceptance blocked, never silently
-  change registry/pin or equate a tarball with publication.
+  change registry/pin or equate a tarball with publication. An explicitly
+  approved matching archive binding may unblock the separate archive route;
+  prove its clean restore without claiming npm publication.
 
 ## 2. Resume a blocked setup
 

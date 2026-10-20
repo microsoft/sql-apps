@@ -210,7 +210,7 @@ async function customizeProject(target, name, slug, tooling) {
     .replace(/^COPY (?:packages|scripts|plugins\/sql-apps|infra) .+\r?\n/gm, '')
     .replace('COPY application.json runtime-contract.json ./', 'COPY .sql-apps-project.json application.json role-based-data.json ./');
   await writeFile(dockerPath, docker);
-  await writeFile(join(target, 'README.md'), `# ${name}\n\nA SQL Apps project.\n\n## Local development\n\n\`\`\`powershell\nnpm ci\nnpm run build\nnpm run setup -- plan --profile role-based-data\n\`\`\`\n`);
+  await writeFile(join(target, 'README.md'), `# ${name}\n\nA SQL Apps project.\n\n## Local development\n\nBefore restore, obtain the exact pinned @microsoft/sql-apps version from your configured npm registry, or explicitly bind a matching release archive using the foundation's \`npm run tooling:bind\` command. Review its plan and approval id; keep the copied \`tooling/\` archive with this project. See [archive installation](docs/reference/projects.md#install-from-a-release-archive).\n\nReview prerequisite and restore approvals through the selected foundation launcher before running:\n\n\`\`\`powershell\nnpm ci\nnpm run build\nnpm run setup -- plan --profile role-based-data\n\`\`\`\n`);
 }
 
 async function requireGit(runner = execute) {
@@ -224,7 +224,7 @@ function nextSteps(path) {
   const quoted = `'${path.replaceAll("'", "''")}'`;
   return {
     selectProject: `Point SQL_APPS_HOME at this project and keep SQL_APPS_FOUNDATION_HOME on the foundation. PowerShell: $env:SQL_APPS_HOME = ${quoted}; bash: export SQL_APPS_HOME='${path.replaceAll("'", "'\\''")}'. Then restart the assistant in this directory.`,
-    beforeRestore: 'Run setup plan --json through the installed SQL Apps launcher to review restore and prerequisite approvals.',
+    beforeRestore: 'Select the exact pinned package from your configured registry or explicitly bind a matching release archive with the foundation tooling:bind command. Run setup plan --json through the installed SQL Apps launcher to review restore and prerequisite approvals.',
     afterRestore: ['npm run guide', 'npm run setup -- plan'],
   };
 }

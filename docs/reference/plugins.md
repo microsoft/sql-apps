@@ -141,7 +141,7 @@ selection, `SQL_APPS_HOME` can select a foundation for creation only; an app is
 not a project factory. The local installer below remains a Copilot alternative
 and creates a persistent foundation binding.
 
-Generated applications restore exactly `@microsoft/sql-apps@0.2.3` from the configured npm feed. Plugin installation does not publish that package or prove it is available. A missing package blocks application restoration; a local tarball or foundation build is not clean-feed release acceptance. See the [release prerequisites](progressive-creation.md).
+Generated applications pin exactly `@microsoft/sql-apps@0.2.3`. Plugin installation does not distribute that package. Use an explicitly [bound release archive](projects.md#install-from-a-release-archive), or a configured npm feed that serves the pin. A missing feed package blocks the registry route; never silently change sources. A verified archive release requires no npm publishing rights but is not evidence of npm publication. See the [release prerequisites](progressive-creation.md).
 
 ## Install from your checkout
 

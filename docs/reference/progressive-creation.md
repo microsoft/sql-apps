@@ -173,14 +173,25 @@ acceptance incomplete. Final Ready still requires live capabilities.
 
 ## Release prerequisite
 
-Independent projects pin an exact `@microsoft/sql-apps` version. A local build,
-tarball or successful packaged regression does not prove that version can be
-installed from the configured npm feed. Verify a clean install from that feed
-before release acceptance. An E404 is an explicit release blocker; never
-silently switch registries, versions or vendor binaries as a success substitute.
+Independent projects pin an exact `@microsoft/sql-apps` version. The supported
+archive release includes a versioned tarball and checksum, with a clean
+generated-project restore from that archive and an empty cache. Users explicitly
+[review and bind the archive](projects.md#install-from-a-release-archive) before
+restore; no npm publishing permission is required.
+
+For registry distribution, verify a clean install from the intended feed.
+An E404 blocks that route. Neither a local build nor archive acceptance proves
+npm publication. Never silently switch registries, versions or installation
+sources to report success.
 
 The generated lockfile includes the pinned package entry and promotes its
 runtime dependencies from the foundation's dev-only tree. A real `npm ci`
 regression uses a bounded loopback registry and an empty package cache to prove
 fresh-install and production dependency behavior independently of public-feed
 availability. That test is not evidence that the package has been published.
+
+Maintainers should use the explicit
+[runtime packaging workflow and source-specific verification](../../CONTRIBUTING.md#releasing-the-runtime-package).
+It produces a checked archive without npm credentials. A successful GitHub
+merge alone does not unblock restoration; distribute and explicitly bind the
+release archive, or publish and verify the optional registry route.
