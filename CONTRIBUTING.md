@@ -74,14 +74,17 @@ exact semantic version.
 
 The manually dispatched [runtime packaging workflow](.github/workflows/package-runtime.yml)
 builds and tests `main`, checks the package inventory, packs the archive, proves
-a fresh generated-project restore with an empty cache, and uploads the archive,
+clone-free creation from that archive plus an independent app restore with empty
+caches, and uploads the archive,
 pack metadata and `SHA256SUMS` as the `runtime-archive-release` Actions artifact:
 
 ```powershell
-gh workflow run package-runtime.yml --ref main -f version=0.2.4
+gh workflow run package-runtime.yml --ref main -f version=0.2.5
 ```
 
-Use the actual manifest version for later releases. After a successful run,
+0.2.5 is an unreleased candidate in this branch; do not reuse the published
+0.2.4 asset for these changes. Use the actual manifest version for later releases.
+After a successful run,
 download the artifact, review the checksum and create a GitHub release at
 that run's exact commit, attaching the tarball and `SHA256SUMS`. Do not overwrite
 an existing released version or asset. The workflow itself does not create a
@@ -94,17 +97,27 @@ npm test
 npm run tooling:build
 npm run tooling:check
 npm pack .\dist\tooling-package --ignore-scripts --pack-destination .\dist
-npm run tooling:verify-archive -- "C:\git\sql-apps\dist\microsoft-sql-apps-0.2.4.tgz"
-Get-FileHash .\dist\microsoft-sql-apps-0.2.4.tgz -Algorithm SHA256
+npm run tooling:verify-archive -- "C:\git\sql-apps\dist\microsoft-sql-apps-0.2.5.tgz"
+Get-FileHash .\dist\microsoft-sql-apps-0.2.5.tgz -Algorithm SHA256
+npm run test:archive-bootstrap
 ```
 
-The archive verifier uses a temporary generated project and an empty npm cache,
-binds the explicitly selected archive, runs `npm ci` with lifecycle scripts
-disabled, validates the installed pin and starts the packaged CLI's help command.
+The archive verifier first installs the explicit candidate with npm `--prefix`
+and lifecycle scripts disabled, using an empty cache. Only that installed
+archive CLI/scaffold creates the app; the foundation factory is not used.
+It reviews/applies binding, checks bootstrap setup planning, restores the exact
+app pin with scripts disabled and verifies dispatch to its local implementation.
+After stopping the owned helper, it copies tracked app inputs (including the
+bound archive, excluding `.sql-apps` receipts), removes fixture-owned original
+app/bootstrap inputs and proves another independent restore with a fresh cache.
 It cleans up only its temporary directory, without changing the user's npm
 settings, applications or databases. Other dependencies still use the configured
 npm registry. This proves installation and CLI startup, **not** a running
-application, SQL persistence or rendered design acceptance.
+application, SQL persistence or rendered design acceptance. The separate
+`test:archive-bootstrap` network-dependent suite also checks missing/wrong/linked
+candidates and a failing feed; the ordinary unit suite remains feed-independent.
+Run the relevant Windows/Linux Node 22/24 CI lanes before claiming cross-platform
+acceptance; a Windows Node 22 result alone does not establish those other lanes.
 
 Users must explicitly [bind the release archive](docs/reference/projects.md#install-from-a-release-archive)
 before the first approved restore. A successful source merge or plugin install

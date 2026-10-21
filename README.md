@@ -37,8 +37,28 @@ screens or sample data.
 
 ## Get started
 
-**Start with [Get started](docs/guides/getting-started.md)** to check tools and
-package access, install assistant guidance and create an independent project.
+**Start with [Get started](docs/guides/getting-started.md)** to verify a release
+archive, install its CLI in a dedicated directory and create an independent
+project. No foundation clone, global install or assistant plugin is required.
+
+The archive-first CLI in this branch targets **unreleased 0.2.5**. Published
+0.2.4 does not include this bootstrap factory; use the documented foundation
+alternative until an archive containing it is released. Maintainers can exercise
+the same flow with a locally built candidate.
+
+After explicitly approving installation of your verified archive:
+
+```powershell
+npm install --prefix "C:\SqlAppsTools\0.2.5" --no-save --package-lock=false --ignore-scripts "C:\Downloads\microsoft-sql-apps-0.2.5.tgz"
+$cli = "C:\SqlAppsTools\0.2.5\node_modules\@microsoft\sql-apps\bin\sql-apps.mjs"
+node $cli projects create-plan "Equipment Checkout" --no-browser
+node $cli projects create "Equipment Checkout" --no-browser --approval <printed-id>
+```
+
+Review the destination, Git repository, ports and owned local helper before
+creation. `--no-browser` suppresses browser opening, not the helper. The guide
+continues with separately reviewed archive binding and app restore, then a fresh
+plan through the app's exact installed tooling.
 
 Open the generated application in your editor, give your assistant access to
 that project and ask:
@@ -171,7 +191,7 @@ and [sharing your app](docs/guides/sharing.md), including the existing bundled
   Keep DAB on ACA with managed identity; SWA is only a fallback when the complete
   required setup fits Free. See [cloud planning](docs/reference/free-first.md).
 - **Your assistant acts with real permissions.** Review plans and approvals,
-  keep backups and do not bypass permissions. See [setup safety](docs/guides/getting-started.md#2-select-the-foundation-and-assistant-guidance).
+  keep backups and do not bypass permissions. See [setup safety](docs/guides/getting-started.md#2-select-the-cli-and-optional-assistant-guidance).
 - **Not production-ready as-is.** A working local app is not production
   certification. The personal cloud option has availability and networking
   trade-offs; review them before storing real or regulated data. See [sharing limits](docs/guides/sharing.md).

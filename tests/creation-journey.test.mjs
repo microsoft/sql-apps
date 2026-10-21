@@ -15,7 +15,7 @@ test('approved creation opens a front door without app restore, preserves direct
     await rm(userHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
   const source = resolve(import.meta.dirname, '..');
-  const plan = await planProjectCreation(source, 'Progressive fixture', { userHome });
+  const plan = await planProjectCreation(source, 'Progressive fixture', { userHome, browser: false });
   assert.equal(plan.effects.some(effect => effect.includes('loopback')), true);
   await assert.rejects(createProject(source, 'Progressive fixture', { userHome, progressive: true, approval: 'wrong' }), /approve/i);
   const project = await createProject(source, 'Progressive fixture', {

@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
-import { cp, lstat, mkdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { lstat, mkdir, readFile, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -92,31 +92,67 @@ export async function setProjectsRoot(value, options = {}) {
   });
 }
 
-async function copyProjectSource(source, target) {
-  for (const name of projectDirectories) {
-    const from = join(source, name);
-    let info;
-    try { info = await lstat(from); }
-    catch (error) { if (error.code === 'ENOENT') continue; throw error; }
-    if (info.isSymbolicLink() || !info.isDirectory()) throw new Error(`Project scaffold input must be a directory: ${name}`);
-    await cp(from, join(target, name), {
-      recursive: true,
-      filter: path => {
-        const relative = path.slice(from.length).replaceAll('\\', '/');
-        return !/(^|\/)(?:node_modules|dist|bin|obj|\.git|\.sql-apps)(?:\/|$)/.test(relative) &&
-          !/^\/?public\/(?:app\.js|auth\/redirect\.js)$/.test(`${name}${relative}`);
-      },
-    });
+export async function resolveProjectSource(sourceValue) {
+  const root = await realpath(sourceValue);
+  const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
+  if (!['sql-apps', '@microsoft/sql-apps'].includes(pkg.name)) throw new Error('Select a SQL Apps foundation or installed tooling package.');
+  const packaged = pkg.name === '@microsoft/sql-apps';
+  const toolingManifest = await readFile(packaged ? join(root, 'package.json') : join(root, 'packages', 'sql-apps', 'package.json'), 'utf8');
+  const tooling = JSON.parse(toolingManifest);
+  if (tooling.name !== '@microsoft/sql-apps' || typeof tooling.version !== 'string') throw new Error('Invalid SQL Apps tooling metadata.');
+  return { root, scaffoldRoot: packaged ? await realpath(join(root, 'assets', 'scaffold')) : root, toolingManifest, tooling };
+}
+
+async function projectInputs(source) {
+  const inputs = [];
+  async function visit(name, inputName = name) {
+    const path = join(source, inputName);
+    const info = await lstat(path);
+    if (info.isSymbolicLink()) throw new Error(`Project scaffold input must not be linked: ${name}`);
+    if (info.isDirectory()) {
+      inputs.push({ name });
+      for (const child of (await readdir(path)).sort()) {
+        if (['node_modules', 'dist', 'bin', 'obj', '.git', '.sql-apps'].includes(child)) continue;
+        if (child.startsWith('.env')) throw new Error(`Environment files are not scaffold inputs: ${join(name, child)}`);
+        const relative = join(name, child);
+        if (['public/app.js', 'public/auth/redirect.js'].includes(relative.replaceAll('\\', '/'))) continue;
+        await visit(relative);
+      }
+    } else if (info.isFile()) {
+      inputs.push({ name, bytes: await readFile(path) });
+    } else throw new Error(`Project scaffold input must be a regular file or directory: ${name}`);
   }
-  for (const name of projectFiles) {
-    const from = join(source, name);
+  for (const name of [...projectDirectories, ...projectFiles]) {
     let info;
-    try { info = await lstat(from); }
-    catch (error) { if (error.code === 'ENOENT') continue; throw error; }
-    if (info.isSymbolicLink() || !info.isFile()) throw new Error(`Project scaffold input must be a file: ${name}`);
-    await mkdir(dirname(join(target, name)), { recursive: true });
-    await cp(from, join(target, name));
+    let inputName = name;
+    try { info = await lstat(join(source, name)); }
+    catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+      if (name !== '.gitignore') continue;
+      inputName = '.gitignore.template';
+      try { info = await lstat(join(source, inputName)); }
+      catch (missing) { if (missing.code === 'ENOENT') continue; throw missing; }
+    }
+    if (info.isSymbolicLink() || (projectDirectories.includes(name) ? !info.isDirectory() : !info.isFile())) {
+      throw new Error(`Invalid project scaffold input: ${name}`);
+    }
+    await visit(name, inputName);
   }
+  return inputs;
+}
+
+async function copyProjectInputs(inputs, target) {
+  for (const { name, bytes } of inputs) {
+    if (bytes === undefined) await mkdir(join(target, name), { recursive: true });
+    else {
+      await mkdir(dirname(join(target, name)), { recursive: true });
+      await writeFile(join(target, name), bytes);
+    }
+  }
+}
+
+export async function copyProjectSource(source, target) {
+  return copyProjectInputs(await projectInputs(source), target);
 }
 
 function promoteToolingDependencies(packages, toolingPath) {
@@ -210,7 +246,7 @@ async function customizeProject(target, name, slug, tooling) {
     .replace(/^COPY (?:packages|scripts|plugins\/sql-apps|infra) .+\r?\n/gm, '')
     .replace('COPY application.json runtime-contract.json ./', 'COPY .sql-apps-project.json application.json role-based-data.json ./');
   await writeFile(dockerPath, docker);
-  await writeFile(join(target, 'README.md'), `# ${name}\n\nA SQL Apps project.\n\n## Local development\n\nBefore restore, obtain the exact pinned @microsoft/sql-apps version from your configured npm registry, or explicitly bind a matching release archive using the foundation's \`npm run tooling:bind\` command. Review its plan and approval id; keep the copied \`tooling/\` archive with this project. See [archive installation](docs/reference/projects.md#install-from-a-release-archive).\n\nReview prerequisite and restore approvals through the selected foundation launcher before running:\n\n\`\`\`powershell\nnpm ci\nnpm run build\nnpm run setup -- plan --profile role-based-data\n\`\`\`\n`);
+  await writeFile(join(target, 'README.md'), `# ${name}\n\nA SQL Apps project, not a finished domain application.\n\n## Local development\n\nBefore restore, explicitly bind a matching verified release archive with your selected archive CLI's \`bind-archive\` command, or select a configured registry serving the exact pinned @microsoft/sql-apps version. Keep the copied \`tooling/\` archive and updated lockfile in this repository. See [archive installation](docs/reference/projects.md#install-from-a-release-archive).\n\nRun \`setup plan --json\` through that CLI from this project directory and review prerequisite and restore approvals separately. A foundation launcher remains an alternative for source-based workflows. Bootstrap setup stops after restore; then review a fresh plan through the app's installed pinned tooling:\n\n\`\`\`powershell\nnpm run setup -- plan --profile role-based-data\n\`\`\`\n\nBuild/start only under the current setup approval. Implement and test your own screens and SQL-backed workflow; CLI installation and health checks alone are not application acceptance.\n`);
 }
 
 async function requireGit(runner = execute) {
@@ -220,11 +256,15 @@ async function requireGit(runner = execute) {
   }
 }
 
-function nextSteps(path) {
+function nextSteps(path, packaged = false) {
   const quoted = `'${path.replaceAll("'", "''")}'`;
   return {
-    selectProject: `Point SQL_APPS_HOME at this project and keep SQL_APPS_FOUNDATION_HOME on the foundation. PowerShell: $env:SQL_APPS_HOME = ${quoted}; bash: export SQL_APPS_HOME='${path.replaceAll("'", "'\\''")}'. Then restart the assistant in this directory.`,
-    beforeRestore: 'Select the exact pinned package from your configured registry or explicitly bind a matching release archive with the foundation tooling:bind command. Run setup plan --json through the installed SQL Apps launcher to review restore and prerequisite approvals.',
+    selectProject: packaged
+      ? `Open ${path} in your editor. Run the selected archive CLI from this directory before restore; after restore, restart your optional assistant here to detect the app-local tooling. No foundation selection is needed.`
+      : `Point SQL_APPS_HOME at this project and keep SQL_APPS_FOUNDATION_HOME on the foundation. PowerShell: $env:SQL_APPS_HOME = ${quoted}; bash: export SQL_APPS_HOME='${path.replaceAll("'", "'\\''")}'. Then restart the assistant in this directory.`,
+    beforeRestore: packaged
+      ? 'Use the selected archive CLI to review bind-archive --project <absolute-project> --archive <absolute-tgz>, then apply with --approve <id>. From the app directory, review setup plan --json and separate restore/prerequisite approvals. After restore, stop and re-plan through the app-local pin.'
+      : 'Select the exact pinned package from your configured registry or explicitly bind a matching release archive with the foundation tooling:bind command. Run setup plan --json through the installed SQL Apps launcher to review restore and prerequisite approvals.',
     afterRestore: ['npm run guide', 'npm run setup -- plan'],
   };
 }
@@ -259,10 +299,15 @@ async function prospectivePath(value) {
 }
 
 export async function planProjectCreation(sourceValue, name, options = {}) {
-  const source = await realpath(sourceValue);
+  const source = await resolveProjectSource(sourceValue);
+  return planCreation(source, await projectInputs(source.scaffoldRoot), name, options);
+}
+
+async function planCreation({ root: source, toolingManifest }, inputs, name, options) {
   const userHome = await realpath(resolve(options.userHome ?? homedir()));
   const state = await readProjectsState({ userHome });
-  const toolingManifest = options.toolingManifest ?? await readFile(join(source, 'packages', 'sql-apps', 'package.json'), 'utf8');
+  const scaffoldFingerprint = fingerprint(inputs.map(({ name, bytes }) =>
+    [name, bytes === undefined ? null : createHash('sha256').update(bytes).digest('hex')]));
   const root = await prospectivePath(state.projectsRoot);
   const destination = join(root, slugify(name));
   const nested = relative(source, destination);
@@ -278,24 +323,25 @@ export async function planProjectCreation(sourceValue, name, options = {}) {
     }
   }
   if (!basePort) throw new Error('No free creation workspace block found; inspect occupied ports without stopping unrelated services.');
+  const browser = options.browser !== false;
   const effects = [
     `Create ${destination} and initialize its Git repository.`,
     `Start an owned loopback status/proxy process on port ${basePort}; reserve private gateway ${basePort + 2}, DAB ${basePort + 1}, SQL ${basePort + 5}.`,
-    'Persist nonsecret creation state in the user SQL Apps directory and open the local browser.',
+    `Persist nonsecret creation state in the user SQL Apps directory${browser ? ' and open the local browser' : '; do not open a browser'}.`,
     'Known later setup effects: dependency restore, build, SQL startup/schema publication and synthetic acceptance. Existing scoped setup approval and SQL terms still apply before those operations; no cloud resources are created.',
   ];
-  return { version: 1, source, home: destination, name: name.trim(), userHome, workspaceId: id, basePort, effects,
+  return { version: 1, source, home: destination, name: name.trim(), userHome, workspaceId: id, basePort, browser, effects,
     approval: fingerprint({ source, home: destination, name: name.trim(), basePort, effects,
-      toolingManifest, implementation: await creationImplementation() }).slice(0, 12) };
+      toolingManifest, scaffoldFingerprint, implementation: await creationImplementation() }).slice(0, 12) };
 }
 
 export async function createProject(sourceValue, name, options = {}) {
-  const source = await realpath(sourceValue);
-  const toolingManifest = await readFile(join(source, 'packages', 'sql-apps', 'package.json'), 'utf8');
-  const tooling = JSON.parse(toolingManifest);
+  const selectedSource = await resolveProjectSource(sourceValue);
+  const { root: source, scaffoldRoot, tooling } = selectedSource;
+  const inputs = await projectInputs(scaffoldRoot);
   const userHome = resolve(options.userHome ?? homedir());
   if (options.initializeGit !== false) await requireGit(options.runner);
-  const creation = options.progressive ? await planProjectCreation(source, name, { ...options, toolingManifest }) : null;
+  const creation = options.progressive ? await planCreation(selectedSource, inputs, name, options) : null;
   if (creation && options.approval !== creation.approval) throw new Error('Review projects create-plan and explicitly approve its current id before starting the browser experience.');
   return withProjectsLock(userHome, async () => {
     const state = await readProjectsState({ userHome });
@@ -324,7 +370,7 @@ export async function createProject(sourceValue, name, options = {}) {
         origin = await startCreationProcess(sessionDirectory, source);
         if (options.browser !== false) await openCreationBrowser(origin);
       }
-      await copyProjectSource(source, temporary);
+      await copyProjectInputs(inputs, temporary);
       await customizeProject(temporary, name.trim(), slug, tooling);
       if (options.initializeGit !== false) await initializeRepository(temporary, options.runner);
       await rename(temporary, destination);
@@ -339,7 +385,7 @@ export async function createProject(sourceValue, name, options = {}) {
       state.projects = [...state.projects.filter(item => item.path !== destination), project];
       state.activeProject = destination;
       await saveProjectsState(state, userHome);
-      return { ...project, ...(origin ? { launchUrl: origin, reviewPending: true } : {}), next: nextSteps(destination) };
+      return { ...project, ...(origin ? { launchUrl: origin, reviewPending: true } : {}), next: nextSteps(destination, scaffoldRoot !== source) };
     } catch (error) {
       await rm(temporary, { recursive: true, force: true });
       if (origin) {
@@ -372,21 +418,38 @@ export async function openProject(value, options = {}) {
   });
 }
 
-export async function main(args = process.argv.slice(2), source = resolve(import.meta.dirname, '..')) {
+export async function main(args = process.argv.slice(2), source = resolve(import.meta.dirname, '..'), options = {}) {
   const [command = 'list', value, ...extra] = args;
-  const progressive = command === 'create' && extra.length === 2 && extra[0] === '--approval' && /^[a-f0-9]{12}$/.test(extra[1]);
-  if (extra.length && !progressive || !['root', 'create-plan', 'create', 'list', 'open'].includes(command)) {
-    throw new Error('Usage: projects <root [absolute-path]|create-plan <name>|create <name> [--approval <id>]|list|open <absolute-path>>');
+  const usage = 'Usage: projects <root [absolute-path]|create-plan <name> [--no-browser]|create <name> [--approval <id>] [--no-browser]|list|open <absolute-path>>';
+  const creationOptions = {};
+  const seen = new Set();
+  if (['create', 'create-plan'].includes(command)) {
+    if (!value || value.startsWith('--')) throw new Error(usage);
+    for (let i = 0; i < extra.length; i++) {
+      const flag = extra[i];
+      if (seen.has(flag)) throw new Error(usage);
+      seen.add(flag);
+      if (flag === '--no-browser') creationOptions.browser = false;
+      else if (command === 'create' && flag === '--approval' && /^[a-f0-9]{12}$/.test(extra[i + 1] ?? '')) {
+        creationOptions.approval = extra[++i];
+      } else throw new Error(usage);
+    }
+    creationOptions.progressive = options.requireApproval === true || creationOptions.approval !== undefined;
+    if (command === 'create' && creationOptions.progressive && !creationOptions.approval) {
+      throw new Error('Review projects create-plan and provide --approval <id> before creating a project.');
+    }
+  } else if (extra.length || !['root', 'list', 'open'].includes(command)) {
+    throw new Error(usage);
   }
   if (command === 'root') {
     const state = value === undefined ? await readProjectsState() : await setProjectsRoot(value);
     console.log(state.projectsRoot);
   } else if (command === 'create') {
     if (!value) throw new Error('Provide a project name.');
-    console.log(JSON.stringify(await createProject(source, value, progressive ? { progressive: true, approval: extra[1] } : {}), null, 2));
+    console.log(JSON.stringify(await createProject(source, value, creationOptions), null, 2));
   } else if (command === 'create-plan') {
     if (!value) throw new Error('Provide a project name.');
-    console.log(JSON.stringify(await planProjectCreation(source, value), null, 2));
+    console.log(JSON.stringify(await planProjectCreation(source, value, creationOptions), null, 2));
   } else if (command === 'open') {
     if (!value) throw new Error('Provide an absolute SQL Apps project path.');
     console.log(JSON.stringify(await openProject(value), null, 2));

@@ -89,7 +89,7 @@ async function resolveToolHome(options = {}) {
   let binding;
   try { binding = JSON.parse(await readFile(configuredBinding, 'utf8')); }
   catch (error) {
-    if (error.code === 'ENOENT') throw new Error('SQL Apps bootstrap requires an installed foundation binding or explicit selection. Set SQL_APPS_FOUNDATION_HOME to the absolute foundation checkout path while SQL_APPS_HOME selects the application. For project creation alone, SQL_APPS_HOME may select the foundation. Copilot users can alternatively run npm run plugin:install there.');
+    if (error.code === 'ENOENT') throw new Error('SQL Apps bootstrap requires an installed foundation binding or explicit selection. Alternatively, use your explicitly selected, verified release archive CLI to bind-archive and review setup before restoring the project pin; then restart the assistant in the app directory. No download or installation is automatic. For foundation workflows, set SQL_APPS_FOUNDATION_HOME to the absolute foundation checkout path while SQL_APPS_HOME selects the application. For project creation alone, SQL_APPS_HOME may select the foundation. Copilot users can alternatively run npm run plugin:install there.');
     if (error instanceof SyntaxError) throw new Error('Invalid SQL Apps local binding; review it or set SQL_APPS_FOUNDATION_HOME to the absolute foundation checkout path.');
     throw error;
   }
@@ -119,7 +119,7 @@ export async function workspaceReport(home, options = {}) {
   if (pkg.sqlApps?.project === true) {
     foundation = false;
     const require = createRequire(join(home, 'package.json'));
-    for (const modules of require.resolve.paths('@microsoft/sql-apps') ?? []) {
+    for (const modules of [join(home, 'node_modules')]) {
       const candidate = join(modules, '@microsoft', 'sql-apps');
       try { await access(candidate); }
       catch (error) { if (error.code === 'ENOENT') continue; throw error; }

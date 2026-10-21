@@ -46,7 +46,7 @@ test('SQL Apps identity is consistent across packages, platform manifests and ma
     assert.equal(manifest.name, 'sql-apps', path);
     assert.equal(manifest.homepage, repository, path);
     assert.equal(manifest.repository, repository, path);
-    assert.equal(manifest.version, '0.2.4', path);
+    assert.equal(manifest.version, '0.2.5', path);
     assert.deepEqual(manifest.author, { name: 'Microsoft SQL team (mssql)', url: 'https://github.com/microsoft' }, path);
   }
   for (const path of ['.github/plugin/marketplace.json', '.claude-plugin/marketplace.json', '.agents/plugins/marketplace.json']) {

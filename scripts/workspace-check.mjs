@@ -142,7 +142,8 @@ async function inspectBuild(home, sourceFingerprint, implementationFingerprint) 
 
 export async function inspectSource(value, options = {}) {
   const home = await realpath(value);
-  const tools = await realpath(await installedTooling(home) ?? options.toolingHome ?? await toolingHome(import.meta.url));
+  const installed = await installedTooling(home);
+  const tools = await realpath(installed ?? options.toolingHome ?? await toolingHome(import.meta.url));
   try {
     const sourcePackage = home === tools
       ? JSON.parse(await readFile(join(home, 'package.json'), 'utf8'))
@@ -206,7 +207,7 @@ export async function inspectSource(value, options = {}) {
     return {
       home,
       toolingHome: tools,
-      bootstrap: toolingPackage.name !== '@microsoft/sql-apps',
+      bootstrap: installed === undefined,
       ready: true,
       code: 'SOURCE_READY',
       packageVersion: pkg.version ?? null,

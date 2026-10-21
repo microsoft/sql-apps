@@ -7,14 +7,24 @@ origin; it does not redirect to a different server port.
 
 ## Create with a reviewed plan
 
-From the foundation, without installing the application's dependencies:
+From any directory, using the [explicitly installed archive CLI](../guides/getting-started.md#2-select-the-cli-and-optional-assistant-guidance),
+without restoring the application's dependencies:
 
 ```powershell
-npm run projects -- create-plan "My App"
-npm run projects -- create "My App" --approval <printed-id>
+node $cli projects create-plan "My App" --no-browser
+node $cli projects create "My App" --no-browser --approval <printed-id>
 ```
 
-The installed plugin's absolute `sql-apps.mjs` launcher accepts the same
+This archive bootstrap path is new in unreleased 0.2.5. It requires a current
+creation approval; creation is not an implicit install/build/startup approval.
+`--no-browser` is part of that approval: it suppresses browser opening, not the
+owned helper, readiness checks or session. Omit it from both commands for
+browser-first creation. Template content changes also invalidate approval.
+Each creation attempt validates and generates the app from one captured snapshot
+of its scaffold and tooling metadata. Updates during creation cannot change the
+approved files or exact tooling pin.
+
+The foundation's `npm run projects -- ...` wrapper and installed plugin launcher accept the same
 `projects` commands. Review the printed destination, new Git repository, port
 block, local helper, browser launch and nonsecret session files before approving.
 The helper starts before scaffold copying and survives the creating command.
@@ -26,8 +36,9 @@ schema publication, service recovery or cloud resources. The plan lists those
 known later effects together, but the existing [setup approval](setup.md) remains
 their authority. Surface new blockers or milestones, not repeated waiting messages.
 
-The original `projects create "My App"` remains a nonprogressive compatibility
-path. Existing projects/workspaces keep their direct-start behavior.
+The foundation's original `projects create "My App"` remains a nonprogressive
+compatibility path; the packaged CLI does not allow unreviewed creation.
+Existing projects/workspaces keep their direct-start behavior.
 
 ## What each check means
 
@@ -174,8 +185,13 @@ acceptance incomplete. Final Ready still requires live capabilities.
 ## Release prerequisite
 
 Independent projects pin an exact `@microsoft/sql-apps` version. The supported
-archive release includes a versioned tarball and checksum, with a clean
-generated-project restore from that archive and an empty cache. Users explicitly
+archive release includes a versioned tarball and checksum. Verification installs
+that archive in isolated bootstrap tooling with scripts disabled, creates via its
+own CLI/scaffold, reviews binding and setup, restores the exact app-local pin,
+then removes fixture-owned bootstrap/original app inputs and restores a copy of
+tracked app inputs with another empty cache. Transient `.sql-apps` receipts are
+not copied. This is installation/handoff evidence, not SQL/browser acceptance.
+Users explicitly
 [review and bind the archive](projects.md#install-from-a-release-archive) before
 restore; no npm publishing permission is required.
 

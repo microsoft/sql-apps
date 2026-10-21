@@ -5,6 +5,22 @@ skills and the dependency-free launcher. The repository root contains catalogs,
 not another plugin. Installing skills does not install the application runtime,
 publish npm tooling, grant setup permissions, or deploy resources.
 
+## Optional guidance over the CLI workflow
+
+The [CLI-first getting-started guide](../guides/getting-started.md) installs an
+explicitly verified archive into a dedicated directory. Its bundled factory can
+create an independent app without a foundation clone or a plugin. This bootstrap
+flow targets unreleased 0.2.5; published 0.2.4 uses the foundation alternative.
+
+Before app restore, an assistant can run that explicitly selected archive CLI by
+absolute path from the app directory. Plugin `projects` commands still use the
+foundation selection documented below; the plugin does not download, bind or
+register an archive CLI automatically. With no restored pin and no foundation,
+its launcher reports an explicit blocker and points to the archive CLI route.
+After restoring the app's exact local pin, restart the assistant in the app
+directory: normal project detection selects that package without a foundation
+binding. Existing foundation-backed workflows remain supported.
+
 ## Assistant support
 
 | Surface | Packaging and evidence |
@@ -31,7 +47,7 @@ Start a fresh Claude session and invoke `/sql-apps:sql-apps-getting-started`,
 or describe the SQL Apps task naturally. The other commands use the same
 `/sql-apps:<skill-name>` namespace. No hooks or MCP servers are required.
 
-For first-project creation, select an existing foundation checkout before
+For the plugin launcher's source-backed project creation, select an existing foundation checkout before
 launching Claude; the plugin cache is not a project factory:
 
 ```powershell
@@ -125,7 +141,7 @@ copilot plugin install sql-apps@sql-apps-skills
 
 This installs the manifests, seven skills and launcher, not the application runtime or project factory. A listing in the default Copilot marketplace requires separate upstream review; registering this repository does not create that listing.
 
-First-project creation still needs a foundation checkout. Select it explicitly in the terminal used to launch Copilot, without replacing a remote marketplace registration with the local installer:
+For the plugin launcher's source-backed project creation, select a foundation explicitly in the terminal used to launch Copilot, without replacing a remote marketplace registration with the local installer. Clone-free creation instead uses the explicit archive CLI described above:
 
 ```powershell
 git clone https://github.com/microsoft/sql-apps.git "C:\git\sql-apps"
@@ -141,7 +157,7 @@ selection, `SQL_APPS_HOME` can select a foundation for creation only; an app is
 not a project factory. The local installer below remains a Copilot alternative
 and creates a persistent foundation binding.
 
-Generated applications pin exactly `@microsoft/sql-apps@0.2.4`. Plugin installation does not distribute that package. Use an explicitly [bound release archive](projects.md#install-from-a-release-archive), or a configured npm feed that serves the pin. A missing feed package blocks the registry route; never silently change sources. A verified archive release requires no npm publishing rights but is not evidence of npm publication. See the [release prerequisites](progressive-creation.md).
+New applications in this branch pin exactly `@microsoft/sql-apps@0.2.5` (unreleased). Plugin installation does not distribute that package. Use an explicitly [bound release archive](projects.md#install-from-a-release-archive), or a configured npm feed that serves the pin. A missing feed package blocks the registry route; never silently change sources. A verified archive release requires no npm publishing rights but is not evidence of npm publication. See the [release prerequisites](progressive-creation.md).
 
 ## Install from your checkout
 
@@ -190,7 +206,7 @@ These companion plugins are not prerequisites for local-only development. Instal
 
 ## Use the GitHub Copilot App
 
-Restart the App or create a **fresh session** after installation. In **Customize -> Plugins**, look for **sql-apps**, marketplace **sql-apps-skills**, version **0.2.4**, enabled. Its skills should appear under **Skills**:
+Restart the App or create a **fresh session** after installation. In **Customize -> Plugins**, look for **sql-apps**, marketplace **sql-apps-skills**, version **0.2.5** for this candidate, enabled. Its skills should appear under **Skills**:
 
 | Skill | Example prompt |
 | --- | --- |
@@ -254,6 +270,11 @@ The installer verifies the CLI loader when you run it. Check the visible App ses
 
 ## Runtime binding and direct checks
 
+The clone-free bootstrap uses `node $cli setup plan --json` from the app
+directory, where `$cli` is the selected archive executable. No bootstrap
+environment variable or profile-wide registration is needed. The plugin's
+foundation-backed route below is an alternative, not a clone-free prerequisite.
+
 For a connected first-run or return journey, the same launcher exposes
 `setup plan|status|run|resume` before dependency restore or build. For example:
 
@@ -286,8 +307,9 @@ Invalid explicit paths/bindings fail; they never silently fall back. The
 foundation selection does not change the runtime home or require applications
 to live beside that checkout.
 
-Once a project's exact pinned `@microsoft/sql-apps` package is restored, that
-package owns command dispatch and build provenance, even when a foundation
+Once a project's exact pinned `@microsoft/sql-apps` package is restored in its
+own `node_modules`, that package owns command dispatch and build provenance,
+even when the external archive executable is invoked or a foundation
 remains selected. A missing package permits read-only/bootstrap commands,
 not foundation-owned application builds or runtime execution. Bootstrap setup
 stops after restore; plan again through the installed package and explicitly

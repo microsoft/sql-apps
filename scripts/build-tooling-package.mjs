@@ -1,8 +1,9 @@
-import { lstat, mkdir, readdir, realpath, rm, copyFile, readFile, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readdir, realpath, rename, rm, copyFile, readFile, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { inspectSource } from './workspace-check.mjs';
 import { withFileLock } from '../src/file-lock.mjs';
+import { copyProjectSource } from './projects.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = join(root, 'dist', 'tooling-package');
@@ -80,6 +81,9 @@ async function stageToolingPackage(destination) {
   for (const asset of assets) {
     await copyEntry(join(canonicalRoot, asset), join(expected, 'assets', asset));
   }
+  await copyProjectSource(canonicalRoot, join(expected, 'assets', 'scaffold'));
+  await rename(join(expected, 'assets', 'scaffold', '.gitignore'),
+    join(expected, 'assets', 'scaffold', '.gitignore.template'));
   const app = join(expected, 'assets', 'src', 'web', 'app.ts');
   await writeFile(app, (await readFile(app, 'utf8')).replace("'../browser.js'", "'@microsoft/sql-apps/browser'"));
   console.log(`Tooling package staged at ${expected}`);

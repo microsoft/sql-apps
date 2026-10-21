@@ -11,29 +11,37 @@ foundation's plugins, examples, tests or runtime implementation source.
 
 ## Create and manage projects
 
-Follow [Get started](../guides/getting-started.md) to select the foundation,
+Follow [Get started](../guides/getting-started.md) to verify and select an archive CLI,
 review a creation plan and create your first application. Projects default to
 `%USERPROFILE%\SqlAppsProjects` on Windows and `~/SqlAppsProjects` elsewhere.
 Creation refuses to merge into an existing folder.
 
-Run project-management commands from the foundation checkout. To change the
+The archive contains its own allowlisted scaffold; no foundation checkout or
+existing app is needed for `projects` or `bind-archive`. The new path targets
+unreleased **0.2.5**, not the published 0.2.4 archive. To change the
 root for future projects, choose an absolute path before creating them:
 
 ```powershell
-npm run projects -- root "D:\SqlAppsProjects"
+node $cli projects root "D:\SqlAppsProjects"
 ```
 
 List registered projects or register and open an existing application:
 
 ```powershell
-npm run projects -- list
-npm run projects -- open "C:\path\to\project"
+node $cli projects list
+node $cli projects open "C:\path\to\project"
 ```
 
-Keep `SQL_APPS_FOUNDATION_HOME` on the foundation and use the command printed by
-creation or opening to point `SQL_APPS_HOME` at the selected app. Open that app
-in your editor and restart your assistant there; the foundation is a tool source,
-not the application repository.
+Here `$cli` is the absolute installed archive executable from the guide. Open
+the app and restart your optional assistant there after restore. The archive
+CLI requires `create-plan` followed by `create --approval <id>`; use
+`--no-browser` on both for headless creation. The owned loopback helper and
+readiness checks are retained.
+
+The foundation's existing `npm run projects -- ...` commands remain available.
+For that source-backed alternative, keep `SQL_APPS_FOUNDATION_HOME` on the
+foundation and set `SQL_APPS_HOME` to the app using creation's printed command.
+The foundation is a tool source, not the application repository.
 
 ## Project manifest
 
@@ -51,7 +59,7 @@ has this shape:
   "scaffoldVersion": 1,
   "tooling": {
     "package": "@microsoft/sql-apps",
-    "version": "0.2.4"
+    "version": "0.2.5"
   }
 }
 ```
@@ -96,12 +104,16 @@ project root and then dispatches the requested command from the installed
 tooling package. `SQL_APPS_PROJECT_HOME` is an internal dispatch boundary and
 must be an absolute path to the same validated project.
 
-Before the first restore, use the installed plugin launcher for `guide`,
-`setup plan` and the approved restore. Its explicit foundation selection
+Before the first restore, use the explicitly selected archive CLI from the app
+directory for `guide`, `setup plan` and the approved restore. It remains
+bootstrap-only even when its package name and version match the app pin.
+The installed plugin launcher is a source-backed alternative; its foundation selection
 (`SQL_APPS_FOUNDATION_HOME` or the Copilot installer binding) supplies
-only the bootstrap commands. Bootstrap setup stops after restore: re-run setup
+supplies only bootstrap commands. Bootstrap setup stops after restore: re-run setup
 through the installed pinned package and review any changed approval scopes.
-Build, runtime execution and subsequent provenance checks all use that package;
+Build, runtime execution and subsequent provenance checks all use the app-local
+package, even when invoked via the external archive executable. An ancestor's
+package is not a project restore;
 a missing or mismatched package is not permission to run foundation runtime code.
 Build output can contain compiled package runtime for distribution, not editable
 copies of its implementation.
@@ -122,12 +134,17 @@ in PowerShell). The archive must match the exact version in your project's
 manifest and package metadata. A local foundation build can produce the same
 format; see [runtime releases](../../CONTRIBUTING.md#releasing-the-runtime-package).
 
-From the foundation checkout, select **absolute** paths and review a read-only
+Using your selected archive CLI, select **absolute** paths and review a read-only
 binding plan:
 
 ```powershell
-npm run tooling:bind -- --project "C:\SqlAppsProjects\my-app" --archive "C:\Downloads\microsoft-sql-apps-0.2.4.tgz"
+node $cli bind-archive --project "C:\SqlAppsProjects\my-app" --archive "C:\Downloads\microsoft-sql-apps-0.2.5.tgz"
 ```
+
+For existing source-backed workflows, the foundation's
+`npm run tooling:bind -- --project ... --archive ...` wrapper is unchanged.
+The bootstrap CLI installation itself is separately approved and uses npm
+`--prefix` and `--ignore-scripts`; see [Get started](../guides/getting-started.md#2-select-the-cli-and-optional-assistant-guidance).
 
 Run the same command with `--approve <approval-id>` only after reviewing the
 reported version, archive SHA-256, destination and effects. Node and native `tar`
@@ -165,8 +182,9 @@ npm run tooling:check
 npm run tooling:pack
 ```
 
-The package contains compiled runtime commands and explicitly selected static
-assets. Packaging rejects links, environment files, examples, tests, plugins,
+The package contains compiled runtime commands, static assets and an allowlisted
+project scaffold. Packaging rejects links, environment files except the explicit
+scaffold `.env.example`, examples, tests, plugins,
 dependency trees and unexpected top-level paths. A generated project owns its
 Git history and `.sql-apps` state; it is not a worktree of the foundation.
 
@@ -176,9 +194,10 @@ created after a failure. The foundation exposes project creation through
 `npm run projects -- create "<name>"`; generated projects use this package-based
 contract and are independent of the foundation checkout.
 
-For the guided browser-first route, review
-`npm run projects -- create-plan "<name>"`, then approve
-`npm run projects -- create "<name>" --approval <id>`. The dependency-free helper
+For reviewed creation, run `node $cli projects create-plan "<name>"`, then
+`node $cli projects create "<name>" --approval <id>`. Add `--no-browser` to both
+commands when appropriate. The source-backed `npm run projects -- ...`
+equivalents remain supported. The dependency-free helper
 opens before application restore and keeps the public origin through app startup.
 See [progressive creation](progressive-creation.md) for separate setup approvals,
 version-2 topology, diagnostics and current-evidence Ready gates.

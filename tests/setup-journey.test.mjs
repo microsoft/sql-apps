@@ -495,7 +495,7 @@ test('approved restore and build re-plan readiness and skip already verified npm
   assert.equal(calls.flat(2).includes('ci'), false);
 });
 
-test('foundation bootstrap stops after restore so the installed tooling is reviewed before build', async t => {
+for (const verified of [true, false]) test(`bootstrap stops after ${verified ? 'verified' : 'partial'} restore before build`, async t => {
   const { home, deps, options } = await fixture(t);
   for (const name of ['package.json', 'package-lock.json', '.config/dotnet-tools.json', 'tsconfig.runtime.json', 'scripts/build-provenance.mjs']) {
     await mkdir(join(home, name, '..'), { recursive: true });
@@ -506,7 +506,7 @@ test('foundation bootstrap stops after restore so the installed tooling is revie
   const calls = [];
   const report = await setup.runSetup(home, options, {
     ...deps,
-    source: async () => ({ ready: true, bootstrap: !restored, fingerprint: 'fixture-build',
+    source: async () => ({ ready: true, bootstrap: !restored || !verified, fingerprint: 'fixture-build',
       build: { ready: false, code: 'BUILD_UNVERIFIED' } }),
     dependencies: async () => ({ ready: restored, npmReady: true, sqlToolsReady: restored }),
     consent: async (root, request) => ['restore', 'build'].includes(request.operation) ?
@@ -517,7 +517,7 @@ test('foundation bootstrap stops after restore so the installed tooling is revie
   assert.equal(calls.length, 1, 'bootstrap must not run a foundation build after installing the project package');
   assert.equal(report.next.id, 'build');
   assert.equal(report.next.status, 'blocked');
-  assert.equal(report.next.code, 'TOOLING_RESTORED');
+  assert.equal(report.next.code, verified ? 'TOOLING_RESTORED' : 'TOOLING_RESTORE_UNVERIFIED');
 });
 
 test('a timed-out dependency probe blocks restore instead of running npm ci under an existing grant', async t => {

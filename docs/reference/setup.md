@@ -1,12 +1,15 @@
 # Setup coordinator
 
 One project-owned journey connects **check -> review -> install -> restore ->
-build -> workspace -> launch -> verify**. No executable or additional desktop
-UI is required. Your assistant can drive it through the existing plugin; direct
+build -> workspace -> launch -> verify**. No additional desktop UI is required.
+The existing CLI works directly; your assistant can optionally drive it; direct
 commands work without an assistant.
 
-The coordinator requires Node 22 or 24 but no application build. The installed
-plugin can bootstrap an unrestored project through an explicit foundation selection
+The coordinator requires Node 22 or 24 but no application build. Before restore,
+run your [verified archive CLI](../guides/getting-started.md#2-select-the-cli-and-optional-assistant-guidance)
+by absolute path from the app directory: `node $cli setup plan --json`.
+An external matching-version archive package is still bootstrap-only. The
+installed plugin can alternatively bootstrap through an explicit foundation selection
 (`SQL_APPS_FOUNDATION_HOME` or the Copilot installer binding).
 If Node is missing, the assistant must first inspect the OS/CPU and obtain
 approval for an official compatible Node installer. A Node script cannot
@@ -32,15 +35,16 @@ npm run setup -- plan --json
 ```
 
 This npm command requires the pinned tooling package to be restored.
-Before restore, use the installed launcher's `setup plan --json`, using its absolute
-script path and explicitly selected runtime checkout. `--profile role-based-data`
+Before restore, use the selected archive CLI's `setup plan --json` from the app
+directory, or the foundation-backed installed launcher. `--profile role-based-data`
 is optional: it is the default and the only local profile.
 
 Only the foundation checkout contains `scripts/setup.mjs`. Generated projects
 use package-backed commands, not copied coordinator scripts. Bootstrap `setup run`
 stops after restoring dependencies. Re-enter `setup plan` through the installed
-pinned tooling, review its current approval id, then continue. Foundation and
-package implementation fingerprints differ, so bootstrap approval must not
+pinned tooling, review its current approval id, then continue. A partial restore
+reports `TOOLING_RESTORE_UNVERIFIED` and cannot continue. Changed tooling
+implementation fingerprints require renewed scopes, so bootstrap approval must not
 silently authorize the newly installed implementation. With tooling already
 installed, the normal single setup approval still covers unchanged local stages.
 

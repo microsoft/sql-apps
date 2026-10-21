@@ -17,7 +17,8 @@ async function regularFile(path) {
   return readFile(path);
 }
 
-async function inspectArchive(path) {
+export async function inspectToolingArchive(path) {
+  if (!isAbsolute(path)) throw new Error('Select an absolute tooling archive path.');
   const info = await lstat(path);
   if (!info.isFile() || info.isSymbolicLink() || info.size > 32 * 1024 * 1024) {
     throw new Error('Tooling archive must be an unlinked regular file no larger than 32 MiB.');
@@ -46,7 +47,7 @@ async function bindingContext(project, archive) {
   } catch (error) { if (error.code !== 'ENOENT') throw error; }
   const manifest = await readProjectManifest(home);
   const [packageBytes, lockBytes, inspected] = await Promise.all([
-    regularFile(join(home, 'package.json')), regularFile(join(home, 'package-lock.json')), inspectArchive(archive),
+    regularFile(join(home, 'package.json')), regularFile(join(home, 'package-lock.json')), inspectToolingArchive(archive),
   ]);
   const pkg = JSON.parse(packageBytes);
   const lock = JSON.parse(lockBytes);
@@ -139,8 +140,7 @@ export async function bindToolingArchive(project, archive, approval) {
   }, 5);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const args = process.argv.slice(2);
+export async function main(args = process.argv.slice(2)) {
   const options = {};
   let invalid = args.length !== 4 && args.length !== 6;
   for (let i = 0; i < args.length; i += 2) {
@@ -149,15 +149,16 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     else options[key] = args[i + 1];
   }
   if (invalid || !options.project || !options.archive) {
-    console.error('Usage: npm run tooling:bind -- --project <absolute-project> --archive <absolute-tgz> [--approve <plan-id>]');
-    process.exitCode = 1;
-  } else {
-    (options.approval ? bindToolingArchive(options.project, options.archive, options.approval) :
-      planToolingArchive(options.project, options.archive)).then(plan => {
-      console.log(JSON.stringify({ ...plan, applied: Boolean(options.approval) }, null, 2));
-    }).catch(error => {
-      console.error(`Archive binding failed: ${error.message}`);
-      process.exitCode = 1;
-    });
+    throw new Error('Usage: sql-apps bind-archive --project <absolute-project> --archive <absolute-tgz> [--approve <plan-id>] (or npm run tooling:bind -- ...)');
   }
+  const plan = await (options.approval ? bindToolingArchive(options.project, options.archive, options.approval) :
+    planToolingArchive(options.project, options.archive));
+  console.log(JSON.stringify({ ...plan, applied: Boolean(options.approval) }, null, 2));
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  main().catch(error => {
+    console.error(`Archive binding failed: ${error.message}`);
+    process.exitCode = 1;
+  });
 }

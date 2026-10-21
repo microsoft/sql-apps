@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { access, cp, mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile, realpath } from 'node:fs/promises';
+import { access, cp, mkdtemp, mkdir, readFile, readdir, rename, rm, symlink, writeFile, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -9,6 +9,7 @@ import { createServer } from 'node:http';
 import { createHash } from 'node:crypto';
 import { creationSession } from '../src/creation-session.mjs';
 import { stopCreationProcess } from '../scripts/creation.mjs';
+import { portState } from '../src/workspace.mjs';
 
 const projects = await import('../scripts/projects.mjs');
 const plugin = await import('../plugins/sql-apps/scripts/sql-apps.mjs');
@@ -24,9 +25,9 @@ function runNpm(args, cwd) {
       npm_config_fetch_retries: '0', npm_config_fetch_timeout: '10000' } });
 }
 
-async function sourceFixture(t) {
+async function sourceFixture(t, packaged = false) {
   const source = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-project-source-')));
-  t.after(() => rm(source, { recursive: true, force: true }));
+  t.after(() => rm(source, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
   for (const directory of ['.config', 'dab', 'docs/guides', 'docs/maintainers', 'docs/reference', 'functions/src', 'infra', 'public', 'scripts', 'sql', 'src']) {
     await mkdir(join(source, directory), { recursive: true });
   }
@@ -96,12 +97,131 @@ async function sourceFixture(t) {
   await writeFile(join(source, 'plugins', 'sql-apps', 'plugin.json'), '{}');
   await mkdir(join(source, 'examples', 'todo'), { recursive: true });
   await writeFile(join(source, 'examples', 'todo', 'README.md'), 'not project content');
+  if (packaged) {
+    const tools = join(source, 'tooling');
+    const scaffold = join(tools, 'assets', 'scaffold');
+    await projects.copyProjectSource(source, scaffold);
+    await rename(join(scaffold, '.gitignore'), join(scaffold, '.gitignore.template'));
+    await cp(join(source, 'packages', 'sql-apps', 'package.json'), join(tools, 'package.json'));
+    return tools;
+  }
   return source;
 }
 
 test('default project root is SqlAppsProjects under the user profile', () => {
   const userHome = join(tmpdir(), 'sql-apps-user');
   assert.equal(projects.defaultProjectsRoot(userHome), join(userHome, 'SqlAppsProjects'));
+});
+
+test('packaged project sources create independent apps from bundled scaffold inputs', async t => {
+  assert.equal(typeof projects.resolveProjectSource, 'function');
+  const source = await sourceFixture(t);
+  const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-packaged-source-')));
+  t.after(() => rm(userHome, { recursive: true, force: true }));
+  const tools = join(userHome, 'tools');
+  const scaffold = join(tools, 'assets', 'scaffold');
+  await mkdir(scaffold, { recursive: true });
+  await projects.copyProjectSource(source, scaffold);
+  await rename(join(scaffold, '.gitignore'), join(scaffold, '.gitignore.template'));
+  await cp(join(source, 'packages', 'sql-apps', 'package.json'), join(tools, 'package.json'));
+  const resolved = await projects.resolveProjectSource(tools);
+  assert.equal(resolved.root, tools);
+  assert.equal(resolved.scaffoldRoot, scaffold);
+  const created = await projects.createProject(tools, 'Packaged App', { userHome, initializeGit: false });
+  const pkg = JSON.parse(await readFile(join(created.path, 'package.json'), 'utf8'));
+  assert.equal(pkg.dependencies['@microsoft/sql-apps'], '1.2.3');
+  assert.equal(pkg.scripts.setup, 'sql-apps setup');
+  assert.equal(await readFile(join(created.path, '.gitignore'), 'utf8'), '.sql-apps/\n');
+  assert.doesNotMatch(created.next.selectProject, /SQL_APPS_FOUNDATION_HOME/);
+  assert.match(created.next.beforeRestore, /archive CLI/);
+  assert.equal(await readFile(join(created.path, 'docs', 'reference', 'read-performance.md'), 'utf8'), '# Read performance');
+  await assert.rejects(access(join(created.path, 'packages')), { code: 'ENOENT' });
+});
+
+test('creation approval changes when scaffold inputs change', async t => {
+  const source = await sourceFixture(t);
+  const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-scaffold-approval-')));
+  t.after(() => rm(userHome, { recursive: true, force: true }));
+  const options = { userHome, probe: async () => 'free' };
+  const before = await projects.planProjectCreation(source, 'Template change', options);
+  await writeFile(join(source, 'public', 'index.html'), '<h1>Changed template</h1>');
+  const after = await projects.planProjectCreation(source, 'Template change', options);
+  assert.notEqual(after.approval, before.approval);
+});
+
+for (const packaged of [false, true]) {
+  const kind = packaged ? 'a package' : 'a foundation';
+
+  test(`progressive creation copies the approved scaffold snapshot from ${kind}`, async t => {
+    const source = await sourceFixture(t, packaged);
+    const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-scaffold-snapshot-')));
+    t.after(() => rm(userHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
+    const scaffold = packaged ? join(source, 'assets', 'scaffold') : source;
+    const options = { userHome, browser: false, initializeGit: false };
+    const plan = await projects.planProjectCreation(source, 'Snapshot App', options);
+    let changed = false, created;
+    try {
+      created = await projects.createProject(source, 'Snapshot App', {
+        ...options, progressive: true, approval: plan.approval,
+        probe: async port => {
+          if (!changed) {
+            changed = true;
+            await Promise.all([
+              writeFile(join(scaffold, 'public', 'index.html'), '<h1>Unreviewed</h1>'),
+              writeFile(join(scaffold, 'public', 'unreviewed.html'), '<h1>New file</h1>'),
+              rm(join(scaffold, 'public', 'style.css')),
+            ]);
+          }
+          return portState(port);
+        },
+      });
+      assert.equal(await readFile(join(scaffold, 'public', 'index.html'), 'utf8'), '<h1>Unreviewed</h1>');
+      assert.equal(await readFile(join(created.path, 'public', 'index.html'), 'utf8'), '<h1>SQL Apps</h1>');
+      assert.equal(await readFile(join(created.path, 'public', 'style.css'), 'utf8'), '');
+      await assert.rejects(access(join(created.path, 'public', 'unreviewed.html')), { code: 'ENOENT' });
+    } finally {
+      if (created) await stopCreationProcess((await creationSession(created.path)).directory);
+    }
+  });
+
+  test(`progressive creation rejects mismatched tooling snapshots from ${kind}`, async t => {
+    const source = await sourceFixture(t, packaged);
+    const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-tooling-snapshot-')));
+    t.after(() => rm(userHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
+    const manifestPath = packaged ? join(source, 'package.json') : join(source, 'packages', 'sql-apps', 'package.json');
+    const approvedManifest = await readFile(manifestPath, 'utf8');
+    const options = { userHome, browser: false };
+    const plan = await projects.planProjectCreation(source, 'Pinned App', options);
+    await writeFile(manifestPath, JSON.stringify({ ...JSON.parse(approvedManifest), version: '1.2.2' }));
+    let created;
+    try {
+      await assert.rejects(projects.createProject(source, 'Pinned App', {
+        ...options, progressive: true, approval: plan.approval,
+        runner: async (command, args, executionOptions) => {
+          if (command === 'git' && args[0] === '--version') await writeFile(manifestPath, approvedManifest);
+          return execute(command, args, executionOptions);
+        },
+      }).then(project => { created = project; return project; }), /approve its current id/);
+      await assert.rejects(access(plan.home), { code: 'ENOENT' });
+      assert.deepEqual((await projects.readProjectsState({ userHome })).projects, []);
+    } finally {
+      if (created) await stopCreationProcess((await creationSession(created.path)).directory);
+    }
+  });
+}
+
+test('creation approval includes the browser-opening choice', async t => {
+  const source = await sourceFixture(t);
+  const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-browser-approval-')));
+  t.after(() => rm(userHome, { recursive: true, force: true }));
+  const options = { userHome, probe: async () => 'free' };
+  const browser = await projects.planProjectCreation(source, 'Headless app', options);
+  const headless = await projects.planProjectCreation(source, 'Headless app', { ...options, browser: false });
+  assert.notEqual(headless.approval, browser.approval);
+  assert.equal(headless.browser, false);
+  await assert.rejects(projects.createProject(source, 'Headless app', {
+    ...options, progressive: true, approval: browser.approval, browser: false, initializeGit: false,
+  }), /approve its current id/);
 });
 
 test('the plugin can guide an unrestored project through its explicit foundation bootstrap', async t => {
@@ -129,6 +249,19 @@ test('the plugin can guide an unrestored project through its explicit foundation
         SQL_APPS_PROJECT_HOME: undefined, SQL_APPS_TOOLING_HOME: undefined },
     }), error => /Restore the pinned project tooling/.test(error.stderr));
   }
+});
+
+test('an unrestored plugin project without a foundation gives archive CLI guidance without adopting another project', async t => {
+  const source = await sourceFixture(t);
+  const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-no-foundation-')));
+  t.after(() => rm(userHome, { recursive: true, force: true }));
+  const selected = await projects.createProject(source, 'Selected App', { userHome, initializeGit: false });
+  const unrelated = await projects.createProject(source, 'Other App', { userHome, initializeGit: false });
+  const environment = { SQL_APPS_HOME: selected.path, COPILOT_HOME: join(userHome, 'absent-profile') };
+  assert.equal(await plugin.resolveHome({ cwd: userHome, userHome, environment }), selected.path);
+  await assert.rejects(plugin.workspaceReport(selected.path, { cwd: userHome, userHome, environment }), /archive CLI/);
+  assert.equal((await projects.readProjectsState({ userHome })).activeProject, unrelated.path);
+  await assert.rejects(access(join(selected.path, 'node_modules')), { code: 'ENOENT' });
 });
 
 test('a copied plugin bootstraps the selected app without a Copilot binding or foundation cwd', async t => {
@@ -216,7 +349,7 @@ test('progressive creation uses the canonical path for a linked project root', a
   await mkdir(actualRoot);
   await symlink(actualRoot, linkedRoot, process.platform === 'win32' ? 'junction' : 'dir');
   await projects.setProjectsRoot(linkedRoot, { userHome });
-  const plan = await projects.planProjectCreation(source, 'Linked App', { userHome });
+  const plan = await projects.planProjectCreation(source, 'Linked App', { userHome, browser: false });
   const created = await projects.createProject(source, 'Linked App', {
     userHome, progressive: true, approval: plan.approval, browser: false, initializeGit: false,
   });
@@ -237,7 +370,7 @@ test('a workspace initialization failure removes the renamed project and owned s
     await rm(userHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   });
   await projects.setProjectsRoot(join(userHome, 'projects'), { userHome });
-  const plan = await projects.planProjectCreation(source, 'Rollback App', { userHome });
+  const plan = await projects.planProjectCreation(source, 'Rollback App', { userHome, browser: false });
   const result = await projects.createProject(source, 'Rollback App', {
     userHome, progressive: true, approval: plan.approval, browser: false, initializeGit: false,
     initializeWorkspace: async () => { throw new Error('workspace initialization failed'); },
@@ -372,9 +505,11 @@ test('archive binding is reviewed and portable, preserving the exact pin and byp
   await new Promise(done => server.listen(0, '127.0.0.1', done));
   t.after(() => new Promise(done => server.close(done)));
   const { verifyToolingFeed } = await import('../scripts/verify-tooling-feed.mjs');
-  const verified = await verifyToolingFeed(fixture.source, `http://127.0.0.1:${server.address().port}`, fixture.archive);
-  assert.equal(verified.archive, fixture.archive);
-  assert.equal(verified.cliOutput.trim(), 'archive tooling 1.2.3');
+  await assert.rejects(
+    verifyToolingFeed(fixture.source, `http://127.0.0.1:${server.address().port}`, fixture.archive),
+    /JSON|bootstrap|projects|scaffold/,
+    'an archive without its own bootstrap factory must not pass clone-free verification',
+  );
   await rm(fixture.archive);
   const result = await runNpm(['ci', '--ignore-scripts', '--no-audit', '--no-fund',
     '--cache', '.npm-cache', `--registry=http://127.0.0.1:${server.address().port}`], moved);
@@ -402,6 +537,20 @@ test('archive binding refuses a changed approval, package mismatch and dependenc
     const packed = JSON.parse((await runNpm(['pack', '--ignore-scripts', '--json'], fixture.directory)).stdout)[0];
     await assert.rejects(planToolingArchive(fixture.project, join(fixture.directory, packed.filename)), /match|dependencies/);
   }
+  await assert.rejects(access(join(fixture.project, 'tooling')), { code: 'ENOENT' });
+});
+
+test('archive binding rejects a missing or changed candidate without modifying project inputs', async t => {
+  const fixture = await archiveFixture(t);
+  const { planToolingArchive, bindToolingArchive } = await import('../scripts/bind-tooling-archive.mjs');
+  const original = await readFile(join(fixture.project, 'package-lock.json'), 'utf8');
+  const plan = await planToolingArchive(fixture.project, fixture.archive);
+  await writeFile(join(fixture.directory, 'changed.txt'), 'archive changed after review');
+  await runNpm(['pack', '--ignore-scripts', '--json'], fixture.directory);
+  await assert.rejects(bindToolingArchive(fixture.project, fixture.archive, plan.approval), /approval/);
+  await rm(fixture.archive);
+  await assert.rejects(planToolingArchive(fixture.project, fixture.archive), { code: 'ENOENT' });
+  assert.equal(await readFile(join(fixture.project, 'package-lock.json'), 'utf8'), original);
   await assert.rejects(access(join(fixture.project, 'tooling')), { code: 'ENOENT' });
 });
 

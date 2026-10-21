@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -148,7 +148,7 @@ before(async () => {
   await buildToolingPackage(staged);
 });
 
-after(() => rm(staged, { recursive: true, force: true }));
+after(() => rm(staged, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }));
 
 test('tooling context resolves source, package and ancestor project homes explicitly', async t => {
   const { project, tooling } = await projectFixture(t);
@@ -180,6 +180,56 @@ test('installed tooling mismatches and incomplete packages fail instead of falli
   }), /does not match the project pin/);
   await rm(manifestPath);
   await assert.rejects(context.installedTooling(project), { code: 'ENOENT' });
+});
+
+test('an external matching archive package remains bootstrap-only until the app pin is restored', async t => {
+  const { project, tooling } = await projectFixture(t);
+  const external = join(dirname(project), 'bootstrap');
+  await rename(tooling, external);
+  const { inspectSource } = await import('../scripts/workspace-check.mjs');
+  const source = await inspectSource(project, { toolingHome: external });
+  assert.equal(source.ready, true);
+  assert.equal(source.bootstrap, true);
+  const { planSetup } = await import('../scripts/setup.mjs');
+  const plan = await planSetup(project, { profile: 'role-based-data' }, {
+    source: () => inspectSource(project, { toolingHome: external }),
+    check: async () => ({ ready: true, checks: [] }),
+    dependencies: async () => ({ ready: false, npmReady: false, sqlToolsReady: true }),
+    consent: async (_, request) => ({ allowed: true, request }),
+    fetch: async () => { throw new Error('offline'); },
+    environment: { NODE_ENV: 'test', SQL_APPS_LOCAL_AUTH: 'preview' },
+  });
+  assert.equal(plan.bootstrap, true);
+  assert.equal(plan.stages.find(stage => stage.id === 'build').status, 'blocked');
+  for (const args of [['build'], ['local', 'status'], ['publish', '--help'], ['consent', 'run', 'build']]) {
+    const result = await run(process.execPath, [join(external, 'bin', 'sql-apps.mjs'), ...args], project);
+    assert.equal(result.code, 1);
+    assert.match(result.stderr, /Restore the pinned project tooling/);
+  }
+});
+
+test('external CLI dispatch executes the restored app implementation rather than a matching external version', async t => {
+  const { project, tooling } = await projectFixture(t);
+  const external = join(dirname(project), 'bootstrap');
+  await cp(tooling, external, { recursive: true });
+  await writeFile(join(external, 'dist', 'scripts', 'guide.mjs'), 'throw new Error("External implementation must not run");\n');
+  const result = await run(process.execPath, [join(external, 'bin', 'sql-apps.mjs'), 'guide', '--json'], project);
+  assert.equal(result.code, undefined, result.stderr);
+  assert.equal(JSON.parse(result.stdout).home, project);
+});
+
+test('an ancestor tooling package is not an app-local restore', async t => {
+  const { project, tooling } = await projectFixture(t);
+  const ancestor = join(dirname(project), 'node_modules', '@microsoft', 'sql-apps');
+  await mkdir(dirname(ancestor), { recursive: true });
+  await rename(tooling, ancestor);
+  const { installedTooling } = await import('../src/tooling-context.mjs');
+  assert.equal(await installedTooling(project), undefined);
+  const plugin = await import('../plugins/sql-apps/scripts/sql-apps.mjs');
+  await assert.rejects(plugin.workspaceReport(project, {
+    cwd: project, userHome: dirname(project),
+    environment: { SQL_APPS_HOME: project, COPILOT_HOME: join(project, 'absent-profile') },
+  }), /archive CLI/);
 });
 
 test('packaged project commands run from nested paths without using the foundation checkout', async t => {

@@ -34,14 +34,14 @@ export async function validatePackageTree(directory = staged) {
   const paths = [];
   async function visit(current) {
     for (const entry of (await readdir(current)).sort()) {
-      if (excluded.has(entry) || entry.startsWith('.env')) {
+      const packaged = relative(directory, join(current, entry)).replaceAll('\\', '/');
+      if (excluded.has(entry) || entry.startsWith('.env') && packaged !== 'assets/scaffold/.env.example') {
         throw new Error(`Excluded path in tooling package: ${join(current, entry)}`);
       }
       const path = join(current, entry);
       const info = await lstat(path);
       if (info.isSymbolicLink()) throw new Error(`Link in tooling package: ${path}`);
       if (!info.isDirectory() && !info.isFile()) throw new Error(`Non-regular package path: ${path}`);
-      const packaged = relative(directory, path).replaceAll('\\', '/');
       paths.push(packaged);
       if (info.isDirectory()) await visit(path);
     }

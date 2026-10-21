@@ -64,6 +64,72 @@ test('tooling ships endpoint helpers, the pinned host DAB manifest and SQL-only 
   assert.equal(manifest.tools['microsoft.dataapibuilder'].version, '2.0.12');
 });
 
+test('archive tooling contains a complete isolated project scaffold', async () => {
+  const scaffold = join(staged, 'assets', 'scaffold');
+  for (const file of [
+    'package.json', 'package-lock.json', 'tsconfig.json', '.env.example', '.gitignore.template', 'Dockerfile',
+    'application.json', 'role-based-data.example.json', 'personal-free-api.example.json',
+    'src/web/app.ts', 'public/index.html', 'sql/database.sqlproj', 'dab/dab-config.json',
+    'docs/reference/setup.md', '.config/dotnet-tools.json',
+  ]) assert.ok((await lstat(join(scaffold, file))).isFile(), file);
+  const files = await pathsBelow(scaffold);
+  assert.deepEqual(files.filter(path => path.startsWith('src/')), ['src/web', 'src/web/app.ts']);
+  assert.equal(files.some(path => /(^|\/)(node_modules|plugins|examples|tests|\.sql-apps|\.git)(\/|$)/.test(path)), false);
+});
+
+test('archive CLI creates and binds a reviewed headless project outside any checkout', async t => {
+  const home = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-cli bootstrap ')));
+  const bin = join(staged, 'bin', 'sql-apps.mjs');
+  const env = { ...process.env, HOME: home, USERPROFILE: home,
+    SQL_APPS_HOME: undefined, SQL_APPS_FOUNDATION_HOME: undefined,
+    SQL_APPS_PROJECT_HOME: undefined, SQL_APPS_TOOLING_HOME: undefined,
+    COPILOT_HOME: join(home, 'unused-profile') };
+  const invoke = (...args) => runNode([bin, ...args], { cwd: home, env });
+  let created;
+  t.after(async () => {
+    if (created) {
+      const { creationSession } = await import('../src/creation-session.mjs');
+      const { stopCreationProcess } = await import('../scripts/creation.mjs');
+      await stopCreationProcess((await creationSession(created.path)).directory);
+    }
+    await rm(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  });
+  assert.match((await invoke('--help')).stdout, /projects/);
+  assert.match((await invoke('--help')).stdout, /bind-archive/);
+  const projectRoot = join(home, 'my projects');
+  assert.equal((await invoke('projects', 'root', projectRoot)).stdout.trim(), projectRoot);
+  const plan = JSON.parse((await invoke('projects', 'create-plan', 'CLI App', '--no-browser')).stdout);
+  assert.equal(plan.browser, false);
+  for (const args of [
+    ['create', 'CLI App'],
+    ['create', 'CLI App', '--approval', '000000000000', '--no-browser'],
+    ['create-plan', 'CLI App', '--no-browser', '--no-browser'],
+    ['create-plan', 'CLI App', '--unknown'],
+  ]) await assert.rejects(invoke('projects', ...args), /approval|Usage/);
+  created = JSON.parse((await invoke('projects', 'create', 'CLI App', '--no-browser', '--approval', plan.approval)).stdout);
+  assert.equal(created.path, plan.home);
+  assert.equal((await fetch(`${created.launchUrl}/__sql_apps/identity`)).status, 200);
+  assert.match(await readFile(join(created.path, '.gitignore'), 'utf8'), /\.sql-apps/);
+  assert.equal(JSON.parse((await invoke('projects', 'list')).stdout).activeProject, created.path);
+  assert.equal(JSON.parse((await invoke('projects', 'open', created.path)).stdout).path, created.path);
+  const existingPlan = JSON.parse((await invoke('projects', 'create-plan', 'CLI App', '--no-browser')).stdout);
+  await assert.rejects(invoke('projects', 'create', 'CLI App', '--no-browser', '--approval', existingPlan.approval), /already exists/);
+
+  const packed = JSON.parse((await runNpm(['pack', '--ignore-scripts', '--json'], {
+    cwd: staged, env: { ...process.env, npm_config_pack_destination: home },
+  })).stdout)[0];
+  assert.ok(packed.files.some(file => file.path === 'assets/scaffold/.gitignore.template'));
+  const archive = join(home, packed.filename);
+  const bindingArgs = ['bind-archive', '--project', created.path, '--archive', archive];
+  const binding = JSON.parse((await invoke(...bindingArgs)).stdout);
+  const lock = await readFile(join(created.path, 'package-lock.json'), 'utf8');
+  await assert.rejects(invoke(...bindingArgs, '--approve', '000000000000'), /approval/);
+  await assert.rejects(invoke(...bindingArgs, '--archive', archive), /Usage/);
+  assert.equal(await readFile(join(created.path, 'package-lock.json'), 'utf8'), lock);
+  assert.equal(JSON.parse((await invoke(...bindingArgs, '--approve', binding.approval)).stdout).applied, true);
+  await assert.rejects(invoke('build'), /project/i);
+});
+
 test('tooling:pack uses a POSIX-portable package path', async () => {
   const pkg = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
   assert.equal(
@@ -93,7 +159,7 @@ test('stages publishable package metadata with synchronized exact runtime depend
 
   for (const candidate of [source, pkg]) {
     assert.equal(candidate.name, '@microsoft/sql-apps');
-    assert.equal(candidate.version, '0.2.4');
+    assert.equal(candidate.version, '0.2.5');
     assert.equal(candidate.type, 'module');
     assert.deepEqual(candidate.bin, { 'sql-apps': 'bin/sql-apps.mjs' });
     assert.equal(Object.hasOwn(candidate, 'private'), false);
@@ -120,7 +186,7 @@ test('stages publishable package metadata with synchronized exact runtime depend
 test('staged tree contains only package files and immutable runtime assets', async () => {
   const paths = await pathsBelow(staged);
   const excluded = /(^|\/)(?:\.git|\.sql-apps|examples|tests|node_modules|plugins)(?:\/|$)|(^|\/)\.env[^/]*$/;
-  assert.equal(paths.some(path => excluded.test(path)), false, paths.join('\n'));
+  assert.equal(paths.some(path => excluded.test(path) && path !== 'assets/scaffold/.env.example'), false, paths.join('\n'));
   assert.equal(paths.some(path => path.startsWith('src/') || path.startsWith('scripts/')), false);
   assert(paths.includes('LICENSE'));
   assert(paths.includes('bin/sql-apps.mjs'));
@@ -173,6 +239,8 @@ test('bin help is project-independent and its validated command map targets pack
 
     const module = await import(`${pathToFileURL(bin).href}?test=${Date.now()}`);
     assert.deepEqual(module.COMMANDS, {
+      projects: 'dist/scripts/projects.mjs',
+      'bind-archive': 'dist/scripts/bind-tooling-archive.mjs',
       build: 'dist/scripts/build-provenance.mjs',
       setup: 'dist/scripts/setup.mjs',
       creation: 'dist/scripts/creation.mjs',
@@ -225,6 +293,10 @@ test('bin dispatches from the project root when invoked in a nested directory', 
       join(staged, 'dist', 'src', 'project-contract.mjs'),
       join(packageRoot, 'dist', 'src', 'project-contract.mjs'),
     ),
+    copyFile(
+      join(staged, 'dist', 'src', 'tooling-context.mjs'),
+      join(packageRoot, 'dist', 'src', 'tooling-context.mjs'),
+    ),
     writeFile(
       join(packageRoot, 'dist', 'scripts', 'setup.mjs'),
       'console.log(JSON.stringify({ cwd: process.cwd(), home: process.env.SQL_APPS_PROJECT_HOME }));\n',
@@ -237,7 +309,7 @@ test('bin dispatches from the project root when invoked in a nested directory', 
       starter: 'data',
       profile: 'role-based-data',
       scaffoldVersion: 1,
-      tooling: { package: '@microsoft/sql-apps', version: '0.2.4' },
+      tooling: { package: '@microsoft/sql-apps', version: '0.2.5' },
     })}\n`),
   ]);
 

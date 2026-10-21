@@ -1,6 +1,6 @@
 # Get started
 
-Prepare your computer, select the SQL Apps foundation and create your own
+Prepare your computer, select the SQL Apps CLI and create your own
 application project. Container and Express routes do not need an Azure
 subscription or Azure CLI login; choosing Azure SQL directly does.
 
@@ -17,7 +17,7 @@ by all routes; check the additional requirements for your chosen database.
 | .NET SDK 8 or later | Build and publish the SQL schema. Choose SDK, not just Runtime. |
 | Docker with Linux containers | Preferred container route only; endpoint fallbacks use host DAB without Docker. |
 | Azure SQL Database container private-preview access | Preferred first-use route, unless cached. If unavailable, offer Azure SQL directly, then SQL Server 2025 Express on Windows x64. |
-| Access to the pinned SQL Apps package | Use the matching release archive, or a configured npm feed that serves `@microsoft/sql-apps@0.2.4`. |
+| Access to the pinned SQL Apps package | Use a verified matching release archive. A configured npm feed serving the exact pin remains an alternative for app restore. |
 
 **Check package access before attempting application restore.** Installing the
 assistant plugin does not make the runtime package available. If your configured
@@ -59,7 +59,42 @@ For Ubuntu or Debian, follow the official instructions for that exact distributi
 
 If Docker reports socket permission denied, follow its [post-install guidance](https://docs.docker.com/engine/install/linux-postinstall/). Docker group membership grants powerful host access. Do not make the socket world-writable or run the entire app as root to hide the problem.
 
-## 2. Select the foundation and assistant guidance
+## 2. Select the CLI and optional assistant guidance
+
+The clone-free commands below target **unreleased 0.2.5**. The published 0.2.4
+archive predates this bootstrap factory. Until a new archive is released, use
+the foundation alternative below, or a locally built candidate following
+[runtime release checks](../../CONTRIBUTING.md#releasing-the-runtime-package).
+
+Download the exact `microsoft-sql-apps-<version>.tgz` and `SHA256SUMS` from the
+same [GitHub release](https://github.com/microsoft/sql-apps/releases). Select
+absolute paths. In PowerShell:
+
+```powershell
+$archive = "C:\Downloads\microsoft-sql-apps-0.2.5.tgz"
+Get-FileHash $archive -Algorithm SHA256
+Get-Content "C:\Downloads\SHA256SUMS"
+```
+
+Compare the hash with the checksum for that exact filename. **Stop if it is
+missing or different.** After verifying the archive, review and explicitly
+approve installing bootstrap tooling and its dependencies in a chosen,
+dedicated directory:
+
+```powershell
+$tools = "C:\SqlAppsTools\0.2.5"
+npm install --prefix $tools --no-save --package-lock=false --ignore-scripts $archive
+$cli = Join-Path $tools "node_modules\@microsoft\sql-apps\bin\sql-apps.mjs"
+node $cli --help
+```
+
+This does not install globally, edit PATH, bind an assistant profile, install
+the app or authorize SQL/cloud work. Lifecycle scripts are disabled for this
+bootstrap installation; other dependencies still come from your configured
+npm feed. Node, npm, Git and native `tar` must be available; .NET and database
+prerequisites can be reviewed later. On other platforms use the same CLI
+arguments with absolute paths appropriate to your shell. Windows Node 22 was
+exercised locally; the changed archive flow still needs Linux/Node 24 CI evidence.
 
 Install the optional [SQL Apps plugin](../reference/plugins.md) for
 Claude Code or GitHub Copilot using that assistant's installation instructions.
@@ -67,7 +102,14 @@ The reference covers support on other assistants, loader verification and
 cloud companion plugins. The plugin supplies skills and a launcher, not the
 application runtime or foundation checkout.
 
-Clone the foundation, or use an existing trusted checkout. If it was shared with
+The assistant can run the explicitly selected archive CLI before restore.
+After restore, restart it in the app directory so normal project detection uses
+the app-local pinned package. No new bootstrap variable or binding is needed.
+
+### Foundation alternative for contributors and older archives
+
+To use the existing source-backed workflow, clone the foundation or use an
+existing trusted checkout. If it was shared with
 you, confirm which branch to use. In PowerShell on Windows:
 
 ```powershell
@@ -98,11 +140,11 @@ Data API builder and npm packages, have their own licenses and telemetry.
 
 ## 3. Create an independent project
 
-From the foundation folder:
+Using the selected archive CLI, from any directory:
 
 ```powershell
-npm run projects -- create-plan "Equipment Checkout"
-npm run projects -- create "Equipment Checkout" --approval <printed-id>
+node $cli projects create-plan "Equipment Checkout" --no-browser
+node $cli projects create "Equipment Checkout" --no-browser --approval <printed-id>
 ```
 
 Replace the example name with your idea. The first command prints the destination,
@@ -116,13 +158,16 @@ initializes an independent Git repository and records the project as active.
 See [Manage projects](../reference/projects.md#create-and-manage-projects) for
 custom roots, listing projects and opening an existing project.
 
-The browser opens on a creation page before app restore; the same origin becomes
+`--no-browser` keeps the owned, readiness-checked loopback helper but does not
+open a browser. Omit it from **both** commands to open the creation page before
+app restore; changing that choice requires a fresh approval. The same origin becomes
 your application as capabilities are verified. See
 [progressive creation](../reference/progressive-creation.md).
 
-Run the printed command that points `SQL_APPS_HOME` at the new project, keep
-`SQL_APPS_FOUNDATION_HOME` on the foundation and open the generated folder in
-your editor. Launch a fresh assistant session there (`claude` or `copilot` for
+Open the generated folder in your editor. For the foundation alternative,
+replace `node $cli projects` with `npm run projects --` from the foundation
+folder, then use its printed project selection while retaining the foundation
+selection. Launch a fresh assistant session there (`claude` or `copilot` for
 those CLIs), giving it access to the app project. The generated folder contains
 `package.json`, `src` and `sql`, but no foundation `scripts`. Implement your
 application here, not in the foundation/plugin checkout.
@@ -130,19 +175,27 @@ application here, not in the foundation/plugin checkout.
 ## 4. Plan setup and restore tooling
 
 Before the first restore, the project's npm commands are not yet available.
-Use the selected foundation's dependency-free launcher with the app selection
-above. In PowerShell:
+Review binding the same verified archive to the generated project, then run the
+binding command with `--approve <printed-id>` only after approving its effects:
 
 ```powershell
-node "$env:SQL_APPS_FOUNDATION_HOME\plugins\sql-apps\scripts\sql-apps.mjs" setup plan --json
+$project = "C:\Users\you\SqlAppsProjects\equipment-checkout"
+node $cli bind-archive --project $project --archive $archive
+node $cli bind-archive --project $project --archive $archive --approve <printed-id>
+Set-Location $project
+node $cli setup plan --json
 ```
 
-This also works without an assistant or an installed plugin. With the plugin,
-you can ask your assistant to run the same plan. It identifies missing
+Retain the copied `tooling` archive and changed lockfile in the app repository.
+Binding does not grant restore, build, services, SQL terms or cloud permission.
+This works without an assistant or installed plugin. It identifies missing
 prerequisites and required approval scopes without installing anything. See the
 [setup coordinator](../reference/setup.md) for approval and continuation commands
 and [runtime binding](../reference/plugins.md#runtime-binding-and-direct-checks)
-for launcher details.
+for launcher details. For the foundation alternative, run
+`node "$env:SQL_APPS_FOUNDATION_HOME\plugins\sql-apps\scripts\sql-apps.mjs" setup plan --json`
+with `SQL_APPS_HOME` selecting the app; archive binding remains available through
+the foundation's `npm run tooling:bind -- ...` wrapper.
 
 Review the plan and approve only the intended operations. Bootstrap setup stops
 after restoring dependencies: re-plan through the app's installed pinned
@@ -159,8 +212,8 @@ npm run setup:check
 ```
 
 This requires restored tooling, not an application build. Before restore, use
-the installed plugin launcher's `setup plan --json` through its explicit
-foundation selection; see [setup](../reference/setup.md). The checks do not install
+`node $cli setup plan --json` from the app directory, or the foundation-backed
+plugin launcher; see [setup](../reference/setup.md). The checks do not install
 tools, accept licenses, change databases or start services. Read each **Next**
 instruction and rerun after resolving missing requirements.
 

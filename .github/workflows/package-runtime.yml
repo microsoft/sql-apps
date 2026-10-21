@@ -42,7 +42,7 @@ jobs:
         run: |
           mkdir -p dist/runtime-release
           npm pack ./dist/tooling-package --ignore-scripts --pack-destination ./dist/runtime-release --json > dist/runtime-release/pack.json
-      - name: Verify independent archive restore with an empty cache
+      - name: Verify archive-only creation, handoff and independent restore with empty caches
         run: npm run tooling:verify-archive -- "$PWD/dist/runtime-release/microsoft-sql-apps-${RELEASE_VERSION}.tgz"
       - name: Calculate release checksum
         working-directory: dist/runtime-release

@@ -83,7 +83,7 @@ async function buildFoundation(home) {
   await mkdir(join(home, 'dist', 'scripts'), { recursive: true });
   for (const script of [
     'build-provenance.mjs', 'setup.mjs', 'setup-check.mjs', 'guide.mjs', 'workspace-check.mjs',
-    'local-consent.mjs', 'check-application.mjs', 'check-application-api.mjs', 'projects.mjs',
+    'local-consent.mjs', 'check-application.mjs', 'check-application-api.mjs', 'projects.mjs', 'bind-tooling-archive.mjs',
     'creation.mjs',
   ]) {
     await copyFile(join(home, 'scripts', script), join(home, 'dist', 'scripts', script));
