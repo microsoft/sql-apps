@@ -40,7 +40,12 @@ tagging merges these values without removing unrelated existing tags.
 `personal-free-api.json` is an allowlist, not an automatic schema explorer. Declare each HTTP route, stored procedure, and exact parameter type. The supported types are `nvarchar`, `uniqueidentifier`, `bit`, `int`, and `datetime2`.
 Requests must provide exactly those parameters. JSON strings map to `nvarchar`,
 JSON booleans to `bit`, 32-bit whole numbers to `int`, UUID strings to
-`uniqueidentifier`, and parseable date-time strings to `datetime2`. Invalid
+`uniqueidentifier`, and valid ISO 8601 date strings (`YYYY-MM-DD`) or date-time
+strings to `datetime2`. Date-times may use `Z`, an explicit offset, or no offset;
+without an offset, a date-time uses the server's time zone. Calendar dates must
+exist, and the resulting UTC date must be within SQL's years 0001-9999.
+Locale-specific date formats and impossible dates such as February 30 are
+rejected rather than normalized. Invalid
 JSON or parameters return HTTP 400; internal SQL errors are logged without
 being returned to callers.
 
@@ -112,6 +117,13 @@ It does not rebuild or read changed application SQL, API declarations or
 infrastructure source. Run `plan` again after edits; do not edit approved output.
 Missing, incomplete or modified artifacts are rejected before Azure writes.
 
+Deployment also retains the verified artifact under
+`.sql-apps/deployments/<name>-<environment>-<approval>-artifact/` before changing
+Azure resources. Planning another release replaces only the `-plan` directory,
+not this retained artifact. Keep the artifact for the current or interrupted
+deployment alongside its protected state; rotation verifies its integrity and
+uses its approved infrastructure and procedure allowlist.
+
 ```powershell
 npm run publish -- deploy --approve <approval-code>
 ```
@@ -124,8 +136,17 @@ The final check requires a JSON response with `status: ready`, not an HTML page
 or merely HTTP 200. The state file records completed stages so a failed
 deployment can be run again with the same approved build.
 
-Deployments planned by older tooling must run `plan` and then `deploy` once to
-establish these approved snapshots before using secret rotation.
+Publishing and rotation share a per-application/environment lock in the project.
+A competing command fails with `Operation is locked` before changing credentials
+or contacting Azure. Wait for the active command to finish and retry; do not
+delete an active lock. The lock is released on success or failure, and a later
+command can recover a lock left by a process that has exited.
+
+For deployments without a retained artifact, rotation can retain the existing
+plan only if it still matches the current deployment approval and config.
+If that older plan is missing or has been replaced, restore the exact approved
+artifact or review and deploy a new plan before rotating; the publisher does
+not substitute an undeployed release.
 
 Check status without printing secrets:
 
@@ -154,6 +175,11 @@ Rotate the runtime SQL secret using the current deployment approval code:
 npm run publish -- rotate-secret --approve <approval-code>
 ```
 
+Use the deployed release's approval code even after planning a newer release.
+The newer plan's code cannot authorize rotation of the current deployment.
+Rotation does not rebuild, replace the pending plan, or require it to exist
+once the deployed artifact has been retained.
+
 Rotation saves the pending password and an in-progress stage before changing
 SQL. If interrupted, rerun the same command: it reuses that saved password,
 updates application settings and verifies readiness before recording `ready`.
@@ -162,7 +188,19 @@ Do not delete protected state as a recovery step.
 Deployment state uses Windows current-user encryption (DPAPI) on Windows and
 owner-only file permissions on Unix. Valid older plaintext receipts are
 explicitly logged and rewritten with host protection on first read, without
-changing their credentials. Temporary plaintext infrastructure parameters live
+changing their credentials.
+
+Each application-name/environment receipt is bound to its Azure subscription
+and resource group. Deployment, rotation, status and invitations reject a
+different target before contacting Azure or changing the saved credentials.
+Use a distinct application name or environment for a separate target; changing
+the config does not move an existing deployment. Older receipts gain the binding
+only when their stored approval matches the verified deployment artifact and
+config, or after read-only Azure checks verify their saved resources in the
+configured subscription and resource group. Verification failures preserve
+the existing credentials and are not treated as a new deployment.
+
+Temporary plaintext infrastructure parameters live
 in a private directory restricted to the current Windows user (or Unix mode
 `0700`), and are removed after use.
 

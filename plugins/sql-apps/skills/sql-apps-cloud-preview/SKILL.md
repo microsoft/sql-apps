@@ -31,8 +31,8 @@ consequential ambiguity/consent, never infrastructure flags. Preserve deployment
 
 Verify App Service Free (`F1`) runtime, OS, region, quotas and auth. Disclose
 development/testing limits, quota stops and no SLA; never silently upgrade.
-If unsuitable/declined, assess ACA. DAB stays on ACA; do not remove it or split
-services merely for priority.
+If unsuitable/declined, assess ACA. DAB stays on ACA; never remove it or split
+services for priority.
 
 Container Apps Consumption pairs frontend/gateway with localhost-only DAB and
 SQL managed identity: a candidate, not a bundled profile. Preserve required
@@ -45,7 +45,7 @@ ACA costs $0; assess compatible App Service Free, local use or a qualifying fall
 Preferences are not spending consent. Guaranteed $0/continuous availability or
 policy can block cloud.
 
-Review all resources before writes; obtain separate
+Review resources before writes; obtain separate
 explicit approval for provisioning/cost risk, identity/firewall changes,
 publication and optional interruption. Re-plan changed inputs/paid additions;
 obtain fresh acceptance.
@@ -83,7 +83,8 @@ provider plus immutable user ID, never email. The guard excludes other resources
 ## Evidence
 
 Run regressions for foundation publisher changes. Use `sql-apps-validation`'s
-four-verdict report; disclose unverified implementation/canaries. Report live
-validation and cost safeguards: configured, exercised, partial or blocked.
+four-verdict report; disclose unverified implementation or live canary checks.
+Report live Azure validation and cost safeguards: configured, exercised,
+partial or blocked.
 Estimates/settings/builds/loaders never prove guaranteed free, private networking
 or live certification.

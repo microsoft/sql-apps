@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { access, readFile, readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { access, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 
 const names = [
   'sql-apps-application', 'sql-apps-cloud-preview', 'sql-apps-design',
@@ -122,3 +124,51 @@ for (const [name, host, change, message] of [
     for (const call of fixture.calls) await assert.rejects(access(call.options.cwd), { code: 'ENOENT' });
   });
 }
+
+test('checkout installer supports an explicit JavaScript CLI without executing an npm shell shim', async t => {
+  const home = await mkdtemp(join(tmpdir(), 'sql apps installer '));
+  t.after(() => rm(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
+  const entrypoint = join(home, 'copilot-cli.mjs');
+  const calls = join(home, 'calls.jsonl');
+  const skills = names.map(name => ({
+    name, source: 'plugin', enabled: true, path: resolve('plugins', 'sql-apps', 'skills', name),
+  }));
+  await writeFile(entrypoint, `
+import { appendFileSync } from 'node:fs';
+const args = process.argv.slice(2);
+appendFileSync(${JSON.stringify(calls)}, JSON.stringify(args) + '\\n');
+if (args.join(' ') === 'plugin marketplace list --json') console.log(JSON.stringify([
+  { name: 'sql-apps-skills', source: ${JSON.stringify(`Local: ${process.cwd()}`)} }
+]));
+else if (args.join(' ') === 'plugin list --json') console.log(JSON.stringify([
+  { name: 'sql-apps', marketplace: 'sql-apps-skills', enabled: true }
+]));
+else if (args.join(' ') === 'skill list --json') console.log(JSON.stringify(${JSON.stringify(skills)}));
+else if (args.join(' ') !== 'plugin enable sql-apps@sql-apps-skills') throw new Error('Unexpected installer command');
+`);
+  const result = spawnSync(process.execPath, ['scripts/install-plugin.mjs', entrypoint], {
+    cwd: process.cwd(), encoding: 'utf8', timeout: 30000, shell: false,
+    env: { ...process.env, HOME: home, USERPROFILE: home, COPILOT_HOME: home },
+  });
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /All 7 skills are discovered and enabled/);
+  assert.deepEqual((await readFile(calls, 'utf8')).trim().split('\n').map(JSON.parse), [
+    ['plugin', 'marketplace', 'list', '--json'],
+    ['plugin', 'list', '--json'],
+    ['plugin', 'enable', 'sql-apps@sql-apps-skills'],
+    ['plugin', 'list', '--json'],
+    ['skill', 'list', '--json'],
+  ]);
+});
+
+test('checkout installer rejects shell shims and relative CLI paths before registration', () => {
+  for (const entrypoint of [resolve('copilot.cmd'), resolve('copilot.ps1'), 'copilot.js']) {
+    const result = spawnSync(process.execPath, ['scripts/install-plugin.mjs', entrypoint], {
+      encoding: 'utf8', timeout: 10000, shell: false,
+    });
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /absolute native or Node CLI entrypoint, not an npm shell shim/);
+  }
+});

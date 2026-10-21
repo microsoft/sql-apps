@@ -197,8 +197,11 @@ export const createApplication = (options, fetcher) => createDemoApplication(app
         for (const name of ['index.html', 'app.css', 'app.js']) {
           await copyFile(join(temporary, 'public', name), join(temporary, 'static', name));
         }
-        await copyFile(join(home, 'public', 'staticwebapp.config.json'),
-          join(temporary, 'static', 'staticwebapp.config.json'));
+        const policy = z.record(z.string(), z.unknown()).parse(
+          JSON.parse((await checkedFile(home, join('public', 'staticwebapp.config.json'))).toString('utf8')));
+        await saveJson(join(temporary, 'static', 'staticwebapp.config.json'), {
+          ...policy, routes: [{ route: '/api/*', allowedRoles: ['anonymous'] }],
+        });
       }
       const pkg = z.object({ scripts: z.record(z.string(), z.string()).optional() }).passthrough()
         .parse(JSON.parse(await readFile(join(home, 'package.json'), 'utf8')));

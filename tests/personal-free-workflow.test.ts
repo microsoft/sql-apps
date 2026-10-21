@@ -146,6 +146,52 @@ test('deployment publishes the approved SQL, infrastructure and API snapshots, n
   assert.equal(f.calls.some(call => call.command === 'dotnet' && call.args[0] === 'build'), false);
 });
 
+test('deployment refuses to reuse saved credentials for another Azure target', async t => {
+  const f = await fixture(t);
+  await deployment.deployPersonalFree(config, f.approval, f.run);
+  const before = await readFile(f.statePath, 'utf8');
+  const manifest = JSON.parse(await readFile(join(f.artifact, 'personal-free-build.json'), 'utf8'));
+  for (const target of [
+    { ...config, resourceGroup: 'another-resource-group' },
+    { ...config, subscriptionId: '44444444-4444-4444-8444-444444444444' },
+  ]) {
+    const approval = deployment.planPersonalFreeDeployment(target, manifest.sourceHash).approval;
+    f.calls.length = 0;
+    await assert.rejects(deployment.deployPersonalFree(target, approval, f.run), /another Azure target/);
+    await assert.rejects(deployment.rotatePersonalFreeRuntimeSecret(target, approval, f.run), /another Azure target/);
+    assert.deepEqual(f.calls, [], 'A target mismatch must fail before any Azure operation');
+    assert.equal(await readFile(f.statePath, 'utf8'), before, 'Keep the original deployment receipt and credentials');
+  }
+});
+
+test('first deployment saves its Azure target before infrastructure changes', async t => {
+  const f = await fixture(t);
+  await rm(f.statePath);
+  f.hooks.infrastructure = async () => {
+    const state = await deployment.readProtectedDeploymentState(f.statePath);
+    assert.deepEqual(state.target, {
+      subscriptionId: '11111111-1111-4111-8111-111111111111', resourceGroup: 'rg-tracker',
+    });
+  };
+  const state = await deployment.deployPersonalFree(config, f.approval, f.run);
+  assert.equal(state.stage, 'ready');
+  assert.deepEqual(state.target, {
+    subscriptionId: '11111111-1111-4111-8111-111111111111', resourceGroup: 'rg-tracker',
+  });
+});
+
+test('deployment preserves legacy credentials when target verification cannot run', async t => {
+  const f = await fixture(t);
+  const before = await readFile(f.statePath, 'utf8');
+  const target = { ...config, sharing: 'team' as const };
+  const manifest = JSON.parse(await readFile(join(f.artifact, 'personal-free-build.json'), 'utf8'));
+  const approval = deployment.planPersonalFreeDeployment(target, manifest.sourceHash).approval;
+  await assert.rejects(deployment.deployPersonalFree(target, approval, async () => {
+    throw Object.assign(new Error('spawn az ENOENT'), { code: 'ENOENT' });
+  }), /spawn az ENOENT/);
+  assert.equal(await readFile(f.statePath, 'utf8'), before);
+});
+
 test('deployment rejects changed approved artifacts before any Azure write', async t => {
   for (const path of ['static/app.js', 'deployment/database.dacpac', 'deployment/template.json', 'deployment/api.json']) {
     await t.test(path, async nested => {
@@ -257,4 +303,92 @@ test('rotation cannot mark an application ready when the final readiness check f
   await assert.rejects(deployment.rotatePersonalFreeRuntimeSecret(config, f.approval, f.run), /readiness/i);
   assert.notEqual((await deployment.readProtectedDeploymentState(f.statePath)).stage, 'ready');
   assert.equal(f.rules.size, 0);
+});
+
+test('publishing and rotation reject overlapping operations without changing the pending deployment', async t => {
+  const operations = {
+    deploy: deployment.deployPersonalFree,
+    rotate: deployment.rotatePersonalFreeRuntimeSecret,
+  };
+  for (const [firstName, firstOperation] of Object.entries(operations)) {
+    for (const [secondName, secondOperation] of Object.entries(operations)) {
+      await t.test(`${firstName} then ${secondName}`, async nested => {
+        const f = await fixture(nested);
+        let enter!: () => void;
+        let release!: () => void;
+        const entered = new Promise<void>(resolve => { enter = resolve; });
+        const released = new Promise<void>(resolve => { release = resolve; });
+        let blocked = false;
+        nested.mock.method(globalThis, 'fetch', async () => {
+          if (!blocked) {
+            blocked = true;
+            enter();
+            await released;
+          }
+          return Response.json({ status: 'ready' });
+        });
+        const first = firstOperation(config, f.approval, f.run);
+        try {
+          await Promise.race([entered, first.then(() => assert.fail('The first operation never reached readiness'))]);
+          const before = await readFile(f.statePath, 'utf8');
+          const calls = f.calls.length;
+          await assert.rejects(secondOperation(config, f.approval, f.run), /Operation is locked/);
+          assert.equal(await readFile(f.statePath, 'utf8'), before);
+          assert.equal(f.calls.length, calls, 'The competing operation must not contact Azure or SQL');
+        } finally {
+          release();
+          await first;
+        }
+        assert.equal((await secondOperation(config, f.approval, f.run)).stage, 'ready');
+      });
+    }
+  }
+});
+
+test('rotation uses the deployed artifact after planning an undeployed release', async t => {
+  const f = await fixture(t);
+  const deployed = await deployment.deployPersonalFree(config, f.approval, f.run);
+  await writeFile(join(root, 'sql', 'AppReady.sql'), 'UNDEPLOYED SQL');
+  await writeFile(join(root, 'personal-free-api.json'), JSON.stringify({
+    version: 1, authenticationProvider: 'aad',
+    routes: [{ method: 'GET', path: '/api/PendingReady', procedure: { name: 'PendingReady', parameters: {} } }],
+  }));
+  const nextManifest = await buildPersonalFreeArtifact(root, f.artifact, f.run);
+  const nextApproval = deployment.planPersonalFreeDeployment(config, nextManifest.sourceHash).approval;
+  assert.notEqual(nextApproval, f.approval);
+  await assert.rejects(deployment.rotatePersonalFreeRuntimeSecret(config, nextApproval, f.run),
+    /does not match this deployment/);
+  f.hooks.query = async statement => {
+    if (statement.includes('GRANT EXECUTE')) {
+      assert.match(statement, /\[AppReady\]/);
+      assert.doesNotMatch(statement, /PendingReady/);
+    }
+  };
+  const rotated = await deployment.rotatePersonalFreeRuntimeSecret(config, f.approval, f.run);
+  assert.equal(rotated.stage, 'ready');
+  assert.equal(rotated.approval, f.approval);
+  assert.notEqual(rotated.runtimePassword, deployed.runtimePassword);
+  assert.deepEqual(JSON.parse(await readFile(join(f.artifact, 'personal-free-build.json'), 'utf8')), nextManifest);
+});
+
+test('rotation does not need the next release plan once its deployed artifact is retained', async t => {
+  const f = await fixture(t);
+  await deployment.deployPersonalFree(config, f.approval, f.run);
+  await rm(f.artifact, { recursive: true });
+  const rotated = await deployment.rotatePersonalFreeRuntimeSecret(config, f.approval, f.run);
+  assert.equal(rotated.stage, 'ready');
+  assert.equal(rotated.approval, f.approval);
+});
+
+test('rotation refuses a modified retained artifact before changing credentials or contacting Azure', async t => {
+  const f = await fixture(t);
+  await deployment.deployPersonalFree(config, f.approval, f.run);
+  const retained = join(root, '.sql-apps', 'deployments', `tracker-dev-${f.approval}-artifact`);
+  await assert.doesNotReject(stat(retained), 'Publishing must retain its approved artifact for future rotation');
+  await writeFile(join(retained, 'deployment', 'api.json'), 'tampered');
+  const before = await readFile(f.statePath, 'utf8');
+  f.calls.length = 0;
+  await assert.rejects(deployment.rotatePersonalFreeRuntimeSecret(config, f.approval, f.run), /artifact|approval/i);
+  assert.equal(await readFile(f.statePath, 'utf8'), before);
+  assert.deepEqual(f.calls, []);
 });

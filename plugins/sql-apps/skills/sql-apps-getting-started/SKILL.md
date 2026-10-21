@@ -8,7 +8,8 @@ description: "Use when a beginner is starting a SQL Apps project, shaping an app
 Resolve and quote `../../scripts/sql-apps.mjs` from this skill, not cwd.
 `SQL_APPS_HOME` selects the app; otherwise use the nearest app.
 Input `docs/...` belongs to it, not the plugin cache.
-`sql-apps-application` is authoritative for creation. Never edit plugins/foundation.
+`sql-apps-application` is the authoritative project-creation workflow.
+Never edit plugins/foundation.
 
 Follow **Describe -> Run locally -> Make it yours -> Share optionally**.
 
@@ -17,12 +18,12 @@ Follow **Describe -> Run locally -> Make it yours -> Share optionally**.
 Use the explicitly selected verified archive CLI's `guide` before restore, then `npm run guide`.
 Reuse saved decisions, not as readiness/permission. Read only this stage's guide.
 Ask about missing users, information or actions one question at a time; summarize
-exclusions. Never ask beginners to choose frameworks or Azure topology.
+exclusions. Never ask beginners for frameworks or Azure topology.
 
 ## Route the work
 
 - Route every new user-facing app and meaningful UI change through `sql-apps-design`.
-  No design companion is required.
+  It owns the design pass; no companion skill is required.
 - `sql-apps-application`: domain scope, code and access rules.
 - `sql-apps-local`: prerequisites, approval and lifecycle.
 - `sql-apps-validation`: checks and evidence.
@@ -30,16 +31,14 @@ exclusions. Never ask beginners to choose frameworks or Azure topology.
 - `sql-apps-cloud-preview`: requested publishing, pricing or cloud readiness;
   it hands Azure work to the Azure Skills plugin, not another SQL Apps deployer.
 
-Load only the current stage.
-
 ## Finish locally
 
 Build one persisted domain workflow first. After authorized startup, use
-`sql-apps-validation`: browser action, SQL save/reload, invalid-save error and
-rendered review.
+`sql-apps-validation`: a real browser action, SQL save/reload, invalid-save error
+and required rendered browser review.
 
-Exclude secrets/real records from briefs. Local success needs no Azure.
+Exclude secrets/real records from briefs. No Azure needed locally.
 
-Missing preview access must not stop 5x5. `sql-apps-local` offers container ->
+Missing preview access never blocks 5x5. `sql-apps-local` offers container ->
 Azure SQL -> Windows x64 SQL Server 2025 Express with host DAB, separate approvals
-and sticky targets. Never claim unobserved passes.
+and sticky targets. Never claim unobserved checks passed.

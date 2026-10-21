@@ -50,6 +50,7 @@ export type PersonalFreeConfig = z.infer<typeof personalFreeConfigSchema>;
 
 export const protectedDeploymentStateSchema = z.strictObject({
   approval: z.string().regex(/^[a-f0-9]{12}$/),
+  target: currentConfigSchema.pick({ subscriptionId: true, resourceGroup: true }).optional(),
   stage: z.enum(['new', 'infrastructure', 'schema', 'runtime-user', 'application', 'ready']),
   sqlAdministratorPassword: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   runtimePassword: z.string().regex(/^[A-Za-z0-9_-]{43}$/),

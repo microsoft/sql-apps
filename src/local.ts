@@ -1,6 +1,6 @@
 import { readFile, unlink } from 'node:fs/promises';
 import { resolve, join, sep } from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { saveJson, withStateLock } from './state-files.js';
 import type { Run } from './process.js';
@@ -26,6 +26,10 @@ const stateSchema = z.strictObject({
   password: z.string().regex(/^SqlApps1![a-f0-9]{64}$/),
 });
 type LocalState = z.infer<typeof stateSchema>;
+const sqlCreationSchema = stateSchema.extend({
+  version: z.literal(1), workspace: z.string(), token: z.uuid(),
+});
+type SqlCreation = z.infer<typeof sqlCreationSchema>;
 const sqlRecoverySchema = z.strictObject({
   version: z.literal(1), workspace: z.string(), container: z.string(),
   imageId: z.string().regex(/^sha256:[a-f0-9]{64}$/), password: z.string().min(1),
@@ -36,17 +40,19 @@ export const localOrigin = runtimeFor().origins.data;
 export const sqlImage = 'sqldbpreview-dpgaeqhmgphzd4bk.azurecr.io/azure-sql/db-dev:latest';
 export const dabImage = pinnedDabImage;
 
-async function prepareSqlResources(container: string, run: Run, create: boolean, inspectMount = true): Promise<void> {
+async function prepareSqlResources(
+  container: string, run: Run, create: boolean, inspectMount = true, creation?: SqlCreation,
+): Promise<void> {
   const runtime = runtimeFor(container);
   if (runtime.mode !== 'isolated') return;
   const volume = `${container}-data`;
   const volumeExists = (await run('docker', ['volume', 'ls', '--filter', `name=^${volume}$`, '--format', '{{.Name}}'])).trim();
   if (volumeExists) {
-    const owner = z.object({ workspace: z.string(), role: z.string() }).parse(JSON.parse(await run('docker',
+    const owner = z.object({ workspace: z.string(), role: z.string(), creation: z.string().nullable().optional() }).parse(JSON.parse(await run('docker',
       ['volume', 'inspect', volume, '--format',
-        '{"workspace":{{json (index .Labels "sql-apps.workspace")}},"role":{{json (index .Labels "sql-apps.local")}}}'])));
+        '{"workspace":{{json (index .Labels "sql-apps.workspace")}},"role":{{json (index .Labels "sql-apps.local")}},"creation":{{json (index .Labels "sql-apps.creation")}}}'])));
     if (owner.workspace !== runtime.id || owner.role !== 'sql') throw new Error('SQL volume belongs to another workspace; no credentials or volumes were reset');
-    if (create) {
+    if ((create || creation) && (!creation || owner.creation !== creation.token)) {
       throw new Error('Owned SQL volume exists without its credential-bearing container; data is preserved and credentials will not be reset');
     }
   } else if (!create) throw new Error('Owned SQL volume is missing; review existing mounts without recreating data');
@@ -66,7 +72,8 @@ async function prepareSqlResources(container: string, run: Run, create: boolean,
     if (owner.workspace !== runtime.id || owner.role !== 'sql-network') throw new Error('SQL bridge network belongs to another workspace');
   } else if (!create) throw new Error('Workspace SQL network is missing; review the existing container before reconnecting it');
   if (create && !volumeExists) {
-    await run('docker', ['volume', 'create', '--label', 'sql-apps.local=sql', ...runtime.labels, volume]);
+    await run('docker', ['volume', 'create', '--label', 'sql-apps.local=sql', ...runtime.labels,
+      ...(creation ? ['--label', `sql-apps.creation=${creation.token}`] : []), volume]);
   }
   if (create && !present) {
     await run('docker', ['network', 'create', '--label', 'sql-apps.local=sql-network', ...runtime.labels, network]);
@@ -149,27 +156,51 @@ async function readSqlRecovery(container: string): Promise<SqlRecovery | undefin
 export async function startLocalSql(container: string, run: Run): Promise<void> {
   stateSchema.shape.container.parse(container);
   const runtime = runtimeFor(container);
-  if (await readSqlRecovery(container)) {
-    throw new Error(`SQL recovery is incomplete. Data and original credentials are preserved; explicitly resume recover-sql ${container} before normal startup.`);
-  }
-  const existing = (await run('docker', ['ps', '--all', '--filter', `name=^/${container}$`, '--format', '{{.Names}}'])).trim();
-  if (existing) {
-    const owned = (await run('docker', ['inspect', container, '--format', '{{index .Config.Labels "sql-apps.local"}}'])).trim();
-    if (owned !== 'sql') throw new Error('Container name is already in use; use init to reuse it or choose a different name');
-    if (runtime.mode === 'isolated') {
-      if (!runtime.ownsSqlName) throw new Error('External SQL containers can be selected for verify/init, but start-sql cannot modify them.');
-      if (runtime.ports.sql === null) throw new Error('Workspace SQL port is missing');
-      await verifyContainerWorkspace(container, runtime, sqlImage, { '1433/tcp': runtime.ports.sql }, run);
-      await prepareSqlResources(container, run, false);
+  const path = `${localPaths(container).stateFile}.creation.json`;
+  await withStateLock(path, async () => {
+    if (await readSqlRecovery(container)) {
+      throw new Error(`SQL recovery is incomplete. Data and original credentials are preserved; explicitly resume recover-sql ${container} before normal startup.`);
     }
-    await run('docker', ['start', container]);
-  } else {
-    if (runtime.mode === 'isolated' && !runtime.ownsSqlName) throw new Error('Use the workspace SQL name for start-sql; external SQL containers must already exist and be explicitly selected for verify/init.');
-    await prepareSqlResources(container, run, true);
-    const password = `SqlApps1!${randomBytes(32).toString('hex')}`;
-    await createSqlContainer(container, password, run);
-  }
-  await waitLocalSql(container, run);
+    let creation: SqlCreation | undefined;
+    try { creation = sqlCreationSchema.parse(JSON.parse(await readFile(path, 'utf8'))); }
+    catch (error) {
+      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+    }
+    if (creation && (creation.workspace !== runtime.id || creation.container !== container)) {
+      throw new Error('SQL creation state belongs to another workspace; no resources were changed');
+    }
+    const existing = (await run('docker', ['ps', '--all', '--filter', `name=^/${container}$`, '--format', '{{.Names}}'])).trim();
+    if (existing) {
+      const owned = (await run('docker', ['inspect', container, '--format', '{{index .Config.Labels "sql-apps.local"}}'])).trim();
+      if (owned !== 'sql') throw new Error('Container name is already in use; use init to reuse it or choose a different name');
+      if (runtime.mode === 'isolated') {
+        if (!runtime.ownsSqlName) throw new Error('External SQL containers can be selected for verify/init, but start-sql cannot modify them.');
+        if (runtime.ports.sql === null) throw new Error('Workspace SQL port is missing');
+        await verifyContainerWorkspace(container, runtime, sqlImage, { '1433/tcp': runtime.ports.sql }, run);
+        await prepareSqlResources(container, run, false, true, creation);
+      }
+      if (creation) {
+        const environment = z.array(z.string()).parse(JSON.parse(
+          await run('docker', ['inspect', container, '--format', '{{json .Config.Env}}'])));
+        if (!environment.includes(`MSSQL_SA_PASSWORD=${creation.password}`)) {
+          throw new Error('SQL administrator credentials differ from interrupted creation; no resources were changed');
+        }
+      }
+      await run('docker', ['start', container]);
+    } else {
+      if (runtime.mode === 'isolated' && !runtime.ownsSqlName) throw new Error('Use the workspace SQL name for start-sql; external SQL containers must already exist and be explicitly selected for verify/init.');
+      if (!creation) {
+        creation = { version: 1, workspace: runtime.id, container, token: randomUUID(),
+          password: `SqlApps1!${randomBytes(32).toString('hex')}` };
+        await saveJson(path, creation);
+      }
+      await prepareSqlResources(container, run, true, false, creation);
+      await prepareSqlResources(container, run, false, false, creation);
+      await createSqlContainer(container, creation.password, run);
+    }
+    await waitLocalSql(container, run);
+    if (creation) await unlink(path);
+  });
 }
 
 async function waitLocalSql(container: string, run: Run): Promise<void> {

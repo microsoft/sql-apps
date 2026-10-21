@@ -2,25 +2,21 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { checkPlugin, checkout, plugin, skillNames } from './check-plugin.mjs';
+import { pluginCliCommand } from './plugin-cli.mjs';
 
 const executeFile = promisify(execFile);
 export const loaderVersions = Object.freeze({ claude: '2.1.296', copilot: '1.0.98' });
 
 export async function checkPluginLoaders(host, options = {}) {
   assert.ok(Object.hasOwn(loaderVersions, host), 'Choose the claude or copilot loader');
-  if (options.entrypoint !== undefined) {
-    assert.ok(typeof options.entrypoint === 'string' && isAbsolute(options.entrypoint) &&
-      !/\.(?:cmd|bat|ps1)$/i.test(options.entrypoint), 'Use an absolute native or Node CLI entrypoint, not an npm shell shim');
-  }
+  const cli = pluginCliCommand(host, options.entrypoint);
   await checkPlugin();
   const execute = options.execute ?? executeFile;
   const report = options.report ?? console.log;
-  const command = options.entrypoint ?? host;
-  const prefix = /\.(?:c|m)?js$/i.test(command) ? [command] : [];
   const root = await realpath(await mkdtemp(join(tmpdir(), 'sql apps loader ')));
   try {
     const home = join(root, 'home');
@@ -40,7 +36,7 @@ export async function checkPluginLoaders(host, options = {}) {
     });
     const run = async args => {
       try {
-        const result = await execute(prefix.length ? process.execPath : command, [...prefix, ...args], {
+        const result = await execute(cli.file, [...cli.prefix, ...args], {
           cwd, env: environment, shell: false, windowsHide: true,
           timeout: 60_000, maxBuffer: 4 * 1024 * 1024,
         });

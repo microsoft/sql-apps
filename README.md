@@ -6,7 +6,7 @@
 
 SQL Apps is a local-first foundation for building SQL-backed web applications
 with the AI assistant of your choice. Start with an idea rather than a framework
-choice, then implement your own screens, data and workflows.
+choice, then let the AI assistant implement the screens, data and workflows.
 
 ## What you get
 

@@ -1,11 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { access, mkdtemp, mkdir, readFile, writeFile, readdir, rm } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readFile, writeFile, readdir, rm, utimes } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { readGuide, saveBrief, validateBrief } from '../scripts/guide.mjs';
 import { initializeWorkspace } from '../src/workspace.mjs';
+import { withFileLock } from '../src/file-lock.mjs';
 
 const brief = () => ({
   purpose: 'Track equipment loans',
@@ -184,9 +186,35 @@ test('saving a guide refuses a concurrent writer and preserves the previous brie
   const home = await fixture(t);
   await saveBrief(home, brief());
   const before = await readFile(join(home, '.sql-apps', 'guide.json'), 'utf8');
-  await mkdir(join(home, '.sql-apps', 'guide.lock'));
-  await assert.rejects(saveBrief(home, { ...brief(), purpose: 'Changed' }), /already being saved/);
+  await withFileLock(join(home, '.sql-apps', 'guide.lock'), async () => {
+    await assert.rejects(saveBrief(home, { ...brief(), purpose: 'Changed' }), /already being saved|locked/);
+  });
   assert.equal(await readFile(join(home, '.sql-apps', 'guide.json'), 'utf8'), before);
+});
+
+test('saving a guide recovers the lock left by an exited writer', async t => {
+  const home = await fixture(t);
+  await saveBrief(home, brief());
+  const lock = join(home, '.sql-apps', 'guide.lock');
+  const child = spawnSync(process.execPath, ['--input-type=module', '-e', `
+    import { withFileLock } from ${JSON.stringify(pathToFileURL(resolve('src', 'file-lock.mjs')).href)};
+    await withFileLock(${JSON.stringify(lock)}, async () => process.exit(0));
+  `], { encoding: 'utf8', timeout: 10000 });
+  assert.equal(child.status, 0, child.stderr);
+  await saveBrief(home, { ...brief(), purpose: 'Changed after interruption' });
+  assert.equal((await readGuide(home)).brief.purpose, 'Changed after interruption');
+  await assert.rejects(access(lock), { code: 'ENOENT' });
+});
+
+test('saving a guide recovers an abandoned empty legacy lock', async t => {
+  const home = await fixture(t);
+  await saveBrief(home, brief());
+  const lock = join(home, '.sql-apps', 'guide.lock');
+  await mkdir(lock);
+  const old = new Date(Date.now() - 60000);
+  await utimes(lock, old, old);
+  await saveBrief(home, { ...brief(), purpose: 'Changed after legacy interruption' });
+  assert.equal((await readGuide(home)).brief.purpose, 'Changed after legacy interruption');
 });
 
 test('sharing reveals cost blockers without converting a saved preference into spending consent', async t => {

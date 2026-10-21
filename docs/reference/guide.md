@@ -83,7 +83,12 @@ Before saving, replace a completed `nextChange` with the next agreed outstanding
 
 The command saves version-1 state in `.sql-apps/guide.json`, including the canonical checkout path, source fingerprint, timestamp and brief. It uses a lock and atomic replacement.
 
-Brief/state files must be regular files at most 16 KiB. Invalid JSON, oversized input, unexpected fields, copied checkout state and symlink state are rejected explicitly rather than reset or overwritten. A concurrent writer must finish before retrying; do not automatically remove its lock.
+Brief/state files must be regular files at most 16 KiB. Invalid JSON, oversized input, unexpected fields, copied checkout state and symlink state are rejected explicitly rather than reset or overwritten. A concurrent writer must finish before retrying; do not manually remove an active writer's lock.
+
+Saves use the shared process/host lock. A lock left by an exited local writer is
+recovered on the next save without losing the previous brief. Empty legacy locks
+are recoverable after 30 seconds. Live writers, fresh empty locks and locks from
+another host are never taken over automatically.
 
 Keep credentials and actual application records out of the brief. Preserve local state when moving or troubleshooting the checkout.
 

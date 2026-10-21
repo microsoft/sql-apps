@@ -125,6 +125,42 @@ test('personal-free API parses typed GET query parameters strictly', async () =>
   assert.equal(calls.length, 1);
 });
 
+for (const method of ['GET', 'POST'] as const) {
+  test(`personal-free ${method} rejects impossible calendar dates before SQL execution`, async () => {
+    const calls: unknown[] = [];
+    const handler = createPersonalFreeHandler([{
+      method, path: '/api/SaveDate', procedure: { name: 'SaveDate', parameters: { when: 'datetime2' } },
+    }], {
+      async execute(_owner, _role, _procedure, values) { calls.push(values); return []; },
+      async ready() {},
+    });
+    const request = (when: string) => handler({
+      method,
+      url: `https://example.test/api/SaveDate${method === 'GET' ? `?${new URLSearchParams({ when })}` : ''}`,
+      headers: new Headers({ 'x-ms-client-principal': ownerHeader }),
+      ...(method === 'POST' ? { body: { when } } : {}),
+    });
+    for (const when of [
+      '2026-02-30T12:00:00Z', '2026-02-29', '1900-02-29T00:00:00Z', '2026-04-31T00:00:00',
+      '0000-01-01T00:00:00Z', '+010000-01-01T00:00:00Z', '0001-01-01T00:00:00+01:00',
+      '9999-12-31T23:59:59-01:00', 'not a date',
+    ]) {
+      const response = await request(when);
+      assert.equal(response.status, 400, when);
+      assert.deepEqual(await response.json(), { error: 'Invalid procedure parameters' });
+    }
+    assert.deepEqual(calls, []);
+    for (const when of [
+      '2028-02-29', '2000-02-29T12:34:56Z', '2028-02-29T12:34:56.1234567+05:30',
+      '2026-01-02T03:04:05', '0001-01-01T00:00:00Z', '9999-12-31T23:59:59.999Z',
+    ]) {
+      const response = await request(when);
+      assert.equal(response.status, 200, when);
+      assert.deepEqual(calls.at(-1), { when });
+    }
+  });
+}
+
 test('personal-free API logs procedure failures without returning database details', async () => {
   const failures: unknown[] = [];
   const handler = createPersonalFreeHandler([{

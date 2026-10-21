@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, rm, mkdir, writeFile, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { checkSetup, parseArguments } from '../scripts/setup-check.mjs';
 import * as setup from '../scripts/setup-check.mjs';
 import { initializeWorkspace, runtimeFor } from '../src/workspace.mjs';
@@ -543,3 +543,80 @@ test('actual pre-build CLI exits nonzero with parseable JSON on invalid argument
   assert.match(report.checks[0].nextAction, /usage/);
   assert.equal(result.stderr, '');
 });
+
+test('foundation setup CLI reaches prerequisite diagnostics without a generated project manifest', () => {
+  const root = resolve(import.meta.dirname, '..');
+  const env = { ...process.env, SQL_APPS_PROJECT_HOME: undefined, SQL_APPS_TOOLING_HOME: undefined };
+  for (const name of Object.keys(env)) if (name.toLowerCase() === 'path') delete env[name];
+  env.PATH = '';
+  const result = spawnSync(process.execPath, [join(root, 'scripts', 'setup-check.mjs'), '--json'], {
+    cwd: root, env, encoding: 'utf8', timeout: 10000, shell: false,
+  });
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 1, 'Missing tools are reported as prerequisites, not a successful setup');
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.home, root);
+  assert.equal(report.checks.find(check => check.id === 'node')?.code, 'NODE_READY');
+  assert.equal(report.checks.find(check => check.id === 'npm')?.code, 'NPM_UNAVAILABLE');
+  assert.equal(report.checks.some(check => check.code === 'DIAGNOSTIC_FAILED'), false);
+  assert.equal(result.stderr, '');
+});
+
+test('setup CLI preserves unsafe explicit project selection errors without falling back to foundation', () => {
+  const root = resolve(import.meta.dirname, '..');
+  const result = spawnSync(process.execPath, [join(root, 'scripts', 'setup-check.mjs'), '--json'], {
+    cwd: root, env: { ...process.env, SQL_APPS_PROJECT_HOME: 'relative-project' },
+    encoding: 'utf8', timeout: 10000, shell: false,
+  });
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 1);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.checks[0].code, 'PROJECT_PATH_UNSAFE');
+  assert.match(report.checks[0].message, /SQL_APPS_PROJECT_HOME.*absolute project path/);
+  assert.equal(result.stderr, '');
+});
+
+test('setup CLI does not substitute the foundation for an unrelated working directory', async t => {
+  const home = await mkdtemp(join(tmpdir(), 'sql-apps-unrelated-check-'));
+  t.after(() => rm(home, { recursive: true, force: true }));
+  const result = spawnSync(process.execPath, [resolve('scripts', 'setup-check.mjs'), '--json'], {
+    cwd: home, env: { ...process.env, SQL_APPS_PROJECT_HOME: undefined, SQL_APPS_TOOLING_HOME: undefined },
+    encoding: 'utf8', timeout: 10000, shell: false,
+  });
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 1);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.checks[0].code, 'PROJECT_NOT_FOUND');
+  assert.match(report.checks[0].message, /No SQL Apps project was found/);
+  assert.equal(result.stderr, '');
+});
+
+for (const format of ['json', 'text']) {
+  test(`setup CLI does not disclose malformed SQL target contents in ${format} output`, async t => {
+    const home = await mkdtemp(join(tmpdir(), 'sql-apps-malformed-target-'));
+    t.after(() => rm(home, { recursive: true, force: true }));
+    const target = join(home, 'sql-target.json');
+    await writeFile(target, 'LEAKME42');
+    const root = resolve(import.meta.dirname, '..');
+    const env = { ...process.env, SQL_APPS_PROJECT_HOME: undefined, SQL_APPS_TOOLING_HOME: undefined };
+    for (const name of Object.keys(env)) if (name.toLowerCase() === 'path') delete env[name];
+    env.PATH = '';
+    const result = spawnSync(process.execPath, [
+      join(root, 'scripts', 'setup-check.mjs'), '--sql-target', target,
+      ...(format === 'json' ? ['--json'] : []),
+    ], { cwd: root, env, encoding: 'utf8', timeout: 10000, shell: false });
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 1);
+    assert.doesNotMatch(result.stdout + result.stderr, /LEAKME42/);
+    if (format === 'json') {
+      const report = JSON.parse(result.stdout);
+      assert.equal(report.ready, false);
+      assert.equal(report.checks[0].code, 'DIAGNOSTIC_FAILED');
+      assert.match(report.checks[0].message, /configuration file is not valid JSON/i);
+      assert.equal(result.stderr, '');
+    } else {
+      assert.equal(result.stdout, '');
+      assert.match(result.stderr, /configuration file is not valid JSON/i);
+    }
+  });
+}

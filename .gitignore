@@ -1,5 +1,6 @@
 node_modules/
 dist/
+/*.tgz
 public/app.js
 public/auth/redirect.js
 .sql-apps/

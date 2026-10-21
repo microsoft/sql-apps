@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { lstat, mkdir, readFile, writeFile, rename, unlink, rmdir } from 'node:fs/promises';
+import { lstat, mkdir, readFile, writeFile, rename, unlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { inspectSource } from './workspace-check.mjs';
 import { runtimeFor } from '../src/workspace.mjs';
 import { projectHome } from '../src/tooling-context.mjs';
+import { withFileLock } from '../src/file-lock.mjs';
 
 const maximumBytes = 16384;
 const stages = [
@@ -97,27 +98,22 @@ export async function saveBrief(home, input) {
   const brief = validateBrief(input);
   const source = await sourceFor(home);
   const directory = await stateDirectory(source.home, true);
-  const lock = join(directory, 'guide.lock');
-  try { await mkdir(lock); }
-  catch (error) {
-    if (error.code === 'EEXIST') throw new Error('Guide is already being saved; review the active writer before retrying. Do not remove its lock automatically.');
-    throw error;
-  }
-  const temporary = join(directory, `guide-${randomUUID()}.tmp`);
-  try {
-    await readState(source.home);
-    const state = { version: 1, home: source.home, sourceFingerprint: source.fingerprint,
-      savedAt: new Date().toISOString(), brief };
-    const content = `${JSON.stringify(state, null, 2)}\n`;
-    if (Buffer.byteLength(content) > maximumBytes) throw new Error('Saved guide is too large; shorten the brief and evidence.');
-    await writeFile(temporary, content, { flag: 'wx', mode: 0o600 });
-    await rename(temporary, join(directory, 'guide.json'));
-    return state;
-  } finally {
-    try { await unlink(temporary); }
-    catch (error) { if (error.code !== 'ENOENT') throw error; }
-    await rmdir(lock);
-  }
+  return withFileLock(join(directory, 'guide.lock'), async () => {
+    const temporary = join(directory, `guide-${randomUUID()}.tmp`);
+    try {
+      await readState(source.home);
+      const state = { version: 1, home: source.home, sourceFingerprint: source.fingerprint,
+        savedAt: new Date().toISOString(), brief };
+      const content = `${JSON.stringify(state, null, 2)}\n`;
+      if (Buffer.byteLength(content) > maximumBytes) throw new Error('Saved guide is too large; shorten the brief and evidence.');
+      await writeFile(temporary, content, { flag: 'wx', mode: 0o600 });
+      await rename(temporary, join(directory, 'guide.json'));
+      return state;
+    } finally {
+      try { await unlink(temporary); }
+      catch (error) { if (error.code !== 'ENOENT') throw error; }
+    }
+  });
 }
 
 export async function readGuide(home) {

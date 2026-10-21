@@ -4,9 +4,12 @@ The preferred local inner loop uses the Azure SQL Database container (Private Pr
 
 For the shortest startup path, use [Run locally](../guides/run-locally.md). This reference covers individual commands, workspace ownership, diagnostics and recovery. If you have a pre-rebrand checkout, read [migration notes](../maintainers/naming-transition.md).
 
-New guided projects use [progressive creation](progressive-creation.md): one
-public origin before restore, a private gateway at base+2, and explicit current
-browser/design gates for Ready. Existing direct-start workspaces are unchanged.
+New guided projects use [application creation and acceptance](progressive-creation.md):
+scaffold, restore, review, run and verify. Creation starts no listener, reserves
+no ports and opens no browser. After approved workspace selection and startup,
+the loopback gateway uses base+0, DAB base+1 and container SQL base+5. Report
+browser workflow and design acceptance separately from setup readiness; there
+is no helper front door or additional creation lifecycle.
 
 ## One local profile
 
@@ -23,6 +26,14 @@ Local mutations enforce [remembered permissions](local-consent.md) before dispat
 ## Prerequisites
 
 First time installing development tools? Use [guided setup](../guides/getting-started.md) rather than treating this list as instructions. Copilot can offer approved installations, explain access/license conditions, guide restarts and verify each step on Windows, macOS or Linux. After tooling restore, `npm run setup:check` needs no application build and never installs or mutates resources. Before restore, use the verified archive CLI, or the installed plugin's `setup plan --json` with explicit `SQL_APPS_TOOLING_HOME`.
+
+The diagnostic also runs from the foundation repository root without a
+generated-project manifest. An explicit project selection remains authoritative:
+an invalid `SQL_APPS_PROJECT_HOME` fails with its cause rather than falling back
+to the foundation. Run from the intended project; an unrelated directory is not
+silently adopted.
+Malformed JSON is reported without quoting file contents in either text or JSON
+diagnostics. Project-selection errors retain their actionable codes and messages.
 
 - Node.js 22 or 24 LTS and npm.
 - .NET SDK 8 or later. The CLI restores this repository's SqlPackage tool.
@@ -139,6 +150,15 @@ Do not deploy the local generated DAB configuration to Azure.
 ## SQL container and schema
 
 `start-sql` creates the workspace-derived SQL container using the current canonical `azure-sql/db-dev:latest` preview image. It generates a bootstrap password without printing it, publishes SQL only to the workspace's loopback SQL port, and stores data in its workspace-derived named volume. Subsequent runs restart the same project-labeled container instead of replacing it. Docker may use its cached `latest` image; refreshing/upgrading is an explicit operator action, not an automatic destructive upgrade.
+
+Before first-time Docker creation, `start-sql` atomically records the bootstrap
+credential and a unique creation token in a gitignored workspace
+`*.creation.json` file. A failed image pull, network creation or container creation
+can be retried with the same command and credential. An existing volume must
+match both workspace ownership and the recorded creation token; an existing
+container must also retain that credential. Unrecorded or mismatched volumes
+are never adopted or reset. Successful SQL readiness removes the temporary
+creation record. Preserve it as sensitive state if startup is interrupted.
 
 Readiness includes a fresh completion marker from the current preview image's control-plane initialization, not just an early `SELECT 1`. A measured preview recovery race (error 904 during control-plane reconciliation) receives at most three explicitly logged restart attempts; other failures are not silently reset. An exhausted reconcile failure is reported as preview control-plane recovery, not proof that registry access was revoked. The existing volume is preserved.
 

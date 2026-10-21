@@ -10,7 +10,7 @@ import {
   personalFreeStatePath,
   planPersonalFreeDeployment,
   readPersonalFreeConfig,
-  readProtectedDeploymentState,
+  readPersonalFreeDeploymentState,
   rotatePersonalFreeRuntimeSecret,
 } from './personal-free-deployment.js';
 import type { ProtectedDeploymentState } from './personal-free-config.js';
@@ -127,7 +127,7 @@ async function invite(args: readonly string[], command: Run, fixedRole?: 'owner'
   const configPath = resolve(take(values, '--config', defaultConfig));
   rejectUnknown(values);
   const config = await readPersonalFreeConfig(configPath);
-  const state = await readProtectedDeploymentState(personalFreeStatePath(config));
+  const state = await readPersonalFreeDeploymentState(config, command);
   if (!state.staticWebAppName || !state.staticWebAppHostname) throw new Error('Deploy the application before inviting people');
   const invitation = await command('az', [
     'staticwebapp', 'users', 'invite',
@@ -151,9 +151,10 @@ async function status(args: readonly string[], command: Run): Promise<string> {
   const config = await readPersonalFreeConfig(configPath);
   let state: ProtectedDeploymentState;
   try {
-    state = await readProtectedDeploymentState(personalFreeStatePath(config));
+    state = await readPersonalFreeDeploymentState(config, command);
   } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return 'Stage: not started';
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT' &&
+        'path' in error && error.path === personalFreeStatePath(config)) return 'Stage: not started';
     throw error;
   }
   const report = await verifyPersonalFreeCostGuard(config, state, command);

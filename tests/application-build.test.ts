@@ -20,16 +20,7 @@ async function fixture() {
   await writeFile(join(home, 'package-lock.json'), await readFile('package-lock.json'));
   await writeFile(join(home, 'application.json'), JSON.stringify({ name: 'clean', selectedExamples: [] }));
   await writeFile(join(home, 'runtime-contract.json'), JSON.stringify({ version: 1, capabilities: ['local', 'setup-check'] }));
-  await writeFile(join(home, 'public', 'staticwebapp.config.json'), JSON.stringify({
-    routes: [{ route: '/api/*', allowedRoles: ['anonymous'] }],
-    navigationFallback: { rewrite: '/index.html', exclude: ['/api/*'] },
-    globalHeaders: {
-      'cache-control': 'no-store',
-      'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
-      'referrer-policy': 'no-referrer',
-      'x-content-type-options': 'nosniff',
-    },
-  }));
+  await cp(resolve('public', 'staticwebapp.config.json'), join(home, 'public', 'staticwebapp.config.json'));
   for (const file of ['application.ts', 'demo-app.ts', 'demo-session.ts', 'workspace.mjs']) await cp(resolve('src', file), join(home, 'src', file));
   for (const file of ['src/local-cli.ts', 'sql/database.sqlproj', 'plugins/sql-apps/plugin.json']) await writeFile(join(home, file), '');
   await writeFile(join(home, 'examples/inventory/application.ts'), `
@@ -66,6 +57,7 @@ test('selected builds are workspace-scoped, immutable and exclude unselected exa
   const home = await fixture();
   t.after(() => rm(home, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }));
   const rootManifest = await readFile(join(home, 'application.json'), 'utf8');
+  const sourcePolicy = await readFile(join(home, 'public', 'staticwebapp.config.json'), 'utf8');
   const built = await buildSelectedApplication(home, 'inventory', 'public-demo');
   assert.ok(built.directory.startsWith(join(home, '.sql-apps', 'workspaces')));
   assert.equal(built.manifest.name, 'inventory');
@@ -109,7 +101,9 @@ test('selected builds are workspace-scoped, immutable and exclude unselected exa
   }
   const swa = JSON.parse(await readFile(join(built.directory, 'static', 'staticwebapp.config.json'), 'utf8'));
   assert.deepEqual(swa.routes, [{ route: '/api/*', allowedRoles: ['anonymous'] }]);
-  assert.equal(swa.navigationFallback.rewrite, '/index.html');
+  assert.deepEqual(swa.navigationFallback, JSON.parse(sourcePolicy).navigationFallback);
+  assert.deepEqual(swa.globalHeaders, JSON.parse(sourcePolicy).globalHeaders);
+  assert.equal(await readFile(join(home, 'public', 'staticwebapp.config.json'), 'utf8'), sourcePolicy);
   assert.deepEqual((await checkSelectedApplication(home, built.directory, 'public-demo')).routes, built.manifest.routes);
   assert.match(await run(process.execPath, [
     resolve('scripts/check-application.mjs'), '--selected', built.directory, 'public-demo', home,

@@ -4,16 +4,20 @@ import { join } from 'node:path';
 import { checkPlugin, checkout, plugin, skillNames } from './check-plugin.mjs';
 import { validateHome } from '../plugins/sql-apps/scripts/sql-apps.mjs';
 import { inspectSource } from './workspace-check.mjs';
+import { pluginCliCommand } from './plugin-cli.mjs';
 
 const execute = promisify(execFile);
-async function copilot(args) {
-  const { stdout, stderr } = await execute('copilot', args, { cwd: checkout, windowsHide: true, maxBuffer: 4 * 1024 * 1024 });
-  if (stderr.trim()) console.error(stderr.trim());
-  return stdout;
-}
 
 async function install() {
-  if (process.argv.length > 2) throw new Error('plugin:install takes no arguments; run it from the contributor checkout');
+  if (process.argv.length > 3) throw new Error('Usage: npm run plugin:install -- [absolute-cli-entrypoint]; run it from the contributor checkout');
+  const cli = pluginCliCommand('copilot', process.argv[2]);
+  const copilot = async args => {
+    const { stdout, stderr } = await execute(cli.file, [...cli.prefix, ...args], {
+      cwd: checkout, shell: false, windowsHide: true, maxBuffer: 4 * 1024 * 1024,
+    });
+    if (stderr.trim()) console.error(stderr.trim());
+    return stdout;
+  };
   await checkPlugin();
   const home = await validateHome(checkout);
   const source = await inspectSource(home);

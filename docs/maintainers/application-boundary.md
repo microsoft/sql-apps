@@ -26,13 +26,36 @@ dotnet build sql\database.sqlproj --output dist\sql
 npm run app:check -- . sql\obj\Debug\model\model.xml
 ```
 
-Against an approved running local app, use the verified startup origin and the
-selected SQL container:
+Against an approved running local app, use the verified startup origin:
 
 ```powershell
 npm run app:check-api -- "<verified-origin>"
-npm run local -- app-check <sql-container-name>
 ```
+
+For **generated applications**, inspect and run the project-owned
+`sql/local/application-acceptance.sql` against the selected application database
+using an explicitly approved administrative SQL session. This read-only catalog
+check is separate from `app-test`, which checks admission/denial at the API.
+If the script is absent, report missing database-absence evidence; do not invent
+a successful check or restore an excluded example.
+
+For an approved, verified workspace-owned SQL container, the existing in-container
+client can execute that script without exposing its administrator password:
+
+```powershell
+Get-Content -Raw .\sql\local\application-acceptance.sql |
+  docker exec -i <workspace-sql-container> sh -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" exec /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -d "$1"' sql <selected-application-database>
+if ($LASTEXITCODE -ne 0) { throw 'Application database absence check failed.' }
+```
+
+Use the actual selected database, never `master`. For Azure SQL or Express,
+execute the same script through the selected provider's approved SQL client and
+authentication; the container command does not apply. Administrative access here
+does not authorize using administrator credentials in the application.
+
+The **foundation checkout only** also exposes
+`npm run local -- app-check <workspace-sql-container>` as a wrapper for this SQL
+script. Generated applications deliberately reject that example-only command.
 
 - **Source and artifacts:** scans active `src`, `public`, `dab`, `sql`, compiled `dist/src`, `dist/functions`, browser bundle and supplied SQL model. It also parses root `tests` and `dist/tests` for example imports/re-exports and literal file dependencies, including absent example trees. Fixture strings, developer TODO comments and negative SQL/API checks remain valid. The SQL project extracts the DACPAC model using MSBuild's built-in Unzip task. Rejects broad Docker copies that ship examples/test output. Missing build output fails rather than proving absence.
 - **API:** creates a separate local acceptance session, verifies authenticated `/api/Todo` returns 404 and the GraphQL `todos` field produces an unknown-field/schema-validation error, then revokes its own session. A backend outage or authentication denial is not accepted as proof of absence.
@@ -91,12 +114,10 @@ Schema publishing retains `DropObjectsNotInSource=False` and data-loss blocking.
 
 Do not enable drop-unspecified-objects or reset volumes to make acceptance pass. Review sample row counts under an administrator, export anything needed, and obtain explicit approval for a separately reviewed cleanup migration. Preserve other application objects and shared security. No automatic destructive migration is included or executed.
 
-For a clean development database without deleting existing data:
-
-```powershell
-npm run local -- start-sql sql-apps-clean-sql
-npm run local -- init sql-apps-clean-sql
-npm run local -- app-check sql-apps-clean-sql
-```
-
-This creates/reuses a separately owned container and persistent volume. It does not replace the original database or start another DAB/gateway. Follow the documented lifecycle when switching local data services (only one default DAB/gateway port at a time).
+For a clean development database without deleting existing data, use a separate
+project/workspace and review its `setup plan` before approving `setup run`. For
+an endpoint provider, explicitly select a separate development database instead.
+Neither route is permission to overwrite the original workspace binding or move
+existing data. After schema publication, run the project-owned database check
+above against the new selected database. Keep the original database and volume
+intact; do not use legacy container-name recipes to bypass workspace ownership.

@@ -218,13 +218,26 @@ New applications in this branch pin exactly `@microsoft/sql-apps@0.1.0` (unrelea
 
 ## Install from your checkout
 
-Prerequisites: Node 22/24 and the GitHub Copilot CLI on PATH, using the same Copilot profile as your App. Start with [first-time setup](../guides/getting-started.md) if tools are missing. Plugin installation does not require npm dependency restore or runtime compilation; its launcher can diagnose setup before the application is built.
+Prerequisites: Node 22/24 and the GitHub Copilot CLI, using the same Copilot profile as your App. A native CLI can be on PATH; for an npm-installed CLI on Windows, pass its absolute JavaScript entrypoint instead of a shell shim. Start with [first-time setup](../guides/getting-started.md) if tools are missing. Plugin installation does not require npm dependency restore or runtime compilation; its launcher can diagnose setup before the application is built.
 
 ```powershell
 Set-Location "C:\git\sql-apps"
 npm run plugin:check
 npm run plugin:install
 ```
+
+For an npm-installed Copilot CLI, resolve the package entrypoint explicitly:
+
+```powershell
+$packagePath = Join-Path (npm root --global) '@github' 'copilot'
+$manifest = Get-Content -Raw (Join-Path $packagePath 'package.json') | ConvertFrom-Json
+npm run plugin:install -- (Join-Path $packagePath $manifest.bin.copilot)
+```
+
+The optional argument also accepts an absolute native CLI path. JavaScript
+entrypoints run through the current Node executable without a shell. Relative
+paths and `.cmd`, `.bat` or `.ps1` shims are rejected before registration.
+The entrypoint argument does not select a different Copilot profile.
 
 The installer:
 

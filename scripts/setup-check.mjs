@@ -637,7 +637,17 @@ export async function installReviewed(path, value, injected = {}) {
 
 export async function main(args = process.argv.slice(2)) {
   const options = parseArguments(args);
-  const report = await checkSetup({ ...options, root: await projectHome() }, {}, { project: true });
+  const tools = await toolingHome(import.meta.url);
+  let root;
+  let project = true;
+  try { root = await projectHome(); }
+  catch (error) {
+    if (error.code !== 'PROJECT_NOT_FOUND' || await realpath(process.cwd()) !== tools ||
+        JSON.parse(await readFile(join(tools, 'package.json'), 'utf8')).name !== 'sql-apps') throw error;
+    root = tools;
+    project = false;
+  }
+  const report = await checkSetup({ ...options, root, toolingRoot: tools }, {}, { project });
   if (options.json) console.log(JSON.stringify(report, null, 2));
   else {
     console.log(`SQL Apps setup check (${report.platform}/${report.architecture})`);
@@ -649,11 +659,14 @@ export async function main(args = process.argv.slice(2)) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  main().catch(() => {
-    const message = 'Setup check could not complete. No installation or resource changes were performed.';
+  main().catch(error => {
+    const detail = error instanceof SyntaxError ? 'A configuration file is not valid JSON.' :
+      error instanceof Error ? error.message : 'Unknown diagnostic failure.';
+    const message = `Setup check could not complete. No installation or resource changes were performed. ${detail}`;
+    const code = typeof error?.code === 'string' ? error.code : 'DIAGNOSTIC_FAILED';
     if (process.argv.includes('--json')) console.log(JSON.stringify({
       version: 1, ready: false, checks: [{
-        id: 'diagnostic', status: 'action-required', code: 'DIAGNOSTIC_FAILED', message,
+        id: 'diagnostic', status: 'action-required', code, message,
         nextAction: 'Confirm this checkout, file permissions and usage: node scripts/setup-check.mjs [--json] [--container <existing-sql-container>] [--profile role-based-data] [--workspace <base-port>].',
         required: true,
       }],

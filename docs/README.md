@@ -15,7 +15,7 @@ To try something already implemented, use the [Todo reference app](../examples/t
 ## Command and configuration reference
 
 - [Independent projects](reference/projects.md): project manifest, packaged tooling and foundation boundaries.
-- [Progressive creation](reference/progressive-creation.md): early localhost, capability checks, stable origin, acceptance evidence and owned recovery.
+- [Application creation and acceptance](reference/progressive-creation.md): reviewed scaffolding, independent restore, one setup lifecycle and separate browser/SQL acceptance evidence.
 - [Local runtime](reference/local-development.md): the role-based-data startup stages, workspace ports, diagnostics and recovery.
 - [Setup coordinator](reference/setup.md): connected first-run planning, approved tool installation and safe continuation.
 - [Remember local permissions](reference/local-consent.md): one setup approval covering restore, build, workspace, startup and SQL terms, reusable grants and revocation.

@@ -201,13 +201,21 @@ for (const selection of [42000] as const) {
   test(`starting SQL binds loopback, uses durable volume, and avoids password command arguments (${mode})`, async t => {
     const runtime = await localWorkspaceFixture(t, selection);
     const calls: string[][] = [];
+    const resources = new Map<string, { name: string; creation: string | undefined }>();
     const runner: Run = async (_command, args, options) => {
       calls.push([...args]);
       if (args[0] === 'ps') return '';
       if (args[0] === 'volume' || args[0] === 'network') {
-        if (args[1] === 'ls') return '';
+        if (args[1] === 'ls') return resources.get(args[0])?.name ?? '';
+        if (args[1] === 'inspect') return JSON.stringify({
+          workspace: runtime.id, role: args[0] === 'volume' ? 'sql' : 'sql-network',
+          creation: resources.get(args[0])?.creation,
+        });
         assert.equal(args[1], 'create');
         assert.ok(args.includes(`sql-apps.workspace=${runtime.id}`));
+        resources.set(args[0], {
+          name: args.at(-1)!, creation: args.find(arg => arg.startsWith('sql-apps.creation='))?.slice('sql-apps.creation='.length),
+        });
         return '';
       }
       if (args.includes('{{json .State}}')) return JSON.stringify({ StartedAt: new Date(Date.now() - 10_000).toISOString(), Status: 'running' });
@@ -382,4 +390,122 @@ test('start-sql preserves an orphaned owned volume instead of resetting its pass
     assert.fail(`Unexpected fixture command: ${args.join(' ')}`);
   }), /Owned SQL volume exists without its credential-bearing container/);
   assert.equal(calls.some(call => call[0] === 'run'), false);
+});
+
+for (const failure of ['volume', 'network', 'container', 'created-container']) {
+  test(`start-sql resumes initial creation after interrupted ${failure} without changing credentials`, async t => {
+    const runtime = await localWorkspaceFixture(t, 42100);
+    let volume = false;
+    let network = false;
+    let exists = false;
+    let interrupted = false;
+    let changedPassword = false;
+    let starts = 0;
+    let creation = '';
+    let password: string | undefined;
+    const path = `${runtime.names.sqlState}.creation.json`;
+    const runner: Run = async (_command, args, options) => {
+      const format = args.at(-1) ?? '';
+      if (args[0] === 'ps') return exists ? runtime.sqlContainer : '';
+      if (args[0] === 'volume') {
+        if (args[1] === 'ls') return volume ? `${runtime.sqlContainer}-data` : '';
+        if (args[1] === 'inspect') return JSON.stringify({ workspace: runtime.id, role: 'sql', creation });
+        assert.equal(args[1], 'create');
+        const pending = JSON.parse(await readFile(path, 'utf8'));
+        creation = pending.token;
+        assert.ok(creation);
+        assert.ok(args.includes(`sql-apps.creation=${creation}`));
+        assert.equal(pending.workspace, runtime.id);
+        assert.equal(pending.container, runtime.sqlContainer);
+        password = pending.password;
+        volume = true;
+      } else if (args[0] === 'network') {
+        if (args[1] === 'ls') return network ? runtime.names.sqlNetwork : '';
+        if (args[1] === 'inspect') return JSON.stringify({ workspace: runtime.id, role: 'sql-network' });
+        assert.equal(args[1], 'create');
+        network = true;
+      } else if (args[0] === 'run') {
+        assert.equal(options?.env?.MSSQL_SA_PASSWORD, password);
+        assert.ok(options?.redact?.includes(password!));
+        assert.equal(args.some(arg => arg.includes(password!)), false);
+        if (failure !== 'container' || interrupted) exists = true;
+      } else if (args[0] === 'inspect') {
+        if (format.includes('HostConfig.PortBindings')) return JSON.stringify({
+          workspace: runtime.id, image: sqlImage,
+          ports: { '1433/tcp': [{ HostIp: '127.0.0.1', HostPort: String(runtime.ports.sql) }] },
+        });
+        if (format.includes('Mounts')) return JSON.stringify([
+          { Type: 'volume', Name: `${runtime.sqlContainer}-data`, Destination: '/var/opt/mssql' },
+        ]);
+        if (format.includes('Config.Env')) return JSON.stringify([
+          `MSSQL_SA_PASSWORD=${changedPassword ? 'a-different-password' : password}`,
+        ]);
+        if (format.includes('json .State')) return JSON.stringify({
+          Status: 'running', StartedAt: new Date(Date.now() - 10000).toISOString(),
+        });
+        return 'sql';
+      } else if (args[0] === 'exec') {
+        return args.some(arg => arg.includes('stat -c %Y')) ? String(Math.floor(Date.now() / 1000)) : '5|SQL Azure';
+      } else {
+        assert.equal(args[0], 'start');
+        starts++;
+      }
+      if (!interrupted && ((failure === args[0]) || (failure.endsWith('container') && args[0] === 'run'))) {
+        interrupted = true;
+        throw new Error('Synthetic initial creation interruption');
+      }
+      return '';
+    };
+    await assert.rejects(startLocalSql(runtime.sqlContainer, runner), /Synthetic initial creation interruption/);
+    const pending = JSON.parse(await readFile(path, 'utf8'));
+    if (failure === 'volume') {
+      await writeFile(path, JSON.stringify({ ...pending, workspace: 'another-workspace' }));
+      await assert.rejects(startLocalSql(runtime.sqlContainer, runner), /another workspace/);
+      await writeFile(path, JSON.stringify(pending));
+    } else if (failure === 'container') {
+      creation = 'another-creation';
+      await assert.rejects(startLocalSql(runtime.sqlContainer, runner), /Owned SQL volume/);
+      creation = pending.token;
+    } else if (failure === 'created-container') {
+      changedPassword = true;
+      await assert.rejects(startLocalSql(runtime.sqlContainer, runner), /credentials differ/);
+      assert.equal(starts, 0);
+      changedPassword = false;
+    }
+    await startLocalSql(runtime.sqlContainer, runner);
+    assert.equal(password, pending.password);
+    assert.equal(exists, true);
+    await assert.rejects(readFile(path), { code: 'ENOENT' });
+    await startLocalSql(runtime.sqlContainer, runner);
+    assert.equal(password, pending.password);
+  });
+}
+
+test('start-sql refuses a volume replaced between initial discovery and creation', async t => {
+  const runtime = await localWorkspaceFixture(t, 42100);
+  const mutations: string[] = [];
+  let volume = false;
+  let network = false;
+  await assert.rejects(startLocalSql(runtime.sqlContainer, async (_command, args) => {
+    if (args[0] === 'ps') return '';
+    if (args[0] === 'volume') {
+      if (args[1] === 'ls') return volume ? `${runtime.sqlContainer}-data` : '';
+      if (args[1] === 'inspect') return JSON.stringify({
+        workspace: runtime.id, role: 'sql', creation: 'another-creation',
+      });
+      assert.equal(args[1], 'create');
+      volume = true;
+      return '';
+    }
+    if (args[0] === 'network') {
+      if (args[1] === 'ls') return network ? runtime.names.sqlNetwork : '';
+      if (args[1] === 'inspect') return JSON.stringify({ workspace: runtime.id, role: 'sql-network' });
+      assert.equal(args[1], 'create');
+      network = true;
+      return '';
+    }
+    mutations.push(args[0]!);
+    throw new Error('Unsafe container creation');
+  }), /Owned SQL volume exists without its credential-bearing container/);
+  assert.deepEqual(mutations, []);
 });

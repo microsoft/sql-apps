@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { cp, lstat, mkdir, mkdtemp, open, readFile, rm } from 'node:fs/promises';
+import { cp, lstat, mkdir, mkdtemp, open, readFile, rename, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { createRequire } from 'node:module';
 import { z } from 'zod';
@@ -17,6 +17,7 @@ import { deploymentName } from './deployment-name.js';
 import { verifyPersonalFreeArtifact } from './personal-free-build.js';
 import { verifyPersonalFreeCostGuard } from './personal-free-cost-guard.js';
 import { projectRoot, toolingRoot } from './runtime-roots.js';
+import { withStateLock } from './state-files.js';
 
 export interface PersonalFreeInitOptions {
   name: string;
@@ -124,9 +125,10 @@ function secret(): string {
   return randomBytes(32).toString('base64url');
 }
 
-export function createProtectedDeploymentState(approval: string): ProtectedDeploymentState {
+export function createProtectedDeploymentState(approval: string, config?: PersonalFreeConfig): ProtectedDeploymentState {
   return protectedDeploymentStateSchema.parse({
     approval,
+    ...(config ? { target: { subscriptionId: config.subscriptionId, resourceGroup: config.resourceGroup } } : {}),
     stage: 'new',
     sqlAdministratorPassword: secret(),
     runtimePassword: secret(),
@@ -149,6 +151,24 @@ export async function readProtectedDeploymentState(path: string): Promise<Protec
     return legacy.data;
   }
   return protectedDeploymentStateSchema.parse(await readProtectedJson(path, execute));
+}
+
+export async function readPersonalFreeDeploymentState(
+  config: PersonalFreeConfig, run: Run, approvedRevision?: string,
+): Promise<ProtectedDeploymentState> {
+  const path = personalFreeStatePath(config);
+  const state = await readProtectedDeploymentState(path);
+  if (state.target) {
+    if (state.target.subscriptionId.toLowerCase() !== config.subscriptionId.toLowerCase() ||
+        state.target.resourceGroup.toLowerCase() !== config.resourceGroup.toLowerCase()) {
+      throw new Error('Deployment state belongs to another Azure target. Use a different application name or environment; preserve the existing deployment state.');
+    }
+    return state;
+  }
+  if (state.approval !== approvedRevision) await verifyPersonalFreeCostGuard(config, state, run);
+  const bound = { ...state, target: { subscriptionId: config.subscriptionId, resourceGroup: config.resourceGroup } };
+  await saveProtectedDeploymentState(path, bound);
+  return bound;
 }
 
 export function approveProtectedDeploymentRevision(
@@ -371,14 +391,27 @@ export function personalFreeStatePath(config: PersonalFreeConfig): string {
 async function withApprovedArtifact<T>(
   config: PersonalFreeConfig,
   approval: string,
+  source: 'plan' | 'deployment',
   action: (artifact: string) => Promise<T>,
 ): Promise<T> {
+  if (!/^[a-f0-9]{12}$/.test(approval)) throw new Error('Deployment approval is invalid; use the reviewed approval code');
   const directory = join(projectRoot, '.sql-apps', 'deployments');
   await mkdir(directory, { recursive: true });
+  const retained = join(directory, `${config.name}-${config.environment}-${approval}-artifact`);
+  let retainedInfo;
+  try { retainedInfo = await lstat(retained); }
+  catch (error) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+  }
+  if (retainedInfo && (!retainedInfo.isDirectory() || retainedInfo.isSymbolicLink())) {
+    throw new Error('Retained deployment artifact must be an unlinked directory');
+  }
+  const input = source === 'deployment' && retainedInfo
+    ? retained : join(directory, `${config.name}-${config.environment}-plan`);
   const snapshot = await mkdtemp(join(directory, `${config.name}-${config.environment}-deploy-`));
   try {
     try {
-      await cp(join(directory, `${config.name}-${config.environment}-plan`), snapshot, { recursive: true });
+      await cp(input, snapshot, { recursive: true });
     } catch (cause) {
       if (!(cause instanceof Error && 'code' in cause && cause.code === 'ENOENT')) throw cause;
       throw new Error('Approved personal-free artifact is missing; run plan and review its approval code before deployment', { cause });
@@ -386,6 +419,13 @@ async function withApprovedArtifact<T>(
     const manifest = await verifyPersonalFreeArtifact(snapshot);
     if (planPersonalFreeDeployment(config, manifest.sourceHash).approval !== approval) {
       throw new Error('Deployment approval is stale; run plan again and review the current target and artifact');
+    }
+    if (!retainedInfo) {
+      await rename(snapshot, retained);
+      return await action(retained);
+    }
+    if (input !== retained && (await verifyPersonalFreeArtifact(retained)).sourceHash !== manifest.sourceHash) {
+      throw new Error('Retained deployment artifact does not match the approved plan; preserve it and review the deployment');
     }
     return await action(snapshot);
   } finally {
@@ -430,17 +470,18 @@ export async function deployPersonalFree(
     approval: string,
     run: Run,
   ): Promise<ProtectedDeploymentState> {
-  return withApprovedArtifact(config, approval, async artifact => {
+  return withStateLock(personalFreeStatePath(config), () => withApprovedArtifact(config, approval, 'plan', async artifact => {
     const statePath = personalFreeStatePath(config);
     let state: ProtectedDeploymentState;
     try {
-      state = await readProtectedDeploymentState(statePath);
+      state = await readPersonalFreeDeploymentState(config, run, approval);
       const revised = approveProtectedDeploymentRevision(state, approval);
       if (revised.approval !== state.approval) await saveProtectedDeploymentState(statePath, revised);
       state = revised;
     } catch (error) {
-      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
-      state = createProtectedDeploymentState(approval);
+      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT' &&
+          'path' in error && error.path === statePath)) throw error;
+      state = createProtectedDeploymentState(approval, config);
       await saveProtectedDeploymentState(statePath, state);
     }
     await requireProviders(config, run);
@@ -479,7 +520,7 @@ export async function deployPersonalFree(
       await saveProtectedDeploymentState(statePath, state);
       return state;
     }
-  });
+  }));
 }
 
 export async function rotatePersonalFreeRuntimeSecret(
@@ -487,9 +528,9 @@ export async function rotatePersonalFreeRuntimeSecret(
     approval: string,
     run: Run,
 ): Promise<ProtectedDeploymentState> {
-  return withApprovedArtifact(config, approval, async artifact => {
+  return withStateLock(personalFreeStatePath(config), () => withApprovedArtifact(config, approval, 'deployment', async artifact => {
     const statePath = personalFreeStatePath(config);
-    let state = await readProtectedDeploymentState(statePath);
+    let state = await readPersonalFreeDeploymentState(config, run, approval);
     if (state.approval !== approval) throw new Error('Rotation approval does not match this deployment');
     if (!state.sqlServer || !state.staticWebAppName || !state.staticWebAppHostname) {
       throw new Error('Deploy the application before rotating its runtime secret');
@@ -516,5 +557,5 @@ export async function rotatePersonalFreeRuntimeSecret(
     state = { ...state, stage: 'ready' };
     await saveProtectedDeploymentState(statePath, state);
     return state;
-  });
+  }));
 }

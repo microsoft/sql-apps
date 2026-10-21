@@ -58,6 +58,13 @@ test('publish status verifies live free settings and fails closed on drift', asy
   };
 
   const messages: string[] = [];
+  const missingAzure: Run = async () => {
+    throw Object.assign(new Error('spawn az ENOENT'), { code: 'ENOENT' });
+  };
+  await assert.rejects(
+    main(['status', '--config', configPath], () => {}, missingAzure),
+    /spawn az ENOENT/,
+  );
   await main(['status', '--config', configPath], message => messages.push(message), run);
   assert.match(messages.join('\n'), /Cost guard: verified/);
   assert.match(messages.join('\n'), /Static Web Apps: Free/);
@@ -69,9 +76,6 @@ test('publish status verifies live free settings and fails closed on drift', asy
     /Static Web Apps SKU is Standard\/Standard/,
   );
 
-  const missingAzure: Run = async () => {
-    throw Object.assign(new Error('spawn az ENOENT'), { code: 'ENOENT' });
-  };
   await assert.rejects(
     main(['status', '--config', configPath], () => {}, missingAzure),
     /spawn az ENOENT/,
@@ -100,6 +104,20 @@ test('publish status verifies live free settings and fails closed on drift', asy
     /--provider must be aad or github/,
   );
   assert.equal(invitations.length, 2);
+
+  for (const changed of [
+    { ...config, resourceGroup: 'another-resource-group' },
+    { ...config, subscriptionId: '44444444-4444-4444-8444-444444444444' },
+  ]) {
+    await writeFile(configPath, JSON.stringify(changed));
+    const commands: string[][] = [];
+    const changedRun: Run = async (_command, args) => { commands.push([...args]); return ''; };
+    await assert.rejects(main(['status', '--config', configPath], () => {}, changedRun), /another Azure target/);
+    await assert.rejects(main([
+      'invite-owner', '--provider', 'aad', '--user', 'owner@example.com', '--config', configPath,
+    ], () => {}, changedRun), /another Azure target/);
+    assert.deepEqual(commands, []);
+  }
 });
 
 test('publish init requires explicit region, subscription, resource group, environment, sharing and client IP choices', async t => {

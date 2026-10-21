@@ -27,6 +27,7 @@ export interface PersonalFreeRequest {
 }
 
 const scalar = z.union([z.string(), z.boolean(), z.number(), z.null()]);
+const dateTime = z.union([z.iso.date(), z.iso.datetime({ offset: true, local: true })]);
 
 export function parsePersonalFreeBody(text: string): unknown {
   try {
@@ -48,7 +49,9 @@ function validParameter(type: ProcedureDefinition['parameters'][string], value: 
     return typeof value === 'number' && Number.isInteger(value) &&
       value >= -2_147_483_648 && value <= 2_147_483_647;
   }
-  return typeof value === 'string' && Number.isFinite(Date.parse(value));
+  if (typeof value !== 'string' || !dateTime.safeParse(value).success) return false;
+  const year = new Date(value).getUTCFullYear();
+  return year >= 1 && year <= 9999;
 }
 
 // Query strings carry only text, so declared int/bit parameters are converted from their canonical forms.
