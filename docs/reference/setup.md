@@ -9,11 +9,17 @@ The coordinator requires Node 22 or 24 but no application build. Before restore,
 run your [verified archive CLI](../guides/getting-started.md#2-select-the-cli-and-optional-assistant-guidance)
 by absolute path from the app directory: `node $cli setup plan --json`.
 An external matching-version archive package is still bootstrap-only. The
-installed plugin can alternatively bootstrap through an explicit foundation selection
-(`SQL_APPS_FOUNDATION_HOME` or the Copilot installer binding).
+installed plugin can alternatively bootstrap through explicit
+`SQL_APPS_TOOLING_HOME` selection of that package or a contributor checkout.
 If Node is missing, the assistant must first inspect the OS/CPU and obtain
 approval for an official compatible Node installer. A Node script cannot
 bootstrap its own missing runtime. Preserve existing version managers.
+
+Restore/build prerequisites (Node, npm and the selected .NET SDK) gate their own
+work. Missing Docker, SQL runtime access or a free service port does not prevent
+approved dependency restore/build; those checks still block workspace startup.
+A positively identified absent SQL image is an approved-startup download, not
+proof of registry access. Unrecognized inspection failures remain blockers.
 
 Generated-project prerequisite checks use the validated project context and
 Node package resolution, including dependencies hoisted beside the installed
@@ -83,7 +89,7 @@ that times out twice reports `NPM_TREE_PROBE_TIMEOUT` or
 treating it as a missing dependency.
 
 Before workspace initialization, prerequisite port checks use the explicit
-`--workspace <base-port|legacy>` selection or the proposed isolated block.
+`--workspace <base-port>` selection or the proposed isolated block.
 An unrelated gateway on legacy ports does not block a free isolated workspace.
 The raw diagnostic accepts the same `--workspace` flag for read-only checks;
 neither command records a workspace selection or reserves those ports.
@@ -154,9 +160,8 @@ Use the same selection for planning and approval:
 
 ```powershell
 npm run setup -- plan --sql-provider express --sql-target "C:\path\express-target.json" --json
-npm run setup -- approval --sql-provider express --sql-target "C:\path\express-target.json"
-# Only after approving the displayed effects, run its printed approve command.
-npm run setup -- run --json
+# Only after approving the displayed effects, run its printed command with the same target:
+npm run setup -- run --sql-provider express --sql-target "C:\path\express-target.json" --approval <printed-id> --json
 ```
 
 Only matching approval saves `.sql-apps/sql-target.json`. The selection is sticky
@@ -201,14 +206,14 @@ require inspection and fresh review before retrying.
 
 Existing-instance changes are **not** part of installation or app startup.
 After selecting the target, review `consent plan configure-express`, approve it
-with `grant --once`, then run `local configure-express`. This separately enables
+with `grant-once`, then run `local configure-express`. This separately enables
 contained authentication, selects loopback-only static TCP and restarts that
 instance; it affects every database there. Use an already-approved administrator
 terminal. Startup creates a new partially contained app database if missing,
 but refuses to change an existing database's containment automatically.
 Password-based contained users also require mixed-mode SQL authentication.
 If inspection reports Windows-only or unknown authentication, separately review
-`consent plan configure-express-auth`, approve with `grant --once`, then run
+`consent plan configure-express-auth`, approve with `grant-once`, then run
 `local configure-express-auth` from an approved administrator terminal.
 This enables mixed mode and restarts only that instance; it changes authentication
 policy for every database there. It does not enable/reset SA, create a
@@ -327,20 +332,20 @@ With pinned tooling installed, local startup needs one reviewed approval per che
 then record it only after explicit human approval:
 
 ```powershell
-npm run setup -- approval --profile role-based-data --workspace 30000
-npm run setup -- approve --profile role-based-data --workspace 30000 --approval <id>
+npm run setup -- plan --profile role-based-data --workspace 30000
+npm run setup -- run --profile role-based-data --workspace 30000 --approval <id>
 npm run setup -- run --profile role-based-data --workspace 30000 --json
 ```
 
-`approval` proposes a free port block when none is selected and lists every
+`plan` proposes a free port block when none is selected and lists every
 scope it covers for the startup operation `app`: restore, build, the workspace,
 image downloads and SQL startup (`sql-start`), schema, services, `synthetic`
 (the read-only SQL acceptance check on the least-privilege app user during
 `init`), and a SQL terms line (startup passes `ACCEPT_EULA=Y` for the
 [container terms](https://aka.ms/azuresqldb-container), no other license). It
 also lists what stays separate: tool installs, stop/recovery and Azure.
-`approve` re-plans and refuses a stale id, so a changed plan must be shown
-again. `run` and `resume` themselves never record approvals. Existing matching
+`run --approval <id>` re-plans and refuses a stale id, so a changed plan must be shown
+again. `run` without an approval id never records approvals. Existing matching
 grants are reused; see [Remember local permissions](local-consent.md).
 This approval can be reviewed and recorded before
 `role-based-data.json`, DAB entities and procedures are complete. The coordinator
@@ -351,11 +356,11 @@ domain inputs are valid.
 After a stop or a new session, resume without another approval:
 
 ```powershell
-npm run setup -- resume --json
+npm run setup -- run --json
 ```
 
 For agreed external SQL reuse, pass the same `--container <name>` to
-`plan`, `run` and `resume`. Review and grant the individual
+`plan` and `run`. Review and grant the individual
 `consent-plan app <name>` target through
 [local consent](local-consent.md); the setup approval bundle covers only
 workspace-owned SQL. Gateway identity checks match the selected container,
@@ -364,7 +369,7 @@ Ownership and engine checks remain in the existing runtime. No automatic
 volume deletion, credential reset, foreign-process termination or SQL recovery
 is performed.
 
-`run`/`resume` stop at the first unmet gate. They execute only existing guarded
+`run` stops at the first unmet gate. It executes only existing guarded
 operations, skip current npm/SQL restores and builds, and re-plan after each
 stage. Failed commands preserve completed work and report a named blocker; they
 are not blindly retried. Process output/progress is stderr and JSON results are

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { initializeWorkspace, runtimeFor } from '../src/workspace.mjs';
 
-export async function localWorkspaceFixture(t: TestContext, selection?: number | 'legacy') {
+export async function localWorkspaceFixture(t: TestContext, selection?: number) {
   const home = await mkdtemp(join(tmpdir(), 'sql-apps-local-test-'));
   const original = process.cwd();
   t.after(async () => {

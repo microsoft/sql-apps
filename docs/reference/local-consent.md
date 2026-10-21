@@ -31,13 +31,14 @@ contain no credentials. Re-probe tools after installation/restart.
 
 1. Confirm the canonical application checkout and inspect setup read-only.
 2. Install missing tools only, each with its own reviewed plan.
-3. With pinned tooling installed, run `setup approval --profile role-based-data --workspace <base-port>`. It
+3. With pinned tooling installed, run `setup plan --profile role-based-data --workspace <base-port>`. It
    lists restore, build, workspace selection, image downloads, SQL startup,
    schema, services, the read-only SQL acceptance check and the SQL terms line
    together, plus what is excluded. Present it once.
-4. After explicit approval, run the printed `setup approve ... --approval <id>`.
+4. After explicit approval, run the printed `setup run ... --approval <id>`.
    It records every listed grant and the inline terms acknowledgement under one
-   lock and refuses a stale id. Then `setup run`.
+   lock and refuses a stale id, then executes approved missing stages. Rerun
+   `setup run` to continue after a separately resolved blocker.
 5. On return, matching grants are reused. Editing application SQL, DAB
    configuration or `role-based-data.json` does not ask again; changed launcher
    code, ports, profile or terms do. A failed approval control captures nothing.
@@ -50,6 +51,8 @@ Before the first restore, the plugin's explicit foundation selection provides
 bootstrap planning and approved restore only. Setup stops after restore; plan
 again through the installed pinned package and review changed approval scopes.
 Bootstrap grants do not silently authorize a different implementation.
+Individual bootstrap grants are limited to restore too; build/runtime grants
+must be reviewed through the installed app-local tooling.
 
 Deliver an approved useful slice early and label synthetic or mock-only
 behavior. Use the validation skill for current workflow evidence; saved grants
@@ -104,11 +107,12 @@ npm run consent -- plan workspace-init 30000
 
 Replace `30000` with the reviewed free port block from `workspace-plan`. Grant
 the reviewed workspace plan and execute `npm run local -- workspace-init 30000`.
-For an existing fixed-port stack, explicitly choose `legacy` instead. This only
-records a descriptor; it does not authorize startup, migrate data or delete it.
+This only records a descriptor; it does not authorize startup, migrate data or delete it.
+Fixed-port and helper-front-door descriptors are unsupported; resources are
+preserved rather than automatically adopted or migrated.
 Creating the descriptor preserves checkout-level restore/build grants.
 
-Once selected, plan the startup operation `app` (`role-based-app` is an alias).
+Once selected, plan the startup operation `app`.
 The plan lists all of its scopes before any startup side effect. Record that
 reviewed plan once rather than repeating prompts after each completed stage.
 
@@ -160,7 +164,7 @@ Permission errors for a still-existing lock remain explicit failures.
 `recover-sql` needs `grant-once <absolute-plan.json>`, not a persistent grant.
 After explicit approval, the direct runtime CLI consumes the grant **before**
 dispatch; even a failed operation needs renewed approval. Recovery still refuses
-running/external/legacy SQL and preserves image, credentials and volume.
+running or external SQL and preserves image, credentials and volume.
 
 ## Scope and invalidation
 
@@ -168,7 +172,7 @@ running/external/legacy SQL and preserves image, credentials and volume.
 | --- | --- |
 | `restore` | npm/NuGet tool restore, downloads and local disk writes; dependency-manifest changes require review. |
 | `build` | Runtime/browser/SQL build effects; ordinary app source edits do not revoke the build permission, but changed build scripts/targets do. |
-| `workspace` | Descriptor creation for the explicit checkout and selected port block or legacy mode. |
+| `workspace` | Descriptor creation for the explicit checkout and selected isolated port block. |
 | `sql-start` | Start/create owned SQL resources and download its image, with matching reviewed terms. |
 | `schema` | Non-destructive schema/grant publication to the declared local database; changes to the schema launcher or role-based profile code require review, application SQL edits do not. |
 | `services` | Start/reuse the role-based-data loopback DAB container and browser gateway with their image/configuration effects. Changed launcher code requires review; DAB configuration and `role-based-data.json` edits do not. |
@@ -189,8 +193,7 @@ selected runtime execution; permission reuse never makes a stale build usable.
 
 Read-only `help`, `workspace-plan`, `verify` and `app-check` do not require a
 grant; ownership and runtime readiness checks still apply. Local mutations
-require explicit workspace selection, including `workspace-init legacy` for an
-existing fixed-port stack.
+require an explicitly approved isolated workspace selection.
 
 `app-test` takes no container selection: it tests the selected workspace gateway.
 It rejects a container argument rather than recording permission for a target

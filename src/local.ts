@@ -334,8 +334,6 @@ async function testLocalSql(state: LocalState, run: Run): Promise<void> {
   const sql = (await readFile(projectPath('sql', 'local', 'acceptance.sql'), 'utf8')).replaceAll('$(LocalDabUser)', login);
   const result = await databaseQuery(state, sql, run);
   if (!result.includes('LOCAL SQL ACCEPTANCE PASSED')) throw new Error('SQL acceptance did not report success');
-  const { recordCreationCapability } = await import('./creation-session.mjs');
-  await recordCreationCapability(runtimeFor().home, 'data', 'verified', 'Least-privilege SQL schema and query acceptance passed.');
 }
 
 export function localPrincipal(oid: string, scope = 'access_as_user', role = 'authenticated'): string {

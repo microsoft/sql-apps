@@ -46,7 +46,7 @@ test('SQL Apps identity is consistent across packages, platform manifests and ma
     assert.equal(manifest.name, 'sql-apps', path);
     assert.equal(manifest.homepage, repository, path);
     assert.equal(manifest.repository, repository, path);
-    assert.equal(manifest.version, '0.2.5', path);
+    assert.equal(manifest.version, '0.1.0', path);
     assert.deepEqual(manifest.author, { name: 'Microsoft SQL team (mssql)', url: 'https://github.com/microsoft' }, path);
   }
   for (const path of ['.github/plugin/marketplace.json', '.claude-plugin/marketplace.json', '.agents/plugins/marketplace.json']) {
@@ -118,7 +118,7 @@ test('setup safety is enforced by executable coordinator paths', async () => {
   assert.doesNotMatch(launcherSource, /Run npm run build/, 'missing-build guidance must use the guarded consent-run build path');
   assert.match(launcherSource, /consent-run build/);
   const setup = await readFile(resolve('scripts', 'setup.mjs'), 'utf8');
-  assert.match(setup, /setup approve needs --approval/);
+  assert.match(setup, /--approval takes the 12-character id shown by setup plan/);
   assert.match(setup, /Setup stopped at/);
   assert.match(setup, /no automatic restart was performed/);
 });
@@ -258,6 +258,25 @@ test('SQL Apps requires rendered browser review with bounded evidence claims', a
   assert.match(gettingStarted, /after authorized startup[\s\S]*real browser action[\s\S]*SQL save\/reload/i);
   assert.match(gettingStarted, /never claim unobserved checks passed/i);
   assert.match(boundary, /blocked[\s\S]*user-reported/i);
+});
+
+test('assistant guidance keeps creation scaffold-only and browser use capability-based', async () => {
+  const readSkill = (name: string) =>
+    readFile(resolve('plugins', 'sql-apps', 'skills', `sql-apps-${name}`, 'SKILL.md'), 'utf8');
+  const application = await readSkill('application');
+  assert.match(application, /projects create-plan "<name>" --archive "<absolute-tgz>"/);
+  assert.match(application, /projects create "<name>" --archive "<absolute-tgz>" --approval <id>/);
+  assert.match(await readSkill('getting-started'), /sql-apps-application.*authoritative project-creation/);
+  const local = await readSkill('local');
+  assert.match(local, /progress in chat/i);
+  assert.match(local, /Creation never starts a helper or browser/i);
+  assert.match(local, /external browser[\s\S]*explicit.*request/i);
+  const design = await readSkill('design');
+  assert.match(design, /native browser\/preview sessions/i);
+  const validation = await readSkill('validation');
+  assert.match(validation, /available, authorized in-app browser\/preview tools/i);
+  assert.match(validation, /localhost[\s\S]*missing evidence/i);
+  assert.match(validation, /external browser[\s\S]*explicit.*request/i);
 });
 
 test('workflow skill descriptions use discovery triggers rather than workflow summaries', async () => {
@@ -489,19 +508,19 @@ test('agent guidance stays concise, stack-neutral and script-led', async () => {
   assert.doesNotMatch(design, /Done \/ Working \/ Next \/ Blocked/);
 });
 
-test('plugin launcher binds the actual checkout independently of plugin cache/session directory', async t => {
+test('plugin launcher ignores provider bindings and requires project selection outside a checkout', async t => {
   const profile = await mkdtemp(join(tmpdir(), 'sql-apps-plugin-'));
   const userHome = await mkdtemp(join(tmpdir(), 'sql-apps-plugin-home-'));
   t.after(() => rm(profile, { recursive: true, force: true }));
   t.after(() => rm(userHome, { recursive: true, force: true }));
   const home = resolve('.');
   await writeFile(join(profile, 'sql-apps-local.json'), JSON.stringify({ version: 1, home }));
-  assert.equal((await probe('process.chdir(process.env.COPILOT_HOME); console.log(await resolveHome({ userHome: process.env.TEST_USER_HOME }));',
-    { COPILOT_HOME: profile, SQL_APPS_HOME: undefined, TEST_USER_HOME: userHome })).trim(), home);
+  await assert.rejects(probe('process.chdir(process.env.COPILOT_HOME); console.log(await resolveHome());',
+    { COPILOT_HOME: profile, SQL_APPS_HOME: undefined }), /Select a SQL Apps project.*SQL_APPS_HOME/);
   assert.equal((await probe('console.log(await resolveHome());', { SQL_APPS_HOME: home })).trim(), home);
 });
 
-test('plugin launcher reports invalid bindings and commands rather than falling back silently', async t => {
+test('plugin launcher rejects invalid explicit selections and ignores malformed obsolete bindings', async t => {
   const profile = await mkdtemp(join(tmpdir(), 'sql-apps-plugin-invalid-'));
   const userHome = await mkdtemp(join(tmpdir(), 'sql-apps-plugin-invalid-home-'));
   t.after(() => rm(profile, { recursive: true, force: true }));
@@ -509,7 +528,7 @@ test('plugin launcher reports invalid bindings and commands rather than falling 
   await mkdir(join(profile, 'not-sql-apps'));
   await writeFile(join(profile, 'sql-apps-local.json'), '{ invalid');
   await assert.rejects(probe('process.chdir(process.env.COPILOT_HOME); await resolveHome({ userHome: process.env.TEST_USER_HOME });',
-    { COPILOT_HOME: profile, SQL_APPS_HOME: undefined, TEST_USER_HOME: userHome }), /JSON|SyntaxError/);
+    { COPILOT_HOME: profile, SQL_APPS_HOME: undefined, TEST_USER_HOME: userHome }), /Select a SQL Apps project/);
   await assert.rejects(probe('await resolveHome();', { SQL_APPS_HOME: join(profile, 'not-sql-apps') }), /ENOENT/);
   await assert.rejects(run(process.execPath, [launcher, 'deploy']), /Unsupported plugin command/);
   await assert.rejects(run(process.execPath, [launcher, 'verify', 'invalid;container']), /Invalid SQL container name/);
@@ -531,14 +550,14 @@ test('copied plugin selects the explicit application outside its cache and sessi
   assert.deepEqual((await readdir(fixture)).sort(), ['plugin cache', 'unrelated session']);
 });
 
-test('missing foundation selection explains SQL_APPS_HOME without requiring a Copilot install', async t => {
+test('missing tooling selection explains the verified archive route without requiring a Copilot install', async t => {
   const fixture = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-no-home-')));
   t.after(() => rm(fixture, { recursive: true, force: true }));
   const url = pathToFileURL(launcher).href;
   await assert.rejects(run(process.execPath, ['--input-type=module', '-e',
     `const { dispatchProjects } = await import(${JSON.stringify(url)});
      await dispatchProjects(['list'], { environment: {}, cwd: ${JSON.stringify(fixture)}, userHome: ${JSON.stringify(fixture)} });`]),
-  /SQL_APPS_(?:FOUNDATION_)?HOME.*absolute.*foundation/i);
+  /SQL_APPS_TOOLING_HOME.*absolute.*package/i);
   await assert.rejects(probe(`await resolveHome({ environment: { SQL_APPS_HOME: 'relative' }, cwd: ${JSON.stringify(fixture)}, userHome: ${JSON.stringify(fixture)} });`),
     /absolute checkout path/);
   assert.deepEqual(await readdir(fixture), []);
@@ -586,20 +605,15 @@ test('plugin dispatch uses checkout cwd, passes literal arguments and preserves 
   assert.equal(output.cwd, home);
   assert.deepEqual(output.args, ['verify', 'custom-sql']);
   // Dispatch checks below only read the fixture, so independent launches run concurrently.
-  await Promise.all(['role-based-app', 'role-based-serve'].map(async command => {
+  await Promise.all(['app', 'serve'].map(async command => {
     const selected = JSON.parse(await run(process.execPath, [launcher, command, 'custom-sql'], { env: { SQL_APPS_HOME: home } }));
     assert.equal(selected.cwd, home);
     assert.deepEqual(selected.args, [command, 'custom-sql']);
   }));
-  const artifact = join(home, '.sql-apps', 'selected artifact; literal');
-  await Promise.all(['selected-app', 'selected-serve', 'selected-test'].map(async command => {
-    const selected = JSON.parse(await run(process.execPath, [launcher, command, artifact], { env: { SQL_APPS_HOME: home } }));
-    assert.equal(selected.cwd, home);
-    assert.deepEqual(selected.args, [command, artifact]);
-    await assert.rejects(run(process.execPath, [launcher, command, 'relative-artifact'], { env: { SQL_APPS_HOME: home } }), /absolute artifact/);
+  await Promise.all(['selected-app', 'selected-serve', 'selected-test', 'selected-stop',
+    'role-based-app', 'role-based-serve', 'role-based-setup-check'].map(async command => {
+    await assert.rejects(run(process.execPath, [launcher, command], { env: { SQL_APPS_HOME: home } }), /Unsupported plugin command/);
   }));
-  const stopped = JSON.parse(await run(process.execPath, [launcher, 'selected-stop', 'inventory'], { env: { SQL_APPS_HOME: home } }));
-  assert.deepEqual(stopped.args, ['selected-stop', 'inventory']);
   const configuredStatus = JSON.parse(await probe(`
     const { initializeWorkspace } = await import(${JSON.stringify(pathToFileURL(resolve('src', 'workspace.mjs')).href)});
     await initializeWorkspace(process.env.SQL_APPS_HOME, 31000, async () => 'free');
@@ -613,8 +627,6 @@ test('plugin dispatch uses checkout cwd, passes literal arguments and preserves 
   const setup = JSON.parse(await run(process.execPath, [launcher, 'setup-check', 'custom-sql'], { env: { SQL_APPS_HOME: home } }));
   assert.equal(setup.cwd, home);
   assert.deepEqual(setup.args, ['--json', '--container', 'custom-sql']);
-  const roleBasedSetup = JSON.parse(await run(process.execPath, [launcher, 'role-based-setup-check', 'custom-sql'], { env: { SQL_APPS_HOME: home } }));
-  assert.deepEqual(roleBasedSetup.args, ['--json', '--profile', 'role-based-data', '--container', 'custom-sql']);
   await rm(join(home, 'dist'), { recursive: true });
   await writeFile(join(home, 'scripts/setup.mjs'),
     'console.log(JSON.stringify({cwd:process.cwd(),args:process.argv.slice(2)}));');
@@ -623,7 +635,7 @@ test('plugin dispatch uses checkout cwd, passes literal arguments and preserves 
     { env: { SQL_APPS_HOME: home } }));
   assert.equal(journey.cwd, home);
   assert.deepEqual(journey.args, ['plan', '--profile', 'role-based-data', '--workspace', '30000', '--json']);
-  const endpointApproval = ['approve', '--profile', 'role-based-data', '--workspace', '30000',
+  const endpointApproval = ['run', '--profile', 'role-based-data', '--workspace', '30000',
     '--sql-provider', 'express', '--sql-target', join(home, 'target.json'), '--approval', 'a'.repeat(12)];
   const forwardedApproval = JSON.parse(await run(process.execPath, [launcher, 'setup', ...endpointApproval],
     { env: { SQL_APPS_HOME: home } }));
@@ -645,7 +657,7 @@ test('plugin dispatch uses checkout cwd, passes literal arguments and preserves 
     'console.log(JSON.stringify({cwd:process.cwd(),args:process.argv.slice(2)}));');
   await Promise.all([
     ...([
-      ['consent-plan', ['role-based-app', 'custom-sql']],
+      ['consent-plan', ['app', 'custom-sql']],
       ['consent-status', ['build']],
       ['consent-grant', [briefPath]],
       ['consent-grant-once', [briefPath]],
@@ -664,5 +676,5 @@ test('plugin dispatch uses checkout cwd, passes literal arguments and preserves 
   await mkdir(join(home, 'dist/src'), { recursive: true });
   await writeFile(join(home, 'dist/src/local-cli.js'), 'process.exitCode=7;');
   await recordFixture(home);
-  await assert.rejects(run(process.execPath, [launcher, 'test'], { env: { SQL_APPS_HOME: home } }), /failed \(7\)/);
+  await assert.rejects(run(process.execPath, [launcher, 'app-test'], { env: { SQL_APPS_HOME: home } }), /failed \(7\)/);
 });

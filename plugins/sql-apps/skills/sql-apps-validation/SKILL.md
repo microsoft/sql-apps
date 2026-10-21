@@ -22,7 +22,10 @@ Use `docs/maintainers/application-boundary.md` for source, SQL model and live AP
 
 ## Live workflow evidence
 
-For approved running local apps, run sequential launcher checks: `app-check` (clean database), `test` (read-only SQL), `app-test` (Development Alice admitted, Bob 403). Fixture writes/restarts need documented approval; startup belongs to `sql-apps-local`. Cloud probes follow the publisher contract.
+For approved local apps, use declared application checks and `app-test`
+(Development Alice admitted, Bob 403). Example-only `app-check`/`test` commands
+are not generated-app commands. Fixture writes/restarts need documented approval;
+startup belongs to `sql-apps-local`. Cloud probes follow the publisher contract.
 
 Apply **Domain contracts and live acceptance** from the boundary reference:
 
@@ -32,15 +35,19 @@ Apply **Domain contracts and live acceptance** from the boundary reference:
 
 Unavailable input/services/tools mean missing evidence. Forced DOM clicks, mocks, source review, health and compilation do not prove workflows.
 
-For performance work or changed reads, apply `docs/reference/read-performance.md` for comparable before/after measurements, sample counts and correctness checks. Report unobserved performance as missing evidence within functional acceptance.
+For performance/changed reads, apply `docs/reference/read-performance.md`: comparable before/after measurements, sample counts, correctness. Report unobserved performance as missing functional evidence.
 
 ## Rendered browser review
 
 Keep API/SQL acceptance, real browser workflow acceptance and rendered visual review distinct. Screenshots do not prove persistence/access; compile/API results do not prove visuals.
 
+Prefer available, authorized in-app browser/preview tools with matching sessions.
+Unreachable localhost means missing evidence. No external browser without
+explicit request; no installs/settings changes without approval.
+
 For new apps and meaningful UI changes, run `sql-apps-design`'s render-critique-improve loop before broad coverage. Verify the intended origin; use semantic browser inspection and real interactions. Never invent or confuse page/instance handles. Inspect desktop and narrow widths; if tooling fails, discover supported alternatives. Source review or opening a tab is not visual review. If blocked, state exact evidence not observed separately from user-reported feedback.
 
-Record origin, source/build, viewport, state, artifact, findings/re-review in `docs/design-review.md` per `docs/reference/design-acceptance.md`; run `sql-apps check`. Progressive Ready additionally requires `creation accept` with retained current evidence; see `docs/reference/progressive-creation.md`.
+Record origin, source/build, viewport, state, artifact, findings/re-review in `docs/design-review.md` per `docs/reference/design-acceptance.md`; run `sql-apps check`.
 
 ## Four-verdict report
 

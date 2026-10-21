@@ -76,7 +76,6 @@ async function buildFoundation(home) {
   for (const module of [
     'workspace.mjs', 'file-lock.mjs', 'local-consent.mjs', 'local-auth.mjs', 'sql-target.mjs',
     'role-based-rules.mjs', 'project-contract.mjs', 'tooling-context.mjs',
-    'creation-progress.mjs', 'creation-session.mjs', 'creation-checks.mjs', 'creation-front-door.mjs', 'creation-acceptance.mjs',
   ]) {
     await copyFile(join(home, 'src', module), join(home, 'dist', 'src', module));
   }
@@ -84,12 +83,10 @@ async function buildFoundation(home) {
   for (const script of [
     'build-provenance.mjs', 'setup.mjs', 'setup-check.mjs', 'guide.mjs', 'workspace-check.mjs',
     'local-consent.mjs', 'check-application.mjs', 'check-application-api.mjs', 'projects.mjs', 'bind-tooling-archive.mjs',
-    'creation.mjs',
   ]) {
     await copyFile(join(home, 'scripts', script), join(home, 'dist', 'scripts', script));
   }
   const { build } = await esbuild(home);
-  await cp(join(home, 'src', 'creation-web'), join(home, 'dist', 'src', 'creation-web'), { recursive: true });
   await build({
     absWorkingDir: home,
     entryPoints: { app: 'src/web/app.ts', 'auth/redirect': 'src/web/auth-redirect.ts' },

@@ -7,7 +7,7 @@ const names = [
   'sql-apps-application', 'sql-apps-cloud-preview', 'sql-apps-design',
   'sql-apps-diagnostics', 'sql-apps-getting-started', 'sql-apps-local', 'sql-apps-validation',
 ];
-const details = `sql-apps 0.2.5
+const details = `sql-apps 0.1.0
   Source: sql-apps@inline
 Component inventory
   Skills (7)  sql-apps-application, sql-apps-cloud-preview, sql-apps-design, sql-apps-diagnostics, sql-apps-getting-started, sql-apps-local, sql-apps-validation
@@ -50,7 +50,7 @@ function cliFixture(host, change = {}) {
     }
     if (args[1] === 'list') {
       return { stdout: JSON.stringify(args[0] === 'plugin'
-        ? [{ name: 'sql-apps', marketplace: 'sql-apps-skills', version: '0.2.5', enabled: true, source: 'live' }]
+        ? [{ name: 'sql-apps', marketplace: 'sql-apps-skills', version: '0.1.0', enabled: true, source: 'live' }]
         : names.slice(0, change.missingSkill ? -1 : undefined).map(name => ({
           name, source: 'plugin', enabled: !change.disabled, path: join(copied, 'skills', name),
         }))), stderr: '' };

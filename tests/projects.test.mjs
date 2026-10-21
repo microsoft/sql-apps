@@ -7,21 +7,18 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createServer } from 'node:http';
 import { createHash } from 'node:crypto';
-import { creationSession } from '../src/creation-session.mjs';
-import { stopCreationProcess } from '../scripts/creation.mjs';
-import { portState } from '../src/workspace.mjs';
 
 const projects = await import('../scripts/projects.mjs');
 const plugin = await import('../plugins/sql-apps/scripts/sql-apps.mjs');
 const workspace = await import('../scripts/workspace-check.mjs');
 const execute = promisify(execFile);
 
-function runNpm(args, cwd) {
+function runNpm(args, cwd, environment = {}) {
   const command = process.platform === 'win32' ? process.env.ComSpec : 'npm';
   return execute(command, process.platform === 'win32'
     ? ['/d', '/s', '/c', `npm ${args.join(' ')}`] : args,
   { cwd, windowsHide: true, maxBuffer: 1024 * 1024,
-    env: { ...process.env, npm_config_update_notifier: 'false',
+    env: { ...process.env, ...environment, npm_config_update_notifier: 'false',
       npm_config_fetch_retries: '0', npm_config_fetch_timeout: '10000' } });
 }
 
@@ -149,21 +146,85 @@ test('creation approval changes when scaffold inputs change', async t => {
   assert.notEqual(after.approval, before.approval);
 });
 
+test('creation planning rejects an existing destination without changing it', async t => {
+  const source = await sourceFixture(t);
+  const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-plan-conflict-')));
+  t.after(() => rm(userHome, { recursive: true, force: true }));
+  const destination = join(userHome, 'SqlAppsProjects', 'existing-app');
+  await mkdir(destination, { recursive: true });
+  await writeFile(join(destination, 'keep.txt'), 'keep');
+  await assert.rejects(projects.planProjectCreation(source, 'Existing App', { userHome }),
+    error => error.code === 'PROJECT_DESTINATION_EXISTS' && error.message.includes(destination));
+  assert.equal(await readFile(join(destination, 'keep.txt'), 'utf8'), 'keep');
+  assert.deepEqual((await projects.readProjectsState({ userHome })).projects, []);
+});
+
+test('bootstrap setup approval grants restore only and cannot authorize the installed phase', async t => {
+  const source = process.cwd();
+  const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-bootstrap-phase-')));
+  t.after(() => rm(userHome, { recursive: true, force: true }));
+  const created = await projects.createProject(source, 'Phase App', { userHome, initializeGit: false });
+  const { planBundle, grantBundle, planConsent, grantConsent } = await import('../src/local-consent.mjs');
+  const options = { profile: 'role-based-data', workspace: '30000' };
+  const bootstrap = await planBundle(created.path, options);
+  assert.equal(bootstrap.phase, 'bootstrap');
+  assert.deepEqual(bootstrap.requirements.map(item => item.scope), ['restore']);
+  assert.equal(bootstrap.terms.required, false);
+  await grantBundle(created.path, { ...options, approval: bootstrap.approval });
+  const buildPlan = await planConsent(created.path, { operation: 'build' });
+  await assert.rejects(grantConsent(created.path, buildPlan), /[Bb]ootstrap.*restore|[Rr]estore.*before.*grant/);
+  await assert.rejects(access(join(created.path, '.sql-apps', 'workspace.json')), { code: 'ENOENT' });
+  const installed = join(created.path, 'node_modules', '@microsoft', 'sql-apps');
+  await mkdir(installed, { recursive: true });
+  await cp(join(source, 'packages', 'sql-apps', 'package.json'), join(installed, 'package.json'));
+  const local = await planBundle(created.path, options);
+  assert.equal(local.phase, 'local');
+  assert.notEqual(local.approval, bootstrap.approval);
+  assert.equal((await planConsent(created.path, { operation: 'build' })).allowed, false);
+  await assert.rejects(grantBundle(created.path, { ...options, approval: bootstrap.approval }), /changed/);
+});
+
+test('approved creation binds the reviewed archive before the initial Git commit without starting services', async t => {
+  const source = await sourceFixture(t);
+  const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-bound-create-')));
+  t.after(() => rm(userHome, { recursive: true, force: true }));
+  const directory = join(source, 'packages', 'sql-apps');
+  const packed = JSON.parse((await runNpm(['pack', '--ignore-scripts', '--json'], directory)).stdout)[0];
+  const archive = join(directory, packed.filename);
+  const options = { userHome, archive };
+  const plan = await projects.planProjectCreation(source, 'Bound App', options);
+  assert.equal(plan.archive.path, archive);
+  assert.equal(plan.archive.sha256, createHash('sha256').update(await readFile(archive)).digest('hex'));
+  const created = await projects.createProject(source, 'Bound App', { ...options, approval: plan.approval });
+  const lock = JSON.parse(await readFile(join(created.path, 'package-lock.json'), 'utf8'));
+  const entry = lock.packages['node_modules/@microsoft/sql-apps'];
+  assert.match(entry.resolved, /^file:tooling\/microsoft-sql-apps-1\.2\.3-/);
+  assert.match(entry.integrity, /^sha512-/);
+  assert.equal(created.launchUrl, undefined);
+  assert.deepEqual(await readdir(join(userHome, '.sql-apps')), ['projects.json']);
+  await assert.rejects(access(join(created.path, '.sql-apps')), { code: 'ENOENT' });
+  await assert.rejects(access(join(created.path, 'node_modules')), { code: 'ENOENT' });
+  const tracked = (await execute('git', ['ls-files', 'tooling'], { cwd: created.path })).stdout;
+  assert.match(tracked, /\.tgz/);
+  const clean = (await execute('git', ['status', '--porcelain'], { cwd: created.path })).stdout;
+  assert.equal(clean, '');
+});
+
 for (const packaged of [false, true]) {
   const kind = packaged ? 'a package' : 'a foundation';
 
-  test(`progressive creation copies the approved scaffold snapshot from ${kind}`, async t => {
+  test(`creation copies the approved scaffold snapshot from ${kind}`, async t => {
     const source = await sourceFixture(t, packaged);
     const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-scaffold-snapshot-')));
     t.after(() => rm(userHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
     const scaffold = packaged ? join(source, 'assets', 'scaffold') : source;
-    const options = { userHome, browser: false, initializeGit: false };
+    const options = { userHome };
     const plan = await projects.planProjectCreation(source, 'Snapshot App', options);
     let changed = false, created;
     try {
       created = await projects.createProject(source, 'Snapshot App', {
-        ...options, progressive: true, approval: plan.approval,
-        probe: async port => {
+        ...options, approval: plan.approval,
+        runner: async (command, args, executionOptions) => {
           if (!changed) {
             changed = true;
             await Promise.all([
@@ -172,7 +233,7 @@ for (const packaged of [false, true]) {
               rm(join(scaffold, 'public', 'style.css')),
             ]);
           }
-          return portState(port);
+          return execute(command, args, executionOptions);
         },
       });
       assert.equal(await readFile(join(scaffold, 'public', 'index.html'), 'utf8'), '<h1>Unreviewed</h1>');
@@ -180,7 +241,7 @@ for (const packaged of [false, true]) {
       assert.equal(await readFile(join(created.path, 'public', 'style.css'), 'utf8'), '');
       await assert.rejects(access(join(created.path, 'public', 'unreviewed.html')), { code: 'ENOENT' });
     } finally {
-      if (created) await stopCreationProcess((await creationSession(created.path)).directory);
+      if (created) await assert.rejects(access(join(created.path, '.sql-apps')), { code: 'ENOENT' });
     }
   });
 
@@ -205,23 +266,22 @@ for (const packaged of [false, true]) {
       await assert.rejects(access(plan.home), { code: 'ENOENT' });
       assert.deepEqual((await projects.readProjectsState({ userHome })).projects, []);
     } finally {
-      if (created) await stopCreationProcess((await creationSession(created.path)).directory);
+      if (created) await assert.rejects(access(join(created.path, '.sql-apps')), { code: 'ENOENT' });
     }
   });
 }
 
-test('creation approval includes the browser-opening choice', async t => {
+test('creation planning has no browser or process topology selection', async t => {
   const source = await sourceFixture(t);
   const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-browser-approval-')));
   t.after(() => rm(userHome, { recursive: true, force: true }));
   const options = { userHome, probe: async () => 'free' };
   const browser = await projects.planProjectCreation(source, 'Headless app', options);
   const headless = await projects.planProjectCreation(source, 'Headless app', { ...options, browser: false });
-  assert.notEqual(headless.approval, browser.approval);
-  assert.equal(headless.browser, false);
-  await assert.rejects(projects.createProject(source, 'Headless app', {
-    ...options, progressive: true, approval: browser.approval, browser: false, initializeGit: false,
-  }), /approve its current id/);
+  assert.equal(headless.approval, browser.approval);
+  assert.equal(headless.browser, undefined);
+  assert.equal(headless.basePort, undefined);
+  assert.equal(headless.effects.some(effect => effect.startsWith('Start ')), false);
 });
 
 test('the plugin can guide an unrestored project through its explicit foundation bootstrap', async t => {
@@ -239,14 +299,14 @@ test('the plugin can guide an unrestored project through its explicit foundation
   const result = await execute(process.execPath, [launcher, 'guide'], {
     cwd: created.path,
     env: { ...process.env, SQL_APPS_HOME: created.path, COPILOT_HOME: copilotHome,
-      SQL_APPS_PROJECT_HOME: undefined, SQL_APPS_TOOLING_HOME: undefined },
+      SQL_APPS_PROJECT_HOME: undefined, SQL_APPS_TOOLING_HOME: process.cwd() },
   });
   assert.equal(JSON.parse(result.stdout).home, created.path);
   for (const command of [['verify'], ['consent-run', 'build']]) {
     await assert.rejects(execute(process.execPath, [launcher, ...command], {
       cwd: created.path,
       env: { ...process.env, SQL_APPS_HOME: created.path, COPILOT_HOME: copilotHome,
-        SQL_APPS_PROJECT_HOME: undefined, SQL_APPS_TOOLING_HOME: undefined },
+        SQL_APPS_PROJECT_HOME: undefined, SQL_APPS_TOOLING_HOME: process.cwd() },
     }), error => /Restore the pinned project tooling/.test(error.stderr));
   }
 });
@@ -275,9 +335,9 @@ test('a copied plugin bootstraps the selected app without a Copilot binding or f
   await mkdir(session);
   const launcher = join(copied, 'scripts', 'sql-apps.mjs');
   const environment = {
-    ...process.env, SQL_APPS_HOME: created.path, SQL_APPS_FOUNDATION_HOME: foundation,
+    ...process.env, SQL_APPS_HOME: created.path,
     COPILOT_HOME: join(root, 'unused Copilot profile'),
-    SQL_APPS_PROJECT_HOME: undefined, SQL_APPS_TOOLING_HOME: undefined,
+    SQL_APPS_PROJECT_HOME: undefined, SQL_APPS_TOOLING_HOME: foundation,
   };
   for (const cwd of [created.path, session]) {
     const options = { cwd, env: environment, maxBuffer: 4 * 1024 * 1024 };
@@ -306,23 +366,23 @@ test('a copied plugin bootstraps the selected app without a Copilot binding or f
   await assert.rejects(access(join(created.path, 'node_modules')), { code: 'ENOENT' });
 });
 
-test('explicit foundation selection fails visibly instead of falling back or selecting the app as tooling', async t => {
+test('explicit tooling selection fails visibly instead of falling back or selecting the app as tooling', async t => {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-explicit-foundation-')));
   t.after(() => rm(root, { recursive: true, force: true }));
   const foundation = await realpath(process.cwd());
   const created = await projects.createProject(foundation, 'Selected App', { userHome: root, initializeGit: false });
-  const environment = { SQL_APPS_HOME: created.path, SQL_APPS_FOUNDATION_HOME: foundation };
+  const environment = { SQL_APPS_HOME: created.path, SQL_APPS_TOOLING_HOME: foundation };
   assert.equal(await plugin.dispatchProjects(['list'], {
     environment, userHome: root,
     projectMain: async (_args, home) => home,
   }), foundation);
   for (const [selection, message] of [
-    ['relative', /absolute checkout path/],
+    ['relative', /absolute tooling package/],
     [join(root, 'missing'), /ENOENT/],
-    [created.path, /foundation checkout, not an application/i],
+    [created.path, /not an application/i],
   ]) {
     await assert.rejects(plugin.workspaceReport(created.path, {
-      cwd: foundation, userHome: root, environment: { ...environment, SQL_APPS_FOUNDATION_HOME: selection },
+      cwd: foundation, userHome: root, environment: { ...environment, SQL_APPS_TOOLING_HOME: selection },
     }), message);
   }
 });
@@ -340,7 +400,7 @@ test('a changed tooling manifest invalidates an approved progressive creation pl
   assert.notEqual(changed.approval, plan.approval);
 });
 
-test('progressive creation uses the canonical path for a linked project root', async t => {
+test('creation uses the canonical path for a linked project root', async t => {
   const source = resolve(import.meta.dirname, '..');
   const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-project-linked-root-')));
   t.after(() => rm(userHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
@@ -353,34 +413,24 @@ test('progressive creation uses the canonical path for a linked project root', a
   const created = await projects.createProject(source, 'Linked App', {
     userHome, progressive: true, approval: plan.approval, browser: false, initializeGit: false,
   });
-  const session = await creationSession(created.path);
-  await stopCreationProcess(session.directory);
   assert.equal(created.path, join(actualRoot, 'linked-app'));
 });
 
-test('a workspace initialization failure removes the renamed project and owned session', async t => {
+test('a Git initialization failure removes the incomplete project without registering it', async t => {
   const source = await sourceFixture(t);
   const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-project-rollback-')));
-  let createdPath;
-  t.after(async () => {
-    if (createdPath) {
-      const session = await creationSession(createdPath);
-      if (session) await stopCreationProcess(session.directory);
-    }
-    await rm(userHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-  });
+  t.after(() => rm(userHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
   await projects.setProjectsRoot(join(userHome, 'projects'), { userHome });
   const plan = await projects.planProjectCreation(source, 'Rollback App', { userHome, browser: false });
   const result = await projects.createProject(source, 'Rollback App', {
-    userHome, progressive: true, approval: plan.approval, browser: false, initializeGit: false,
-    initializeWorkspace: async () => { throw new Error('workspace initialization failed'); },
-  }).then(project => { createdPath = project.path; return project; }, error => error);
-  assert.ok(result instanceof Error, 'the injected post-rename workspace failure must abort creation');
-  assert.match(result.message, /workspace initialization failed/);
+    userHome, approval: plan.approval,
+    runner: async (_command, args) => { if (args.includes('commit')) throw new Error('Git commit failed'); },
+  }).catch(error => error);
+  assert.ok(result instanceof Error);
+  assert.match(result.message, /Git commit failed/);
   await assert.rejects(access(join(userHome, 'projects', 'rollback-app')), { code: 'ENOENT' });
   assert.deepEqual((await projects.readProjectsState({ userHome })).projects, []);
-  const sessions = join(userHome, '.sql-apps', 'creation-sessions');
-  assert.deepEqual(await readdir(sessions), []);
+  assert.deepEqual(await readdir(join(userHome, 'projects')), []);
 });
 
 test('a fresh generated project installs its exact tooling version with npm ci from a registry', async t => {
@@ -604,7 +654,7 @@ test('create scaffolds an independent named project and records it as active', a
   assert.deepEqual(state.projects.map(project => project.path), [created.path]);
   assert.ok(created.next.selectProject.includes(`$env:SQL_APPS_HOME = '${created.path}'`),
     'creation tells the user how to select the new project instead of the foundation');
-  assert.match(created.next.selectProject, /keep SQL_APPS_FOUNDATION_HOME/);
+  assert.match(created.next.selectProject, /registry does not select execution ownership/);
   assert.deepEqual(created.next.afterRestore, ['npm run guide', 'npm run setup -- plan']);
   for (const command of created.next.afterRestore) {
     assert.ok(Object.hasOwn(pkg.scripts, command.split(' ')[2]), `${command} must exist in a generated project`);
@@ -713,27 +763,30 @@ test('open registers an existing SQL Apps project and list reports all projects'
   assert.deepEqual(state.projects.map(project => project.path), [first.path, external]);
 });
 
-test('plugin accepts generated projects and resolves the current or active project before its foundation binding', async t => {
+test('plugin resolves the nearest project without adopting the registry active project', async t => {
   const source = await sourceFixture(t);
   const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-project-routing-')));
   t.after(() => rm(userHome, { recursive: true, force: true }));
   const created = await projects.createProject(source, 'Current App', { userHome, initializeGit: false });
   assert.equal(await plugin.validateHome(created.path), created.path);
   assert.equal(await plugin.resolveHome({ cwd: created.path, userHome, environment: {} }), created.path);
-  assert.equal(await plugin.resolveHome({ cwd: userHome, userHome, environment: {} }), created.path);
-  assert.equal(await plugin.resolveHome({ cwd: source, userHome, environment: {} }), created.path);
+  await assert.rejects(plugin.resolveHome({ cwd: userHome, userHome, environment: {} }), /Select.*SQL_APPS_HOME/);
+  assert.equal(await plugin.resolveHome({ cwd: source, userHome, environment: {} }), source);
   assert.equal(await plugin.resolveHome({
     cwd: userHome, userHome, environment: { SQL_APPS_HOME: source },
   }), source);
 });
 
-test('an active project selected from the foundation is an explicit workspace selection', async t => {
+test('project bootstrap requires explicit tooling instead of an ambient foundation binding', async t => {
   const source = await sourceFixture(t);
   const userHome = await mkdtemp(join(tmpdir(), 'sql-apps-project-active-workspace-'));
   t.after(() => rm(userHome, { recursive: true, force: true }));
   const created = await projects.createProject(source, 'Active App', { userHome, initializeGit: false });
-  const report = await plugin.workspaceReport(created.path, { cwd: source, userHome, environment: {} });
-  assert.equal(report.binding.source, 'active-project');
+  await assert.rejects(plugin.workspaceReport(created.path, { cwd: source, userHome, environment: {} }), /archive CLI/);
+  const report = await plugin.workspaceReport(created.path, {
+    cwd: source, userHome, environment: { SQL_APPS_HOME: created.path, SQL_APPS_TOOLING_HOME: source },
+  });
+  assert.equal(report.binding.source, 'environment');
   assert.equal(report.binding.explicit, true);
   assert.equal(report.executionAllowed, true);
 });
@@ -748,7 +801,7 @@ test('generated projects pass source inspection without carrying plugin implemen
   assert.equal(report.application.name, 'inspected-app');
 });
 
-test('plugin project dispatch uses the bound foundation as scaffold source without resolving an app first', async t => {
+test('plugin project dispatch uses explicitly selected tooling without an ambient binding', async t => {
   const source = await sourceFixture(t);
   const userHome = await mkdtemp(join(tmpdir(), 'sql-apps-project-dispatch-'));
   t.after(() => rm(userHome, { recursive: true, force: true }));
@@ -758,10 +811,10 @@ test('plugin project dispatch uses the bound foundation as scaffold source witho
   const calls = [];
   await plugin.dispatchProjects(['create', 'A New App'], {
     userHome,
-    environment: { COPILOT_HOME: copilotHome },
-    projectMain: async (args, home) => calls.push({ args, home }),
+    environment: { COPILOT_HOME: copilotHome, SQL_APPS_TOOLING_HOME: source },
+    projectMain: async (args, home, options) => calls.push({ args, home, options }),
   });
-  assert.deepEqual(calls, [{ args: ['create', 'A New App'], home: source }]);
+  assert.deepEqual(calls, [{ args: ['create', 'A New App'], home: source, options: { requireApproval: true } }]);
 });
 
 test('marketplace project dispatch accepts an explicit foundation without a local-plugin binding', async t => {
@@ -772,7 +825,63 @@ test('marketplace project dispatch accepts an explicit foundation without a loca
   await plugin.dispatchProjects(['create-plan', 'A New App'], {
     userHome,
     environment: { SQL_APPS_HOME: source },
-    projectMain: async (args, home) => calls.push({ args, home }),
+    projectMain: async (args, home, options) => calls.push({ args, home, options }),
   });
-  assert.deepEqual(calls, [{ args: ['create-plan', 'A New App'], home: source }]);
+  assert.deepEqual(calls, [{ args: ['create-plan', 'A New App'], home: source, options: { requireApproval: true } }]);
+});
+
+test('a copied plugin delegates approved archive-bound scaffolding in either flag order', async t => {
+  const home = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-native-plugin-')));
+  t.after(() => rm(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
+  const copied = join(home, 'plugin cache');
+  const cwd = join(home, 'unrelated session');
+  await cp(resolve('plugins', 'sql-apps'), copied, { recursive: true });
+  await mkdir(cwd);
+  const env = { ...process.env, HOME: home, USERPROFILE: home,
+    SQL_APPS_HOME: undefined, SQL_APPS_PROJECT_HOME: undefined, SQL_APPS_TOOLING_HOME: process.cwd(),
+    COPILOT_HOME: join(home, 'unused profile') };
+  const invoke = (...args) => execute(process.execPath, [join(copied, 'scripts', 'sql-apps.mjs'), ...args],
+    { cwd, env, windowsHide: true, maxBuffer: 4 * 1024 * 1024 });
+  const packed = JSON.parse((await runNpm(['pack', '--ignore-scripts', '--json'],
+    join(process.cwd(), 'packages', 'sql-apps'), { npm_config_pack_destination: home })).stdout)[0];
+  const archive = join(home, packed.filename);
+  for (const [name, order] of [['Archive first', 'first'], ['Approval first', 'last']]) {
+    await t.test(name, async () => {
+      const plan = JSON.parse((await invoke('projects', 'create-plan', name, '--archive', archive)).stdout);
+      const flags = order === 'first' ? ['--archive', archive, '--approval', plan.approval] :
+        ['--approval', plan.approval, '--archive', archive];
+      const project = JSON.parse((await invoke('projects', 'create', name, ...flags)).stdout);
+      assert.equal(project.launchUrl, undefined);
+      const lock = JSON.parse(await readFile(join(project.path, 'package-lock.json'), 'utf8'));
+      assert.match(lock.packages['node_modules/@microsoft/sql-apps'].resolved, /^file:tooling\//);
+      await assert.rejects(access(join(project.path, '.sql-apps')), { code: 'ENOENT' });
+      await assert.rejects(access(join(project.path, 'node_modules')), { code: 'ENOENT' });
+    });
+  }
+  const beforeProjects = await projects.readProjectsState({ userHome: home });
+  await assert.rejects(invoke('projects', 'create', 'Unapproved', '--archive', archive), /approval/);
+  await assert.rejects(invoke('projects', 'create-plan', 'Browser', '--archive', archive, '--browser'), /Usage/);
+  assert.deepEqual(await projects.readProjectsState({ userHome: home }), beforeProjects);
+  await assert.rejects(access(join(home, '.sql-apps', 'creation-sessions')), { code: 'ENOENT' });
+  await assert.rejects(access(join(home, 'unused profile')), { code: 'ENOENT' });
+});
+
+test('project commands reject browser flags and missing or duplicate archive selections before side effects', async t => {
+  const home = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-browser-flags-')));
+  t.after(() => rm(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
+  const source = process.cwd();
+  const script = join(source, 'scripts', 'projects.mjs');
+  const env = { ...process.env, HOME: home, USERPROFILE: home };
+  for (const command of ['create-plan', 'create']) {
+    for (const flags of [
+      ['--browser', '--browser'], ['--no-browser', '--no-browser'],
+      ['--browser', '--no-browser'], ['--no-browser', '--browser'],
+      ['--unknown'], ['--approval'], ['--approval', '--browser'],
+      ['--approval', '000000000000', '--approval', '000000000000'],
+      ['--archive'], ['--archive', 'relative.tgz'],
+      ['--archive', join(home, 'a.tgz'), '--archive', join(home, 'a.tgz')],
+    ]) await assert.rejects(execute(process.execPath, [script, command, 'Invalid app', ...flags], { env }), /Usage/);
+  }
+  assert.deepEqual(await readdir(home), []);
+  await assert.rejects(execute(process.execPath, [script, 'create-plan', 'No archive'], { env }), /--archive/);
 });

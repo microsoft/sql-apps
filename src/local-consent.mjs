@@ -4,7 +4,7 @@ import { join, isAbsolute, relative } from 'node:path';
 import { runtimeFor, readWorkspace, describeWorkspace } from './workspace.mjs';
 import { withFileLock } from './file-lock.mjs';
 import { readProjectManifest } from './project-contract.mjs';
-import { toolingHome } from './tooling-context.mjs';
+import { installedTooling, toolingHome } from './tooling-context.mjs';
 import { readSqlTarget, validateSqlTarget } from './sql-target.mjs';
 
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -18,7 +18,7 @@ export const SQL_TERMS = Object.freeze({
 const readOnly = new Set(['help', 'workspace-plan', 'verify', 'app-check']);
 const scopeNames = ['restore', 'build', 'workspace', 'sql-start', 'schema', 'services', 'synthetic', 'stop', 'maintenance'];
 const runtimeCommands = new Set([
-  'app', 'serve', 'role-based-app', 'role-based-serve', 'start-sql', 'init', 'test', 'data', 'app-test', 'stop',
+  'app', 'serve', 'start-sql', 'init', 'test', 'data', 'app-test', 'stop',
   'recover-sql', 'selected-app', 'selected-serve', 'selected-stop', 'selected-test',
   'configure-express', 'configure-express-auth',
 ]);
@@ -150,7 +150,7 @@ async function requirementsFor(home, request, proposed, proposedSql) {
       (typeof selection !== 'string' || !selection || selection.length > 4096))) throw new Error('Invalid consent request');
   if (readOnly.has(operation)) return [];
   if (!['restore', 'build', 'workspace-init'].includes(operation) && !runtimeCommands.has(operation)) {
-    throw new Error(`Unsupported consent operation: ${operation}. Use restore, build, workspace-init <base-port|legacy>, ${[...runtimeCommands].join(', ')}`);
+    throw new Error(`Unsupported consent operation: ${operation}. Use restore, build, workspace-init <base-port>, ${[...runtimeCommands].join(', ')}`);
   }
   if (operation === 'app-test' && selection !== undefined) {
     throw new Error('app-test takes no container selection; it tests the selected workspace gateway');
@@ -192,16 +192,16 @@ async function requirementsFor(home, request, proposed, proposedSql) {
     return requirements;
   }
   if (operation === 'workspace-init') {
-    if (selection !== 'legacy' && !(selection && /^\d+$/.test(selection) &&
+    if (!(selection && /^\d+$/.test(selection) &&
         Number(selection) >= 20000 && Number(selection) <= 60000 && Number(selection) % 10 === 0)) {
-      throw new Error('Select legacy or a port block aligned to 10 between 20000 and 60000');
+      throw new Error('Select a port block aligned to 10 between 20000 and 60000');
     }
     await add('workspace', `${home}:${selection}`, ['Create workspace descriptor only; no startup or data migration.']);
     return requirements;
   }
   const selected = operation.startsWith('selected-');
   const runtime = runtimeFor(selected ? undefined : selection, home, proposed);
-  if (runtime.mode === 'legacy-unselected' && !['configure-express', 'configure-express-auth'].includes(operation)) throw new Error('Explicit workspace selection required before planning local operations: setup plan proposes a port block; review consent-plan workspace-init <base-port|legacy> first.');
+  if (runtime.mode === 'unselected' && !['configure-express', 'configure-express-auth'].includes(operation)) throw new Error('Explicit workspace selection required before planning local operations: review the port block and approval in setup plan first.');
   if (selected && operation !== 'selected-stop') {
     if (!selection || !isAbsolute(selection)) throw new Error('Selected consent requires an absolute artifact directory');
     const directory = await realpath(selection);
@@ -247,12 +247,12 @@ async function requirementsFor(home, request, proposed, proposedSql) {
   ], ['src/local-images.ts', 'src/local.ts', 'src/local-app.ts',
     ...(endpoint ? ['src/endpoint-local.ts', 'src/local-data-process.ts', 'src/sql-endpoint.ts', 'src/sql-target.mjs', '.config/host-dab/dotnet-tools.json'] : []),
     ...(artifact ? ['src/selected-local.ts'] : ['src/role-based-profile.ts'])], true, artifact ? ['server', 'dab/dab-config.json'] : []);
-  const composite = ['app', 'role-based-app', 'selected-app'].includes(operation);
+  const composite = ['app', 'selected-app'].includes(operation);
   if (composite || operation === 'init') { await restore(); await build(); }
   if (!endpoint && ((composite && (selected || runtime.ownsSqlName)) || operation === 'start-sql' || operation === 'recover-sql')) await sql();
   if (endpoint && ['start-sql', 'recover-sql'].includes(operation)) throw new Error('Endpoint SQL is not a container; installation, instance configuration and cloud provisioning require their separate reviewed plans.');
   if (composite || operation === 'init') await schema();
-  if (composite || ['data', 'serve', 'role-based-serve', 'selected-serve'].includes(operation)) await services();
+  if (composite || ['data', 'serve', 'selected-serve'].includes(operation)) await services();
   if (['test', 'app-test', 'selected-test'].includes(operation)) {
     await add('synthetic', `${target}:${operation}`, [`Run ${operation}; create synthetic fixtures and perform its documented scoped cleanup.`],
       [...(artifact ? ['src/selected-local.ts', `examples/${artifact.name}/demo/smoke.mjs`] :
@@ -260,7 +260,7 @@ async function requirementsFor(home, request, proposed, proposedSql) {
         ...(endpoint ? ['src/endpoint-local.ts', 'src/sql-endpoint.ts', 'src/sql-target.mjs'] : [])],
       true, artifact ? ['sql', 'setup', 'server', 'dab/dab-config.json'] : []);
   }
-  if (['app', 'role-based-app', 'init'].includes(operation)) {
+  if (['app', 'init'].includes(operation)) {
     await add('synthetic', `${endpoint ? target : sqlResourceTarget}:sql-acceptance`,
       ['Run the built-in read-only SQL acceptance check on the least-privilege app user during initialization.'],
       ['src/local.ts', 'sql/local/acceptance.sql', ...(endpoint ? ['src/endpoint-local.ts', 'src/sql-endpoint.ts'] : [])]);
@@ -295,6 +295,9 @@ export async function grantConsent(value, approved, options = {}) {
   const home = await realpath(value);
   object(approved, ['version', 'home', 'request', 'requirements', 'missing', 'termsRequired', 'termsAcknowledged', 'allowed'], 'approved plan');
   if (approved.version !== 1 || approved.home !== home) throw new Error('Approved plan belongs to another checkout or version');
+  if (approved.request?.operation !== 'restore' && (await consentInputs(home)).generated && !await installedTooling(home)) {
+    throw new Error('Bootstrap permits restore grants only. Restore the pinned tooling before granting build or runtime operations through the app-local package.');
+  }
   await withStateLock(home, async directory => {
     const current = await planConsent(home, approved.request);
     if (JSON.stringify(current.requirements) !== JSON.stringify(approved.requirements)) {
@@ -318,24 +321,29 @@ export async function planBundle(value, options) {
   const home = await realpath(value);
   const operation = launchOperations[options.profile];
   if (!operation) throw new Error('Select bundle profile role-based-data');
+  const context = await consentInputs(home);
+  const bootstrap = context.generated && !await installedTooling(home);
   if (options.workspace !== undefined && typeof options.workspace !== 'string') throw new Error('Invalid bundle workspace selection');
   const existing = readWorkspace(home);
   const requirements = [];
   let proposed;
   let workspace = options.workspace;
   if (existing) {
-    const current = existing.mode === 'legacy' ? 'legacy' : String(existing.basePort);
+    const current = String(existing.basePort);
     if (workspace !== undefined && workspace !== current) {
       throw new Error(`Requested workspace ${workspace} differs from the existing selection ${current}; inspect it without overwriting.`);
     }
     workspace = current;
   } else {
-    if (workspace === undefined) throw new Error('Choose a workspace port block (setup plan proposes one) or legacy before approving startup');
-    requirements.push(...await requirementsFor(home, { operation: 'workspace-init', selection: workspace }));
-    proposed = describeWorkspace(home, workspace === 'legacy' ? 'legacy' : Number(workspace));
+    if (!bootstrap) {
+      if (workspace === undefined) throw new Error('Choose a workspace port block (setup plan proposes one) before approving startup');
+      requirements.push(...await requirementsFor(home, { operation: 'workspace-init', selection: workspace }));
+      proposed = describeWorkspace(home, Number(workspace));
+    }
   }
-  const selectedSql = options.sqlTarget === undefined ? undefined : validateSqlTarget(options.sqlTarget);
-  for (const item of await requirementsFor(home, { operation }, proposed, selectedSql)) {
+  const selectedSql = options.sqlTarget === undefined || bootstrap ? undefined : validateSqlTarget(options.sqlTarget);
+  const phase = bootstrap ? 'bootstrap' : 'local';
+  for (const item of await requirementsFor(home, { operation: bootstrap ? 'restore' : operation }, proposed, selectedSql)) {
     if (!requirements.some(other => other.contract === item.contract)) requirements.push(item);
   }
   const state = await readState(home);
@@ -343,8 +351,8 @@ export async function planBundle(value, options) {
   const required = requirements.some(item => item.scope === 'sql-start');
   const sha256 = digest(SQL_TERMS.statement);
   const acknowledged = await termsAcknowledged(home);
-  const approval = digest(JSON.stringify({ home, operation, workspace, requirements, terms: required ? sha256 : null })).slice(0, 12);
-  return { version: 1, home, profile: options.profile, workspace, operation, requirements, missing,
+  const approval = digest(JSON.stringify({ home, phase, operation, workspace, requirements, terms: required ? sha256 : null })).slice(0, 12);
+  return { version: 1, home, phase, profile: options.profile, workspace, operation, requirements, missing,
     ...(selectedSql ? { sqlTarget: selectedSql } : {}),
     terms: { required, url: SQL_TERMS.url, statement: SQL_TERMS.statement, sha256, acknowledged },
     approval, allowed: missing.length === 0 && (!required || acknowledged) };
@@ -353,13 +361,13 @@ export async function planBundle(value, options) {
 // Records every bundle scope and the inline terms in one locked write, only if the reviewed approval id still matches.
 export async function grantBundle(value, approved) {
   object(approved, ['profile', 'workspace', 'approval', 'sqlTarget'], 'bundle approval');
-  if (typeof approved.approval !== 'string' || !/^[a-f0-9]{12}$/.test(approved.approval)) throw new Error('Provide the approval id shown by setup approval');
+  if (typeof approved.approval !== 'string' || !/^[a-f0-9]{12}$/.test(approved.approval)) throw new Error('Provide the approval id shown by setup plan');
   const home = await realpath(value);
   await withStateLock(home, async directory => {
     const current = await planBundle(home, { profile: approved.profile,
       ...(approved.sqlTarget === undefined ? {} : { sqlTarget: approved.sqlTarget }),
       ...(approved.workspace === undefined ? {} : { workspace: approved.workspace }) });
-    if (current.approval !== approved.approval) throw new Error('Approval bundle changed; review a fresh setup approval before approving');
+    if (current.approval !== approved.approval) throw new Error('Approval bundle changed; review a fresh setup plan before approving');
     if (current.requirements.some(item => !item.reusable)) throw new Error('Bundle contains a one-operation scope; approve it separately');
     const state = await readState(home);
     const savedAt = new Date().toISOString();

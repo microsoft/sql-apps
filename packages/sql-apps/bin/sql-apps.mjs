@@ -8,7 +8,6 @@ export const COMMANDS = {
   'bind-archive': 'dist/scripts/bind-tooling-archive.mjs',
   build: 'dist/scripts/build-provenance.mjs',
   setup: 'dist/scripts/setup.mjs',
-  creation: 'dist/scripts/creation.mjs',
   'setup-check': 'dist/scripts/setup-check.mjs',
   guide: 'dist/scripts/guide.mjs',
   'workspace-check': 'dist/scripts/workspace-check.mjs',
@@ -52,7 +51,7 @@ async function runTarget(target, commandArgs, projectHome, tools, load) {
 export async function dispatch(command, commandArgs, projectHome, load = specifier => import(specifier)) {
   const { installedTooling } = await import('../dist/src/tooling-context.mjs');
   const installed = await installedTooling(projectHome);
-  if (!installed && (!['setup', 'creation', 'setup-check', 'guide', 'workspace-check', 'consent'].includes(command) ||
+  if (!installed && (!['setup', 'setup-check', 'guide', 'workspace-check', 'consent'].includes(command) ||
       command === 'consent' && commandArgs[0] === 'run' && commandArgs[1] !== 'restore')) {
     throw new Error('Restore the pinned project tooling first, then run setup plan through the installed package and review its approvals before build or runtime execution.');
   }

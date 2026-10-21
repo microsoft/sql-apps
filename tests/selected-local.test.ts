@@ -51,7 +51,7 @@ test('schema publishing does not restore an already verified SqlPackage installa
   assert.ok(calls.some(call => call.includes('/Action:Publish')));
 });
 
-test('selected resource namespaces reject legacy mode and never reuse foundation database or DAB names', async t => {
+test('selected resource namespaces reject unselected mode and never reuse foundation database or DAB names', async t => {
   const home = await mkdtemp(join(tmpdir(), 'sql-apps-selected-local-'));
   t.after(() => rm(home, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }));
   const runtime = await initializeWorkspace(home, 45000, async () => 'free');
@@ -63,7 +63,7 @@ test('selected resource namespaces reject legacy mode and never reuse foundation
   assert.notEqual(a.database, b.database);
   assert.notEqual(a.stateFile, b.stateFile);
   assert.ok(a.stateFile.startsWith(join(runtime.stateDirectory, 'applications', 'inventory')));
-  assert.throws(() => selected.selectedLocalPaths({ ...runtime, mode: 'legacy' }, 'inventory'), /isolated/);
+  assert.throws(() => selected.selectedLocalPaths({ ...runtime, mode: 'unselected' }, 'inventory'), /isolated/);
   assert.throws(() => selected.selectedLocalPaths(runtime, '../inventory'), /selection/);
 });
 

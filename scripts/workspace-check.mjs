@@ -15,7 +15,6 @@ const projectDirectories = ['src', 'public', 'sql', 'dab'];
 const projectFiles = [
   '.sql-apps-project.json', 'package.json', 'package-lock.json', 'application.json',
   'role-based-data.json', 'tsconfig.json', '.config/dotnet-tools.json',
-  'creation-checks.json',
   '.config/host-dab/dotnet-tools.json',
 ];
 
@@ -183,10 +182,15 @@ export async function inspectSource(value, options = {}) {
       ? join(tools, 'assets', 'runtime-contract.json')
       : join(tools, 'runtime-contract.json');
     const contract = JSON.parse(await readFile(contractPath, 'utf8'));
-    if (pkg.dependencies?.['@microsoft/sql-apps'] !== project.tooling.version ||
-        project.tooling.version !== installedVersion || !validApplication(application) || !validContract(contract)) {
+    if (pkg.dependencies?.['@microsoft/sql-apps'] !== project.tooling.version || project.tooling.version !== installedVersion) {
+      return { home, toolingHome: tools, ready: false, code: 'TOOLING_VERSION_MISMATCH',
+        expectedVersion: project.tooling.version, actualVersion: installedVersion,
+        dependencyVersion: pkg.dependencies?.['@microsoft/sql-apps'] ?? null,
+        nextAction: `Project ${home} requires @microsoft/sql-apps@${project.tooling.version}; its dependency is ${pkg.dependencies?.['@microsoft/sql-apps'] ?? 'missing'} and selected tooling ${tools} is ${installedVersion}. Select the matching verified archive and restore the exact project pin. Pre-release demo projects are not migrated automatically.` };
+    }
+    if (!validApplication(application) || !validContract(contract)) {
       return { home, ready: false, code: 'SOURCE_INVALID',
-        nextAction: 'Review the project manifest, exact tooling dependency, application and runtime contract.' };
+        nextAction: `Review application.json in ${home} and the runtime contract in ${tools}; project and tooling versions match.` };
     }
     const required = [
       ['src', 'directory'],

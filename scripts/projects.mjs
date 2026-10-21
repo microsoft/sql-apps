@@ -3,22 +3,20 @@ import { createHash, randomUUID } from 'node:crypto';
 import { lstat, mkdir, readFile, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
-import { promisify } from 'node:util';
+import { isDeepStrictEqual, promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { withFileLock } from '../src/file-lock.mjs';
 import { readProjectManifest } from '../src/project-contract.mjs';
-import { portState, initializeWorkspace, workspaceIdentity } from '../src/workspace.mjs';
-import { initialProgress, fingerprint } from '../src/creation-progress.mjs';
-import { writeCreationJson } from '../src/creation-session.mjs';
-import { creationImplementation, startCreationProcess, stopCreationProcess, openCreationBrowser } from './creation.mjs';
+import { inspectToolingArchive, planToolingArchive, bindToolingArchive } from './bind-tooling-archive.mjs';
 
 const execute = promisify(execFile);
+const fingerprint = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const projectDirectories = ['.config', 'content', 'dab', 'docs', 'public', 'sql'];
 const projectFiles = [
   '.dockerignore', '.env.example', '.gitignore', 'Dockerfile', 'LICENSE',
   'application.json', 'package-lock.json', 'package.json',
   'role-based-data.example.json', 'personal-free-api.example.json',
-  'tsconfig.json', 'src/web/app.ts', 'creation-checks.json',
+  'tsconfig.json', 'src/web/app.ts',
 ];
 
 export function defaultProjectsRoot(userHome = homedir()) {
@@ -246,7 +244,7 @@ async function customizeProject(target, name, slug, tooling) {
     .replace(/^COPY (?:packages|scripts|plugins\/sql-apps|infra) .+\r?\n/gm, '')
     .replace('COPY application.json runtime-contract.json ./', 'COPY .sql-apps-project.json application.json role-based-data.json ./');
   await writeFile(dockerPath, docker);
-  await writeFile(join(target, 'README.md'), `# ${name}\n\nA SQL Apps project, not a finished domain application.\n\n## Local development\n\nBefore restore, explicitly bind a matching verified release archive with your selected archive CLI's \`bind-archive\` command, or select a configured registry serving the exact pinned @microsoft/sql-apps version. Keep the copied \`tooling/\` archive and updated lockfile in this repository. See [archive installation](docs/reference/projects.md#install-from-a-release-archive).\n\nRun \`setup plan --json\` through that CLI from this project directory and review prerequisite and restore approvals separately. A foundation launcher remains an alternative for source-based workflows. Bootstrap setup stops after restore; then review a fresh plan through the app's installed pinned tooling:\n\n\`\`\`powershell\nnpm run setup -- plan --profile role-based-data\n\`\`\`\n\nBuild/start only under the current setup approval. Implement and test your own screens and SQL-backed workflow; CLI installation and health checks alone are not application acceptance.\n`);
+  await writeFile(join(target, 'README.md'), `# ${name}\n\nA SQL Apps project, not a finished domain application.\n\n## Local development\n\nRelease creation includes the reviewed runtime archive in \`tooling/\` and binds the exact tooling pin to its relative path and integrity. Keep the archive and lockfile in this repository. See [archive installation](docs/reference/projects.md#install-from-a-release-archive) for explicit repair only.\n\nFrom this project directory, run \`setup plan --json\` through your explicitly selected archive CLI. Review prerequisite installations separately; approve restore with \`setup run --approval <printed-id>\`. Bootstrap stops after restore. Then review a fresh plan through the app's installed pinned tooling:\n\n\`\`\`powershell\nnpm run setup -- plan --json\nnpm run setup -- run --approval <printed-id>\n\`\`\`\n\nRun only after explicitly approving the current effects and applicable SQL terms. Creation starts no services or browser. Implement and test your own screens and SQL-backed workflow; CLI installation and health checks alone are not application acceptance.\n`);
 }
 
 async function requireGit(runner = execute) {
@@ -256,15 +254,11 @@ async function requireGit(runner = execute) {
   }
 }
 
-function nextSteps(path, packaged = false) {
+function nextSteps(path) {
   const quoted = `'${path.replaceAll("'", "''")}'`;
   return {
-    selectProject: packaged
-      ? `Open ${path} in your editor. Run the selected archive CLI from this directory before restore; after restore, restart your optional assistant here to detect the app-local tooling. No foundation selection is needed.`
-      : `Point SQL_APPS_HOME at this project and keep SQL_APPS_FOUNDATION_HOME on the foundation. PowerShell: $env:SQL_APPS_HOME = ${quoted}; bash: export SQL_APPS_HOME='${path.replaceAll("'", "'\\''")}'. Then restart the assistant in this directory.`,
-    beforeRestore: packaged
-      ? 'Use the selected archive CLI to review bind-archive --project <absolute-project> --archive <absolute-tgz>, then apply with --approve <id>. From the app directory, review setup plan --json and separate restore/prerequisite approvals. After restore, stop and re-plan through the app-local pin.'
-      : 'Select the exact pinned package from your configured registry or explicitly bind a matching release archive with the foundation tooling:bind command. Run setup plan --json through the installed SQL Apps launcher to review restore and prerequisite approvals.',
+    selectProject: `Open ${path} in your editor and start your optional assistant there. Or explicitly select it in PowerShell: $env:SQL_APPS_HOME = ${quoted}. The registry does not select execution ownership.`,
+    beforeRestore: 'From the app directory, use the selected archive CLI to review setup plan --json, then setup run --approval <printed-id> after explicit restore approval. Release creation already binds the reviewed archive. Prerequisite installations remain separate; bootstrap stops after restore for fresh app-local review.',
     afterRestore: ['npm run guide', 'npm run setup -- plan'],
   };
 }
@@ -298,41 +292,51 @@ async function prospectivePath(value) {
   }
 }
 
+async function requireNewDestination(destination) {
+  try { await lstat(destination); }
+  catch (error) { if (error.code === 'ENOENT') return; throw error; }
+  throw Object.assign(new Error(`Project destination already exists: ${destination}. Select that existing project explicitly or choose another name/root. Nothing will be merged or overwritten.`),
+    { code: 'PROJECT_DESTINATION_EXISTS' });
+}
+
 export async function planProjectCreation(sourceValue, name, options = {}) {
   const source = await resolveProjectSource(sourceValue);
   return planCreation(source, await projectInputs(source.scaffoldRoot), name, options);
 }
 
-async function planCreation({ root: source, toolingManifest }, inputs, name, options) {
+async function planCreation({ root: source, toolingManifest, tooling }, inputs, name, options) {
   const userHome = await realpath(resolve(options.userHome ?? homedir()));
   const state = await readProjectsState({ userHome });
   const scaffoldFingerprint = fingerprint(inputs.map(({ name, bytes }) =>
     [name, bytes === undefined ? null : createHash('sha256').update(bytes).digest('hex')]));
   const root = await prospectivePath(state.projectsRoot);
   const destination = join(root, slugify(name));
+  await requireNewDestination(destination);
   const nested = relative(source, destination);
   if (nested === '' || !nested.startsWith('..') && !isAbsolute(nested)) throw new Error('Application projects must be outside the foundation checkout.');
-  const id = workspaceIdentity(destination);
-  let basePort;
-  const probe = options.probe ?? portState;
-  for (let attempt = 0; attempt < 100; attempt++) {
-    const candidate = 20000 + ((parseInt(id.slice(0, 8), 16) + attempt) % 4000) * 10;
-    if ((await Promise.all([0, 1, 2, 5].map(offset => probe(candidate + offset)))).every(state => state === 'free')) {
-      basePort = candidate;
-      break;
+  let archive;
+  if (options.archive !== undefined) {
+    const inspected = await inspectToolingArchive(options.archive);
+    if (inspected.metadata.name !== tooling.name || inspected.metadata.version !== tooling.version) {
+      throw new Error(`Creation archive must match ${tooling.name}@${tooling.version}; no package or version substitution is allowed.`);
     }
+    for (const key of ['dependencies', 'optionalDependencies', 'peerDependencies', 'peerDependenciesMeta']) {
+      if (!isDeepStrictEqual(inspected.metadata[key] ?? {}, tooling[key] ?? {})) throw new Error(`Creation archive ${key} do not match the selected tooling.`);
+    }
+    archive = { path: options.archive, sha256: inspected.sha256, integrity: inspected.integrity, version: tooling.version };
   }
-  if (!basePort) throw new Error('No free creation workspace block found; inspect occupied ports without stopping unrelated services.');
-  const browser = options.browser !== false;
   const effects = [
     `Create ${destination} and initialize its Git repository.`,
-    `Start an owned loopback status/proxy process on port ${basePort}; reserve private gateway ${basePort + 2}, DAB ${basePort + 1}, SQL ${basePort + 5}.`,
-    `Persist nonsecret creation state in the user SQL Apps directory${browser ? ' and open the local browser' : '; do not open a browser'}.`,
-    'Known later setup effects: dependency restore, build, SQL startup/schema publication and synthetic acceptance. Existing scoped setup approval and SQL terms still apply before those operations; no cloud resources are created.',
+    ...(archive ? [`Copy ${archive.path} (SHA-256 ${archive.sha256}) into the project tooling/ directory; bind package-lock.json to its relative path and SHA-512 integrity and copy tooling/ before Docker restore.`] : []),
+    'Register the project for listing only; the registry does not select execution ownership.',
+    'No dependency restore, build, browser, background helper, workspace, database or cloud operation. Review setup plan separately from the project directory.',
   ];
-  return { version: 1, source, home: destination, name: name.trim(), userHome, workspaceId: id, basePort, browser, effects,
-    approval: fingerprint({ source, home: destination, name: name.trim(), basePort, effects,
-      toolingManifest, scaffoldFingerprint, implementation: await creationImplementation() }).slice(0, 12) };
+  const implementation = fingerprint(await Promise.all([
+    import.meta.url, new URL('./bind-tooling-archive.mjs', import.meta.url).href,
+  ].map(path => readFile(new URL(path), 'utf8'))));
+  return { version: 1, source, home: destination, name: name.trim(), userHome, ...(archive ? { archive } : {}), effects,
+    approval: fingerprint({ source, home: destination, name: name.trim(), archive, effects,
+      toolingManifest, scaffoldFingerprint, implementation }).slice(0, 12) };
 }
 
 export async function createProject(sourceValue, name, options = {}) {
@@ -341,8 +345,9 @@ export async function createProject(sourceValue, name, options = {}) {
   const inputs = await projectInputs(scaffoldRoot);
   const userHome = resolve(options.userHome ?? homedir());
   if (options.initializeGit !== false) await requireGit(options.runner);
-  const creation = options.progressive ? await planCreation(selectedSource, inputs, name, options) : null;
-  if (creation && options.approval !== creation.approval) throw new Error('Review projects create-plan and explicitly approve its current id before starting the browser experience.');
+  const creation = options.approval !== undefined || options.archive !== undefined
+    ? await planCreation(selectedSource, inputs, name, options) : null;
+  if (creation && options.approval !== creation.approval) throw new Error('Review projects create-plan and explicitly approve its current id before starting creation.');
   return withProjectsLock(userHome, async () => {
     const state = await readProjectsState({ userHome });
     await mkdir(state.projectsRoot, { recursive: true });
@@ -353,49 +358,30 @@ export async function createProject(sourceValue, name, options = {}) {
     }
     const slug = slugify(name);
     const destination = join(projectsRoot, slug);
-    try {
-      await lstat(destination);
-      throw new Error(`A project folder named "${slug}" already exists in ${state.projectsRoot}.`);
-    } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    await requireNewDestination(destination);
     const temporary = join(projectsRoot, `.${slug}-${randomUUID()}.tmp`);
     await mkdir(temporary, { mode: 0o700 });
-    let sessionDirectory, session, origin, destinationCreated = false;
+    let destinationCreated = false;
     try {
-      if (creation) {
-        if (destination !== creation.home) throw new Error('Creation destination changed; review a new creation plan.');
-        session = initialProgress({ home: destination, name: name.trim(), workspaceId: creation.workspaceId,
-          publicOrigin: `http://127.0.0.1:${creation.basePort}`, gatewayOrigin: `http://127.0.0.1:${creation.basePort + 2}` });
-        sessionDirectory = join(creation.userHome, '.sql-apps', 'creation-sessions', session.sessionId);
-        await writeCreationJson(join(sessionDirectory, 'progress.json'), session);
-        origin = await startCreationProcess(sessionDirectory, source);
-        if (options.browser !== false) await openCreationBrowser(origin);
-      }
+      if (creation && destination !== creation.home) throw new Error('Creation destination changed; review a new creation plan.');
       await copyProjectInputs(inputs, temporary);
       await customizeProject(temporary, name.trim(), slug, tooling);
+      if (creation?.archive) {
+        const binding = await planToolingArchive(temporary, creation.archive.path);
+        if (binding.sha256 !== creation.archive.sha256) throw new Error('Creation archive changed; review a new creation plan.');
+        await bindToolingArchive(temporary, creation.archive.path, binding.approval);
+      }
       if (options.initializeGit !== false) await initializeRepository(temporary, options.runner);
       await rename(temporary, destination);
       destinationCreated = true;
-      if (creation) {
-        await writeCreationJson(join(destination, '.sql-apps', 'creation-session.json'),
-          { version: 1, home: destination, directory: sessionDirectory, sessionId: session.sessionId });
-        await (options.initializeWorkspace ?? initializeWorkspace)(destination, creation.basePort, portState,
-          { frontDoor: true, sessionId: session.sessionId });
-      }
       const project = { name: name.trim(), slug, path: destination, createdAt: new Date().toISOString() };
       state.projects = [...state.projects.filter(item => item.path !== destination), project];
       state.activeProject = destination;
       await saveProjectsState(state, userHome);
-      return { ...project, ...(origin ? { launchUrl: origin, reviewPending: true } : {}), next: nextSteps(destination, scaffoldRoot !== source) };
+      return { ...project, next: nextSteps(destination) };
     } catch (error) {
       await rm(temporary, { recursive: true, force: true });
-      if (origin) {
-        try { await stopCreationProcess(sessionDirectory); }
-        catch (cleanup) { throw new AggregateError([error, cleanup], 'Scaffolding and owned front-door cleanup failed; inspect the creation session.'); }
-      }
       if (destinationCreated) await rm(destination, { recursive: true, force: true });
-      if (sessionDirectory && error.code !== 'CREATION_PROCESS_CLEANUP_FAILED') {
-        await rm(sessionDirectory, { recursive: true, force: true });
-      }
       throw error;
     }
   });
@@ -420,7 +406,7 @@ export async function openProject(value, options = {}) {
 
 export async function main(args = process.argv.slice(2), source = resolve(import.meta.dirname, '..'), options = {}) {
   const [command = 'list', value, ...extra] = args;
-  const usage = 'Usage: projects <root [absolute-path]|create-plan <name> [--no-browser]|create <name> [--approval <id>] [--no-browser]|list|open <absolute-path>>';
+  const usage = 'Usage: projects <root [absolute-path]|create-plan <name> --archive <absolute-tgz>|create <name> --archive <absolute-tgz> --approval <id>|list|open <absolute-path>>';
   const creationOptions = {};
   const seen = new Set();
   if (['create', 'create-plan'].includes(command)) {
@@ -429,13 +415,13 @@ export async function main(args = process.argv.slice(2), source = resolve(import
       const flag = extra[i];
       if (seen.has(flag)) throw new Error(usage);
       seen.add(flag);
-      if (flag === '--no-browser') creationOptions.browser = false;
+      if (flag === '--archive' && isAbsolute(extra[i + 1] ?? '')) creationOptions.archive = extra[++i];
       else if (command === 'create' && flag === '--approval' && /^[a-f0-9]{12}$/.test(extra[i + 1] ?? '')) {
         creationOptions.approval = extra[++i];
       } else throw new Error(usage);
     }
-    creationOptions.progressive = options.requireApproval === true || creationOptions.approval !== undefined;
-    if (command === 'create' && creationOptions.progressive && !creationOptions.approval) {
+    if (!creationOptions.archive) throw new Error(`Select the verified release archive with --archive <absolute-tgz>. ${usage}`);
+    if (command === 'create' && !creationOptions.approval) {
       throw new Error('Review projects create-plan and provide --approval <id> before creating a project.');
     }
   } else if (extra.length || !['root', 'list', 'open'].includes(command)) {

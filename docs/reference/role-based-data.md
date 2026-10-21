@@ -38,7 +38,7 @@ launcher supplies a separate database-backed readiness probe before listening.
 
 Follow [scoped consent](../guides/run-locally.md#approvals-and-readiness). Dependency restore, build, workspace selection, SQL terms/downloads/schema/startup and synthetic acceptance are distinct approval scopes.
 
-After tooling restore and before build, `npm run setup:check -- --profile role-based-data` checks prerequisites and only selected gateway/DAB ports; the installed launcher exposes the same diagnostic as `role-based-setup-check`, including through its explicit foundation bootstrap binding before restore. It does not install tools or start services.
+After tooling restore and before build, `npm run setup:check -- --profile role-based-data` checks prerequisites and selected gateway/DAB ports. Before restore, use the verified archive CLI's `setup plan`; the installed launcher also exposes `setup-check` through explicit bootstrap tooling selection. These checks do not install tools or start services.
 
 After an approved build and explicit workspace selection:
 
@@ -46,7 +46,7 @@ After an approved build and explicit workspace selection:
 npm run local -- app
 ```
 
-`role-based-app` is an alias of `app`. An optional second argument selects an explicitly approved existing SQL container. Startup runs the `start-sql`, `init` (schema, procedure grants and read-only SQL acceptance) and `data` stages, then checks the actual readiness procedure before listening on the loopback gateway (`serve`). Port ownership checks include only the gateway, DAB and SQL ports. It preserves data and reports the failed stage rather than resetting volumes.
+An optional second argument selects an explicitly approved existing SQL container. Startup runs the `start-sql`, `init` (schema, procedure grants and read-only SQL acceptance) and `data` stages, then checks the actual readiness procedure before listening on the loopback gateway (`serve`). Port ownership checks include only the gateway, DAB and SQL ports. It preserves data and reports the failed stage rather than resetting volumes.
 
 After readiness passes, open the reported workspace origin and select **Sign in**. Product screens use account/access states, label the default simulated identity as **Test user** and do not offer persona selectors. For authorization testing, open the reported local-only developer page in the same tab; Development Alice is labeled as having the required role and Development Bob as lacking it. Switch there and return to the application; switching revokes the old server-issued session. Use **Sign out** to revoke the current local session.
 
@@ -58,4 +58,4 @@ Verify an agreed browser action, SQL persistence/reload, invalid input and appli
 npm run local -- serve
 ```
 
-`role-based-serve` is an alias of `serve`. Use the existing approved `stop` command to stop only the owned DAB container when needed; never delete SQL volumes to resume.
+Use the approved `stop` command to stop only the owned DAB container when needed; never delete SQL volumes to resume.

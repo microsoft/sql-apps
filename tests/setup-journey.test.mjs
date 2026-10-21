@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, mkdir, writeFile, realpath } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir, writeFile, realpath, copyFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runtimeFor, initializeWorkspace } from '../src/workspace.mjs';
@@ -38,6 +38,62 @@ test('a dependency-free coordinator exposes planning and guarded execution', () 
   assert.equal(typeof setup?.runSetup, 'function');
 });
 
+test('setup run accepts the reviewed approval id and rejects obsolete setup aliases', () => {
+  assert.deepEqual(setup.parseSetupArguments(['run', '--approval', '123456789abc']),
+    { command: 'run', options: { profile: 'role-based-data', approval: '123456789abc' } });
+  for (const command of ['resume', 'approval', 'approve']) {
+    assert.throws(() => setup.parseSetupArguments([command]), /Unsupported setup command/);
+  }
+  assert.throws(() => setup.parseSetupArguments(['plan', '--workspace', 'legacy']), /Invalid setup/);
+});
+
+test('rendered setup approval retains the explicitly reviewed SQL target flags', () => {
+  const bundle = { profile: 'role-based-data', home: 'fixture', phase: 'local', workspace: '30000',
+    requirements: [], missing: [], terms: { required: false }, approval: '123456789abc', allowed: false };
+  const target = resolve('express-target.json');
+  const output = setup.renderSetup({ stages: [], approval: bundle }, { sqlProvider: 'express', sqlTarget: target }).join('\n');
+  assert.ok(output.includes(`--sql-target "${target}" --sql-provider express`));
+  assert.match(output, /--approval 123456789abc/);
+});
+
+test('setup run records its reviewed bundle and executes the approved proposed workspace', async t => {
+  const { home, deps, options } = await fixture(t, false);
+  for (const file of ['package.json', 'package-lock.json', '.config/dotnet-tools.json', 'tsconfig.runtime.json',
+    'scripts/build-provenance.mjs', 'src/local.ts', 'src/local-images.ts', 'src/local-app.ts',
+    'src/role-based-profile.ts', 'sql/local/acceptance.sql', 'role-based-data.json']) {
+    await mkdir(join(home, file, '..'), { recursive: true });
+    await copyFile(resolve(file), join(home, file));
+  }
+  const probes = { ...deps, consent: planConsent,
+    source: async () => ({ ready: true, toolingHome: resolve('.'), fingerprint: 'fixture-build',
+      build: { ready: true, code: 'BUILD_CURRENT' } }) };
+  const plan = await setup.planSetup(home, options, probes);
+  assert.equal(plan.approval.allowed, false);
+  assert.equal(plan.approval.terms.required, true);
+  const incomplete = await setup.planSetup(home, options, { ...probes,
+    check: async () => ({ ready: true, checks: [{ id: 'role-based-config', status: 'action-required', required: false,
+      code: 'ROLE_BASED_CONFIG_MISSING', message: 'Profile configuration missing.', nextAction: 'Implement the app.' }] }) });
+  assert.equal(incomplete.approval?.approval, plan.approval.approval,
+    'incomplete domain configuration must not prevent reviewing restore/build/workspace effects');
+  assert.equal(incomplete.stages.find(stage => stage.id === 'launch').code, 'ROLE_BASED_CONFIG_MISSING');
+  let launched = false;
+  const report = await setup.runSetup(home, { ...options, approval: plan.approval.approval }, {
+    ...probes, progress: () => {},
+    launch: async () => { launched = true; return { completion: Promise.resolve(), stop: async () => {} }; },
+    fetch: async url => {
+      if (!launched) throw new Error('not launched');
+      const runtime = runtimeFor(undefined, home);
+      return Response.json(String(url).endsWith('/local/workspace') ?
+        { version: 1, id: runtime.id, mode: runtime.mode, profile: options.profile, origins: runtime.origins,
+          container: runtime.defaultSql, sourceFingerprint: 'fixture-build', authentication: { mode: 'preview' } } :
+        { status: 'ready' });
+    },
+  });
+  assert.equal(report.running, true);
+  assert.equal(runtimeFor(undefined, home).ports.gateway, Number(plan.approval.workspace));
+  assert.equal((await planConsent(home, { operation: 'app' })).allowed, true);
+});
+
 test('endpoint gateway reuse requires the actual selected provider and target fingerprint', async t => {
   const { home, deps, options } = await fixture(t);
   const runtime = runtimeFor(undefined, home);
@@ -68,7 +124,7 @@ test('prerequisites ready never means workspace selected or launch approved', as
   const { proposal } = report.next;
   const suggested = proposal.conflicts.length ? proposal.alternative.basePort : proposal.descriptor.basePort;
   assert.match(report.next.nextAction, new RegExp(`--workspace ${suggested}\\b`));
-  assert.match(report.next.nextAction, new RegExp(`setup approval --profile role-based-data --workspace ${suggested}\\b`));
+  assert.match(report.next.nextAction, new RegExp(`setup plan --profile role-based-data --workspace ${suggested}\\b`));
   assert.match(report.next.nextAction, new RegExp(`setup run --profile role-based-data --workspace ${suggested}\\b`));
   assert.doesNotMatch(report.next.nextAction, /workspace-plan/, 'workspace-plan needs a current build; setup must be usable before it');
   const launch = report.stages.find(stage => stage.id === 'launch');
@@ -345,7 +401,7 @@ test('external SQL startup guidance reviews the selected target instead of the o
   const report = await setup.planSetup(home, { ...options, container: 'external-sql' }, deps);
   const text = setup.renderSetup(report).join('\n');
   assert.match(text, /consent-plan app external-sql/);
-  assert.doesNotMatch(text, /setup approval --profile/, 'the setup bundle cannot approve external SQL selection');
+  assert.doesNotMatch(text, /Review setup plan --profile/, 'the setup bundle cannot approve external SQL selection');
 });
 
 test('first setup uses the proposed or explicit isolated ports while the legacy gateway is occupied', async t => {
@@ -495,6 +551,52 @@ test('approved restore and build re-plan readiness and skip already verified npm
   assert.equal(calls.flat(2).includes('ci'), false);
 });
 
+test('missing restore tools and unknown required checks still block all setup execution', async t => {
+  const { home, deps, options } = await fixture(t);
+  let executed = false;
+  for (const id of ['dotnet', 'unrecognized-check']) {
+    const report = await setup.runSetup(home, options, { ...deps,
+      check: async () => ({ checks: [{ id, required: true, status: 'action-required', code: 'UNVERIFIED' }] }),
+      dependencies: async () => ({ ready: false, npmReady: true, sqlToolsReady: false }),
+      consent: async (_, request) => ({ allowed: true, request }),
+      execute: async () => { executed = true; },
+    });
+    assert.equal(report.next.id, 'tooling');
+    assert.equal(report.next.status, 'blocked');
+  }
+  assert.equal(executed, false);
+});
+
+for (const bootstrap of [true, false]) test(`${bootstrap ? 'bootstrap restore' : 'restore/build'} proceeds before runtime-only prerequisites`, async t => {
+  const { home, deps, options } = await fixture(t);
+  for (const name of ['package.json', 'package-lock.json', '.config/dotnet-tools.json', 'tsconfig.runtime.json', 'scripts/build-provenance.mjs']) {
+    await mkdir(join(home, name, '..'), { recursive: true });
+    await writeFile(join(home, name), '{}');
+  }
+  for (const operation of ['restore', 'build']) await grantConsent(home, await planConsent(home, { operation }));
+  let restored = false;
+  let built = false;
+  const calls = [];
+  const targetPath = join(home, 'selected-target.json');
+  await writeFile(targetPath, JSON.stringify({ version: 1, provider: 'express', instance: 'SQLEXPRESS',
+    server: '127.0.0.1', port: 1433, database: 'development' }));
+  const report = await setup.runSetup(home, { ...options, ...(bootstrap ? { sqlProvider: 'express', sqlTarget: targetPath } : {}) }, {
+    ...deps,
+    source: async () => ({ ready: true, bootstrap, fingerprint: 'fixture-build', build: { ready: built, code: 'BUILD_UNVERIFIED' } }),
+    check: async () => ({ checks: [{ id: 'docker-cli', required: true, status: 'action-required', code: 'DOCKER_UNAVAILABLE' },
+      { id: 'sql-image', required: true, status: 'not-checked', code: 'SQL_NOT_CHECKED' }] }),
+    dependencies: async () => ({ ready: restored, npmReady: true, sqlToolsReady: restored }),
+    consent: async (root, request) => ['restore', 'build'].includes(request.operation) ? planConsent(root, request) : deps.consent(root, request),
+    execute: async (file, args) => { calls.push([file, args]); if (file === 'dotnet') restored = true; else built = true; },
+    progress: () => {},
+  });
+  assert.equal(calls.length, bootstrap ? 1 : 2);
+  assert.equal(report.prerequisitesReady, false);
+  assert.equal(report.running, false);
+  assert.equal(report.next.id, bootstrap ? 'build' : 'prerequisites');
+  assert.equal(report.next.status, 'blocked');
+});
+
 for (const verified of [true, false]) test(`bootstrap stops after ${verified ? 'verified' : 'partial'} restore before build`, async t => {
   const { home, deps, options } = await fixture(t);
   for (const name of ['package.json', 'package-lock.json', '.config/dotnet-tools.json', 'tsconfig.runtime.json', 'scripts/build-provenance.mjs']) {
@@ -561,7 +663,7 @@ test('human setup output states completed results and names the checks behind a 
   assert.match(summary, /^Next: workspace/);
   assert.match(summary, /consent-plan workspace-init 21240/, 'the final next step must say what to approve, not only the effect');
   const bundled = setup.renderSetup({ profile: 'role-based-data', stages: [workspace], next: workspace }).at(-1);
-  assert.match(bundled, /setup approval --profile role-based-data --workspace 21240/, 'profile reports point at the single approval');
+  assert.match(bundled, /setup plan --profile role-based-data --workspace 21240/, 'profile reports point at the single approval');
 });
 
 async function processFixture(t, outcome, container) {
@@ -614,7 +716,7 @@ test('attached launch reports invalid real-auth before spawning', async t => {
   const { home, options, deps } = await fixture(t);
   const runtime = runtimeFor(undefined, home);
   let spawns = 0;
-  await assert.rejects(setup.launchSetup(home, 'role-based-app', undefined, runtime, options.profile, deps.fetch, {
+  await assert.rejects(setup.launchSetup(home, 'app', undefined, runtime, options.profile, deps.fetch, {
     source: deps.source,
     environment: { NODE_ENV: 'test', SQL_APPS_LOCAL_AUTH: 'entra' },
     spawn: () => { spawns++; throw new Error('Unexpected launch effect'); },
@@ -640,7 +742,7 @@ require('node:fs').writeFileSync('authentication-environment.json', JSON.stringi
   clientId: process.env.API_CLIENT_ID, nodeEnvironment: process.env.NODE_ENV,
 }));
 `);
-  const started = await setup.launchSetup(home, 'role-based-app', undefined, runtime, options.profile, fetcher, {
+  const started = await setup.launchSetup(home, 'app', undefined, runtime, options.profile, fetcher, {
     ...injected, environment,
     spawn: (file, args, options) => {
       assert.ok(options.env === environment, 'the configured environment must be passed unchanged to the child');
@@ -670,7 +772,7 @@ test('attached launch closes its own child on an authentication mismatch without
   let healthReads = 0;
   const before = [process.listenerCount('SIGINT'), process.listenerCount('SIGTERM')];
   await assert.rejects(async () => {
-    const started = await setup.launchSetup(home, 'role-based-app', undefined, runtime, options.profile,
+    const started = await setup.launchSetup(home, 'app', undefined, runtime, options.profile,
       async url => {
         if (String(url).endsWith('/health/ready')) healthReads++;
         return fetcher(url);
@@ -685,7 +787,7 @@ test('attached launch closes its own child on an authentication mismatch without
 test('attached launch becomes HTTP-ready and stopping it closes the real child', async t => {
   const { home, options, runtime, injected, fetcher, child } = await processFixture(t);
   const before = [process.listenerCount('SIGINT'), process.listenerCount('SIGTERM')];
-  const started = await setup.launchSetup(home, 'role-based-app', undefined, runtime, options.profile, fetcher, injected);
+  const started = await setup.launchSetup(home, 'app', undefined, runtime, options.profile, fetcher, injected);
   assert.equal(child().exitCode, null);
   await started.stop();
   await started.completion;
@@ -695,7 +797,7 @@ test('attached launch becomes HTTP-ready and stopping it closes the real child',
 
 test('attached launch verifies an explicitly selected external SQL container over real HTTP', async t => {
   const { home, options, runtime, injected, fetcher, child } = await processFixture(t, undefined, 'external-sql');
-  const started = await setup.launchSetup(home, 'role-based-app', runtime.sqlContainer, runtime, options.profile, fetcher, injected);
+  const started = await setup.launchSetup(home, 'app', runtime.sqlContainer, runtime, options.profile, fetcher, injected);
   assert.equal(child().exitCode, null);
   await started.stop();
   await started.completion;
@@ -705,7 +807,7 @@ test('attached launch verifies an explicitly selected external SQL container ove
 test('attached launch propagates an early child failure without leaking listeners', async t => {
   const { home, options, runtime, injected, fetcher } = await processFixture(t, 'exit');
   const before = [process.listenerCount('SIGINT'), process.listenerCount('SIGTERM')];
-  await assert.rejects(setup.launchSetup(home, 'role-based-app', undefined, runtime, options.profile, fetcher, injected),
+  await assert.rejects(setup.launchSetup(home, 'app', undefined, runtime, options.profile, fetcher, injected),
     /exited \(7\)/);
   assert.deepEqual([process.listenerCount('SIGINT'), process.listenerCount('SIGTERM')], before);
 });
@@ -713,7 +815,7 @@ test('attached launch propagates an early child failure without leaking listener
 test('attached launch stops its real child after a responding identity conflict', async t => {
   const { home, options, runtime, injected, fetcher, child } = await processFixture(t);
   await writeFile(join(home, 'identity.json'), '{"version":1,"id":"foreign-workspace"}');
-  await assert.rejects(setup.launchSetup(home, 'role-based-app', undefined, runtime, options.profile, fetcher, injected),
+  await assert.rejects(setup.launchSetup(home, 'app', undefined, runtime, options.profile, fetcher, injected),
     /identity changed/);
   assert.throws(() => process.kill(child().pid, 0), { code: 'ESRCH' });
 });
@@ -721,7 +823,7 @@ test('attached launch stops its real child after a responding identity conflict'
 test('attached launch timeout stops its real child rather than leaving a server running', async t => {
   const { home, options, runtime, injected, child } = await processFixture(t);
   let clock = 0;
-  await assert.rejects(setup.launchSetup(home, 'role-based-app', undefined, runtime, options.profile,
+  await assert.rejects(setup.launchSetup(home, 'app', undefined, runtime, options.profile,
     async () => { throw new Error('unavailable'); }, { ...injected, now: () => { clock += 100_000; return clock; } }),
   /bounded wait/);
   assert.throws(() => process.kill(child().pid, 0), { code: 'ESRCH' });
@@ -731,7 +833,7 @@ test('attached launch never publishes a matching but unready child and closes it
   const { home, options, runtime, injected, fetcher, child } = await processFixture(t, 'unready');
   let probes = 0;
   const before = [process.listenerCount('SIGINT'), process.listenerCount('SIGTERM')];
-  await assert.rejects(setup.launchSetup(home, 'role-based-app', undefined, runtime, options.profile,
+  await assert.rejects(setup.launchSetup(home, 'app', undefined, runtime, options.profile,
     async url => {
       const response = await fetcher(url);
       if (String(url).endsWith('/health/ready')) probes++;

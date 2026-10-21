@@ -6,21 +6,19 @@ description: "Use when a beginner is starting a SQL Apps project, shaping an app
 # SQL Apps
 
 Resolve and quote `../../scripts/sql-apps.mjs` from this skill, not cwd.
-`SQL_APPS_HOME` selects the app; `SQL_APPS_FOUNDATION_HOME` retains bootstrap tooling.
-Input `docs/...` belongs to that app, or foundation before creation.
-Create via `projects create-plan "<name>"`, then after approval
-`projects create "<name>" --approval <id>`; relay its `SQL_APPS_HOME` command.
-Never edit the foundation/plugin or other plugins.
+`SQL_APPS_HOME` explicitly selects the app; otherwise use the nearest app.
+Input `docs/...` belongs to that app, not the plugin cache.
+Use `sql-apps-application` as the authoritative project-creation contract.
+Never edit foundation/plugin or other plugins.
 
 Follow **Describe -> Run locally -> Make it yours -> Share optionally**.
 
 ## Describe
 
-Before restore, use the installed launcher's `guide`; afterward, `npm run guide`.
-Review installed-tooling setup approvals after bootstrap restore. Saved decisions
-are historical, not readiness or permission. Read only the current stage's guide.
+Use the explicitly selected verified archive CLI's `guide` before restore, then `npm run guide`.
+Saved decisions are not readiness or permission. Read only this stage's guide.
 Ask one outcome-focused question about missing users, information or actions at a
-time; summarize exclusions. Do not ask beginners to choose frameworks, Azure
+time; summarize exclusions. Never ask beginners to choose frameworks, Azure
 services or topology.
 
 ## Route the work
@@ -31,9 +29,9 @@ services or topology.
 - `sql-apps-local`: prerequisites, approval and lifecycle.
 - `sql-apps-validation`: checks and evidence.
 - `sql-apps-diagnostics`: an existing failure or slow read.
-- `sql-apps-cloud-preview`: requested publishing, pricing or cloud readiness; assesses App Service, then Container Apps, then qualifying SWA Free fallback.
+- `sql-apps-cloud-preview`: requested publishing, pricing or cloud readiness.
 
-Load only the needed stage; stop gathering context once its command or blocker is known.
+Load only the current stage until its command/blocker is known.
 
 ## Finish locally
 

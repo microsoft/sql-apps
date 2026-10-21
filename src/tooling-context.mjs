@@ -25,7 +25,7 @@ export async function installedTooling(home) {
     readFile(join(candidate, 'package.json'), 'utf8').then(JSON.parse),
   ]);
   if (pkg.name !== project.tooling.package || pkg.version !== project.tooling.version) {
-    throw new Error('Installed SQL Apps tooling does not match the project pin; restore its exact version before continuing.');
+    throw new Error(`Project ${home} requires ${project.tooling.package}@${project.tooling.version}, but installed tooling ${candidate} is ${pkg.name}@${pkg.version}. Restore the exact project pin before continuing.`);
   }
   return realpath(candidate);
 }

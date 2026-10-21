@@ -7,7 +7,6 @@ import { projectPath, toolingAsset } from './runtime-roots.js';
 import { runtimeFor } from './workspace.mjs';
 import type { RoleBasedProfile } from './role-based-profile.js';
 import type { Run } from './process.js';
-import { recordCreationCapability } from './creation-session.mjs';
 
 export async function endpointLocalCommand(command: string, target: EndpointTarget, run: Run, profile?: RoleBasedProfile): Promise<void> {
   if (process.env.NODE_ENV === 'production') throw new Error('Development database routes are disabled in production.');
@@ -25,18 +24,17 @@ export async function endpointLocalCommand(command: string, target: EndpointTarg
     await endpointAdminQuery(target, await readFile(projectPath('sql', 'local', 'application-acceptance.sql'), 'utf8'), run);
     return;
   }
-  if (['app', 'role-based-app', 'init'].includes(command)) {
+  if (['app', 'init'].includes(command)) {
     await initializeEndpoint(target, run, profile);
     const state = await readEndpointCredentials(runtimeFor(), target, run);
     const statement = (await readFile(projectPath('sql', 'local', 'acceptance.sql'), 'utf8')).replaceAll('$(LocalDabUser)', state.login);
     const rows = await endpointRuntimeQuery(target, statement, run);
     if (!rows.some(row => row.message === 'LOCAL SQL ACCEPTANCE PASSED')) throw new Error('Endpoint SQL acceptance did not report success.');
-    await recordCreationCapability(runtimeFor().home, 'data', 'verified', 'Selected endpoint least-privilege SQL query and schema acceptance passed.');
     if (command === 'init') return;
   }
   const config = await localDabConfig(profile);
-  if (['app', 'role-based-app', 'data'].includes(command)) await startHostData(target, config, run);
-  if (['app', 'role-based-app', 'serve', 'role-based-serve'].includes(command)) {
+  if (['app', 'data'].includes(command)) await startHostData(target, config, run);
+  if (['app', 'serve'].includes(command)) {
     await verifyHostData(target, config);
     await serveLocalApp(runtimeFor().sqlContainer, profile);
     return;

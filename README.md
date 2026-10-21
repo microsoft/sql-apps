@@ -41,24 +41,23 @@ screens or sample data.
 archive, install its CLI in a dedicated directory and create an independent
 project. No foundation clone, global install or assistant plugin is required.
 
-The archive-first CLI in this branch targets **unreleased 0.2.5**. Published
-0.2.4 does not include this bootstrap factory; use the documented foundation
-alternative until an archive containing it is released. Maintainers can exercise
-the same flow with a locally built candidate.
+This branch prepares the **initial 0.1.0 release candidate**, not a published
+runtime. Maintainers can exercise the archive flow with a locally built candidate.
+Earlier demos have no compatibility or migration guarantee.
 
 After explicitly approving installation of your verified archive:
 
 ```powershell
-npm install --prefix "C:\SqlAppsTools\0.2.5" --no-save --package-lock=false --ignore-scripts "C:\Downloads\microsoft-sql-apps-0.2.5.tgz"
-$cli = "C:\SqlAppsTools\0.2.5\node_modules\@microsoft\sql-apps\bin\sql-apps.mjs"
-node $cli projects create-plan "Equipment Checkout" --no-browser
-node $cli projects create "Equipment Checkout" --no-browser --approval <printed-id>
+npm install --prefix "C:\SqlAppsTools\0.1.0" --no-save --package-lock=false --ignore-scripts "C:\Downloads\microsoft-sql-apps-0.1.0.tgz"
+$cli = "C:\SqlAppsTools\0.1.0\node_modules\@microsoft\sql-apps\bin\sql-apps.mjs"
+node $cli projects create-plan "Equipment Checkout" --archive "C:\Downloads\microsoft-sql-apps-0.1.0.tgz"
+node $cli projects create "Equipment Checkout" --archive "C:\Downloads\microsoft-sql-apps-0.1.0.tgz" --approval <printed-id>
 ```
 
-Review the destination, Git repository, ports and owned local helper before
-creation. `--no-browser` suppresses browser opening, not the helper. The guide
-continues with separately reviewed archive binding and app restore, then a fresh
-plan through the app's exact installed tooling.
+Review the destination, Git repository and archive checksum before creation.
+Creation binds the reviewed archive immediately and starts no helper or browser.
+The guide continues with a restore-only bootstrap approval, then a fresh local
+setup plan through the app's exact installed tooling.
 
 Open the generated application in your editor, give your assistant access to
 that project and ask:

@@ -101,20 +101,17 @@ test('copied workspace descriptors fail instead of sharing another home resource
   assert.throws(() => runtimeFor(undefined, second), /another checkout/);
 });
 
-test('fixed-port legacy selection preserves SQL Apps defaults, names and state', async t => {
+test('unselected workspaces use isolated identities and reject legacy selections', async t => {
   const root = await home(t);
   const { runtimeFor, initializeWorkspace } = await load();
-  const legacy = runtimeFor('owned-sql', root);
-  assert.equal(legacy.mode, 'legacy-unselected');
-  assert.equal(legacy.ports.gateway, 18080);
-  assert.equal(legacy.ports.data, 15000);
-  await initializeWorkspace(root, 'legacy');
-  const selected = runtimeFor('owned-sql', root);
-  assert.equal(selected.mode, 'legacy');
-  assert.deepEqual(selected.names, legacy.names);
-  assert.equal(selected.stateDirectory, legacy.stateDirectory);
-  assert.equal(selected.database, 'sql_apps_local');
-  assert.equal(selected.login, 'sql_apps_local_dab');
+  const runtime = runtimeFor(undefined, root);
+  assert.equal(runtime.mode, 'unselected');
+  assert.equal(runtime.defaultSql, `sql-apps-${runtime.id}-sql`);
+  assert.ok(runtime.ports.gateway >= 20000);
+  assert.equal(runtime.database, `sql_apps_local_${runtime.id}`);
+  await assert.rejects(initializeWorkspace(root, 'legacy'), /port block/);
+  await initializeWorkspace(root, 30000, async () => 'free');
+  assert.equal(runtimeFor(undefined, root).mode, 'isolated');
 });
 
 test('external SQL selection scopes downstream resources without claiming SQL ownership', async t => {

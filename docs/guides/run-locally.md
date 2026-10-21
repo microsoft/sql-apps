@@ -24,15 +24,15 @@ SQL Apps has one profile, [role-based-data](../reference/role-based-data.md): Az
 The [setup coordinator](../reference/setup.md) connects these steps without
 requiring a desktop executable. Run `npm run setup -- plan --json`
 before changing anything. Before tooling restore, use the installed plugin's
-`setup plan --json` with `SQL_APPS_FOUNDATION_HOME` (or the Copilot installer
-binding) selecting the foundation. Bootstrap setup stops after restore; review the
+`setup plan --json` with `SQL_APPS_TOOLING_HOME` selecting the verified archive
+package or contributor checkout. Bootstrap setup stops after restore; review the
 installed package's plan and changed approval scopes before continuing.
-After explicit approvals, `run` or `resume` rechecks
+After explicit approval, `run --approval <id>` rechecks
 the checkout, skips current dependencies/builds and launches the app.
-It never records grants automatically. The existing individual commands below
+It records only the effects bound to that reviewed id. The individual commands below
 remain available; selected examples retain their separate application workflow.
 
-Before the first approval, explain what stays separate: tool installations (only if missing), the bootstrap-to-installed-tooling approval transition, and anything in Azure. With tooling installed, local startup shares one approval: `npm run setup -- approval --profile role-based-data --workspace <base-port>` lists restore, build, the workspace port block, image downloads, SQL startup, schema, services, the read-only SQL acceptance check and the SQL terms line, with exclusions. After explicit approval run the printed `setup approve ... --approval <id>`, then `setup run`. Editing your application's SQL, DAB configuration or `role-based-data.json` reuses the approval; launcher, port or terms changes show a new id to review.
+Before the first approval, explain what stays separate: tool installations (only if missing), the bootstrap-to-installed-tooling approval transition, and anything in Azure. With tooling installed, local startup shares one approval: `npm run setup -- plan --profile role-based-data --workspace <base-port>` lists restore, build, the workspace port block, image downloads, SQL startup, schema, services, the read-only SQL acceptance check and the SQL terms line, with exclusions. After explicit approval run the printed `setup run ... --approval <id>`, then `setup run`. Editing your application's SQL, DAB configuration or `role-based-data.json` reuses the approval; launcher, port or terms changes show a new id to review.
 
 [Remembered local permissions](../reference/local-consent.md) store that approval per checkout and workspace across sessions. Grants are revocable, never global, and do not cover tool installations or Azure deployment.
 
@@ -63,9 +63,9 @@ npm run local -- workspace-init <base-port>
 npm run local -- app
 ```
 
-Workspace selection keeps this checkout's service names, ports and saved state separate. `app` (alias `role-based-app`) runs four stages: `start-sql`, `init`, `data` and `serve`. It downloads missing images, accepts the SQL container EULA, publishes the project schema, starts DAB and launches the browser gateway. Read the [local runtime reference](../reference/local-development.md) before reusing an existing stack or database.
+Workspace selection keeps this checkout's service names, ports and saved state separate. `app` runs four stages: `start-sql`, `init`, `data` and `serve`. It downloads missing images, accepts the SQL container EULA, publishes the project schema, starts DAB and launches the browser gateway. Read the [local runtime reference](../reference/local-development.md) before reusing an existing stack or database.
 
-The workspace and startup commands above are covered by the single `setup approval` bundle; with the individual commands you can instead record scopes from their [consent plans](../reference/local-consent.md). Use the guarded `consent run restore`/`consent run build` paths for assistant-led work; raw package commands are not permission bypasses.
+The workspace and startup commands above are covered by the bundle shown by `setup plan`; with the individual commands you can instead record scopes from their [consent plans](../reference/local-consent.md). Use the guarded `consent run restore`/`consent run build` paths for assistant-led work; raw package commands are not permission bypasses.
 
 After the intended server responds and `/health/ready` passes, open its reported browser URL and select **Sign in**. The product signs in a simulated **Test user**; it does not offer a persona selector. To check authorization, open the reported local-only developer page in the same tab and switch between Development Alice (has the required role) and Development Bob (does not). Bob receives HTTP 403 for data requests; `/auth/me` reports whether access is allowed. Use **Sign out** to end the local session. Real Entra sign-in is an explicit local opt-in described in [Authentication and application access](../reference/authentication.md).
 
@@ -91,7 +91,7 @@ npm run local -- stop
 
 After `stop`, use `app` (or `data`, then `serve`) to start again. Selected-reference commands have their own stop/resume steps in the Todo guide. Do not delete volumes or saved credentials to restart an app. In preview mode, open local preview again after a gateway restart; SQL data persists independently of the session.
 
-`serve` (alias `role-based-serve`) only resumes the gateway against existing SQL and DAB. It tries readiness three times, with one-second pauses and a four-second shared deadline per attempt, then reports the named failure without listening or publishing a ready URL. It never starts or restarts a dependency. Inspect the failure before separately approved recovery; full `app` startup recreates the owned DAB container and is not a diagnostic retry.
+`serve` only resumes the gateway against existing SQL and DAB. It tries readiness three times, with one-second pauses and a four-second shared deadline per attempt, then reports the named failure without listening or publishing a ready URL. It never starts or restarts a dependency. Inspect the failure before separately approved recovery; full `app` startup recreates the owned DAB container and is not a diagnostic retry.
 
 If SQL or DAB fails after a successful launch, keep the gateway running. Readiness becomes HTTP 503 while liveness remains HTTP 200. Readiness recovers on the next successful probe without a gateway restart.
 

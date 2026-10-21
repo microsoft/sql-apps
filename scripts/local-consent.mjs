@@ -31,7 +31,7 @@ export async function main(args = process.argv.slice(2), value, runner = execute
   const [command = 'help', operation, selection] = args;
   if (command === 'help' && args.length <= 1) {
     console.log('Local consent: plan|status <operation> [selection] | grant|grant-once <absolute-plan.json> | grant|grant-once --plan-from <operation> [selection] | terms <absolute-reviewed-document> | revoke [scope|terms] | run <operation> [selection]');
-    console.log('Record grants/terms only after explicit human approval. No global, installation or cloud permission is recorded. Recovery and retention cleanup require grant-once. For first startup prefer one bundle: setup approval.');
+    console.log('Record grants/terms only after explicit human approval. No global, installation or cloud permission is recorded. Recovery and retention cleanup require grant-once. For first startup review setup plan, then setup run --approval <id>.');
     return;
   }
   if (['plan', 'status', 'run'].includes(command)) {

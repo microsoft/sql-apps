@@ -19,7 +19,7 @@ async function fixture(t) {
   await writeFile(join(home, 'package.json'), JSON.stringify({
     name: 'fixture', version: '0.1.0', sqlApps: { project: true },
     scripts: { local: 'sql-apps local' },
-    dependencies: { '@microsoft/sql-apps': '0.2.5' },
+    dependencies: { '@microsoft/sql-apps': '0.1.0' },
   }));
   await writeFile(join(home, 'package-lock.json'), JSON.stringify({ lockfileVersion: 3 }));
   await writeFile(join(home, 'tsconfig.json'), JSON.stringify({ compilerOptions: {} }));
@@ -32,7 +32,7 @@ async function fixture(t) {
     starter: 'data',
     profile: 'role-based-data',
     scaffoldVersion: 1,
-    tooling: { package: '@microsoft/sql-apps', version: '0.2.5' },
+    tooling: { package: '@microsoft/sql-apps', version: '0.1.0' },
   }));
   await writeFile(join(home, 'application.json'), JSON.stringify({ name: 'fixture', selectedExamples: [] }));
   await writeFile(join(home, 'role-based-data.json'), JSON.stringify({
@@ -55,6 +55,25 @@ test('launcher offers a dependency-free workspace report before build', async ()
     env: { ...process.env, SQL_APPS_HOME: process.cwd() },
   });
   assert.equal(JSON.parse(stdout).version, 1);
+});
+
+test('source diagnostics identify the project pin and selected tooling version', async t => {
+  const home = await fixture(t);
+  const manifestPath = join(home, '.sql-apps-project.json');
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  manifest.tooling.version = '9.9.9';
+  await writeFile(manifestPath, JSON.stringify(manifest));
+  const pkgPath = join(home, 'package.json');
+  const pkg = JSON.parse(await readFile(pkgPath, 'utf8'));
+  pkg.dependencies['@microsoft/sql-apps'] = '9.9.9';
+  await writeFile(pkgPath, JSON.stringify(pkg));
+  const report = await (await load()).inspectSource(home);
+  assert.equal(report.ready, false);
+  assert.equal(report.code, 'TOOLING_VERSION_MISMATCH');
+  assert.equal(report.expectedVersion, '9.9.9');
+  assert.equal(report.actualVersion, JSON.parse(await readFile(resolve('packages', 'sql-apps', 'package.json'), 'utf8')).version);
+  assert.ok(report.nextAction.includes(home));
+  assert.match(report.nextAction, /9\.9\.9/);
 });
 
 test('equal package versions do not hide differing worktree source', async t => {
@@ -212,7 +231,7 @@ test('current project takes precedence over the foundation binding and explicit 
   const profile = await mkdtemp(join(tmpdir(), 'sql-apps binding-'));
   t.after(() => rm(profile, { recursive: true, force: true }));
   await writeFile(join(profile, 'sql-apps-local.json'), JSON.stringify({ version: 1, home: process.cwd() }));
-  const env = { ...process.env, COPILOT_HOME: profile };
+  const env = { ...process.env, COPILOT_HOME: profile, SQL_APPS_TOOLING_HOME: process.cwd() };
   delete env.SQL_APPS_HOME;
   const current = await execute(process.execPath, [launcher, 'workspace-check'], { cwd: active, env });
   assert.equal(JSON.parse(current.stdout).bound.home, active);
@@ -222,16 +241,16 @@ test('current project takes precedence over the foundation binding and explicit 
   assert.equal(JSON.parse(selected.stdout).bound.home, home);
 });
 
-test('checkout plugin requires separate foundation tooling for generated projects', async t => {
+test('checkout plugin requires explicit bootstrap tooling for unrestored generated projects', async t => {
   const home = await fixture(t);
   const profile = await mkdtemp(join(tmpdir(), 'sql-apps no-binding-'));
   t.after(() => rm(profile, { recursive: true, force: true }));
   await assert.rejects(
     execute(process.execPath, [launcher, 'verify'], {
       cwd: home,
-      env: { ...process.env, COPILOT_HOME: profile, SQL_APPS_HOME: home },
+      env: { ...process.env, COPILOT_HOME: profile, SQL_APPS_HOME: home, SQL_APPS_TOOLING_HOME: undefined },
     }),
-    error => /requires an installed foundation binding/i.test(error.stderr) &&
+    error => /verified archive CLI/i.test(error.stderr) &&
       !error.stdout.includes('EXECUTED'),
   );
 });

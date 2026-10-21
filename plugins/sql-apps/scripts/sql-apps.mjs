@@ -1,13 +1,7 @@
 import { readFile, access, realpath } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { createRequire } from 'node:module';
-
-export function bindingPath() {
-  return join(process.env.COPILOT_HOME || join(homedir(), '.copilot'), 'sql-apps-local.json');
-}
 
 export async function validateHome(value) {
   if (typeof value !== 'string' || !isAbsolute(value)) throw new Error('SQL Apps home must be an absolute checkout path');
@@ -25,151 +19,78 @@ export async function validateHome(value) {
   return root;
 }
 
-async function activeProject(userHome) {
-  let state;
-  try { state = JSON.parse(await readFile(join(userHome, '.sql-apps', 'projects.json'), 'utf8')); }
-  catch (error) {
-    if (error.code === 'ENOENT') return undefined;
-    if (error instanceof SyntaxError) throw new Error('Invalid SQL Apps project registry; review it without resetting state.');
-    throw error;
-  }
-  if (state?.version !== 1 || (state.activeProject !== null && typeof state.activeProject !== 'string')) {
-    throw new Error('Invalid SQL Apps project registry; review it without resetting state.');
-  }
-  return state.activeProject ?? undefined;
-}
-
 export async function resolveHome(options = {}) {
   const environment = options.environment ?? process.env;
-  const userHome = resolve(options.userHome ?? homedir());
   if (environment.SQL_APPS_HOME !== undefined) return validateHome(environment.SQL_APPS_HOME);
   let candidate = resolve(options.cwd ?? process.cwd());
-  let foundation;
   while (true) {
     try {
       const pkg = JSON.parse(await readFile(join(candidate, 'package.json'), 'utf8'));
-      if (pkg.sqlApps?.project === true) return validateHome(candidate);
-      if (pkg.name === 'sql-apps') foundation = candidate;
+      if (pkg.sqlApps?.project === true || pkg.name === 'sql-apps') return validateHome(candidate);
     } catch (error) { if (error.code !== 'ENOENT') throw error; }
     const parent = dirname(candidate);
     if (parent === candidate) break;
     candidate = parent;
   }
-  const active = await activeProject(userHome);
-  if (active !== undefined) return validateHome(active);
-  if (foundation !== undefined) return validateHome(foundation);
-  let binding;
-  const configuredBinding = join(environment.COPILOT_HOME || join(userHome, '.copilot'), 'sql-apps-local.json');
-  try { binding = await readFile(configuredBinding, 'utf8'); }
-  catch (error) { if (error.code !== 'ENOENT') throw error; }
-  if (binding !== undefined) {
-    const config = JSON.parse(binding);
-    if (config.version !== 1 || Object.keys(config).some(key => !['version', 'home'].includes(key))) {
-      throw new Error('Invalid SQL Apps local binding; review it or set SQL_APPS_HOME to the absolute application/foundation path. Copilot users can rerun npm run plugin:install from the foundation checkout.');
-    }
-    return validateHome(config.home);
-  }
-  throw new Error('SQL Apps checkout not configured. Set SQL_APPS_HOME to its absolute application/foundation path. Copilot users can alternatively run npm run plugin:install from the foundation checkout.');
+  throw new Error('Select a SQL Apps project: open its directory or set SQL_APPS_HOME to its absolute checkout path. The project registry and assistant plugin bindings do not select runtime ownership.');
 }
 
 async function resolveToolHome(options = {}) {
   const environment = options.environment ?? process.env;
-  const selection = environment.SQL_APPS_FOUNDATION_HOME !== undefined
-    ? environment.SQL_APPS_FOUNDATION_HOME : environment.SQL_APPS_HOME;
-  if (selection !== undefined) {
-    const home = await validateHome(selection);
+  if (environment.SQL_APPS_TOOLING_HOME !== undefined) {
+    if (!isAbsolute(environment.SQL_APPS_TOOLING_HOME)) throw new Error('SQL_APPS_TOOLING_HOME must be an absolute tooling package or contributor checkout path.');
+    const home = await realpath(environment.SQL_APPS_TOOLING_HOME);
     const pkg = JSON.parse(await readFile(join(home, 'package.json'), 'utf8'));
-    if (pkg.name === 'sql-apps') return home;
-    if (environment.SQL_APPS_FOUNDATION_HOME !== undefined) {
-      throw new Error('SQL_APPS_FOUNDATION_HOME must point to the foundation checkout, not an application project.');
-    }
+    if (!['sql-apps', '@microsoft/sql-apps'].includes(pkg.name)) throw new Error('SQL_APPS_TOOLING_HOME must select an installed tooling package or contributor checkout, not an application project.');
+    return home;
   }
-  const userHome = resolve(options.userHome ?? homedir());
-  const configuredBinding = join(environment.COPILOT_HOME || join(userHome, '.copilot'), 'sql-apps-local.json');
-  let binding;
-  try { binding = JSON.parse(await readFile(configuredBinding, 'utf8')); }
+  let home;
+  try { home = await resolveHome(options); }
   catch (error) {
-    if (error.code === 'ENOENT') throw new Error('SQL Apps bootstrap requires an installed foundation binding or explicit selection. Alternatively, use your explicitly selected, verified release archive CLI to bind-archive and review setup before restoring the project pin; then restart the assistant in the app directory. No download or installation is automatic. For foundation workflows, set SQL_APPS_FOUNDATION_HOME to the absolute foundation checkout path while SQL_APPS_HOME selects the application. For project creation alone, SQL_APPS_HOME may select the foundation. Copilot users can alternatively run npm run plugin:install there.');
-    if (error instanceof SyntaxError) throw new Error('Invalid SQL Apps local binding; review it or set SQL_APPS_FOUNDATION_HOME to the absolute foundation checkout path.');
-    throw error;
+    throw new Error('Select the verified archive CLI for bootstrap, or set SQL_APPS_TOOLING_HOME to its absolute installed package directory. For contributor workflows, run from the foundation checkout.', { cause: error });
   }
-  if (binding.version !== 1 || typeof binding.home !== 'string' ||
-      Object.keys(binding).some(key => !['version', 'home'].includes(key))) {
-    throw new Error('Invalid SQL Apps local binding; review it or set SQL_APPS_FOUNDATION_HOME to the absolute foundation checkout path.');
-  }
-  const home = await validateHome(binding.home);
   const pkg = JSON.parse(await readFile(join(home, 'package.json'), 'utf8'));
-  if (pkg.name !== 'sql-apps') throw new Error('The installed SQL Apps binding must point to the foundation checkout, not an application project.');
-  return home;
+  if (pkg.name === 'sql-apps') return home;
+  const candidate = join(home, 'node_modules', '@microsoft', 'sql-apps');
+  try {
+    await access(join(candidate, 'package.json'));
+    return realpath(candidate);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    throw new Error(`Project tooling is not restored in ${home}. Use the explicitly selected verified archive CLI to review setup and restore, or set SQL_APPS_TOOLING_HOME to that installed package directory. No source is selected or installed automatically.`);
+  }
 }
 
 export async function dispatchProjects(args, options = {}) {
   const home = await resolveToolHome(options);
+  const pkg = JSON.parse(await readFile(join(home, 'package.json'), 'utf8'));
   const projectMain = options.projectMain ??
-    (await import(pathToFileURL(join(home, 'scripts', 'projects.mjs')).href)).main;
-  return projectMain(args, home);
+    (await import(pathToFileURL(join(home, ...(pkg.name === '@microsoft/sql-apps' ? ['dist'] : []), 'scripts', 'projects.mjs')).href)).main;
+  return projectMain(args, home, { requireApproval: true });
 }
 
 export async function workspaceReport(home, options = {}) {
   const environment = options.environment ?? process.env;
-  const userHome = resolve(options.userHome ?? homedir());
   const pkg = JSON.parse(await readFile(join(home, 'package.json'), 'utf8'));
+  const foundation = pkg.name === 'sql-apps';
+  const local = join(home, 'node_modules', '@microsoft', 'sql-apps');
   let tools = home;
-  let foundation = true;
-  if (pkg.sqlApps?.project === true) {
-    foundation = false;
-    const require = createRequire(join(home, 'package.json'));
-    for (const modules of [join(home, 'node_modules')]) {
-      const candidate = join(modules, '@microsoft', 'sql-apps');
-      try { await access(candidate); }
-      catch (error) { if (error.code === 'ENOENT') continue; throw error; }
-      const context = await import(pathToFileURL(require.resolve('@microsoft/sql-apps/tooling-context')).href);
-      tools = await context.installedTooling(home);
-      break;
-    }
-  }
-  if (!foundation && tools === home) {
-    if (environment.SQL_APPS_FOUNDATION_HOME !== undefined) tools = await resolveToolHome(options);
-    let candidate = resolve(options.cwd ?? process.cwd());
-    while (tools === home) {
-      try {
-        const current = JSON.parse(await readFile(join(candidate, 'package.json'), 'utf8'));
-        if (current.name === 'sql-apps') {
-          tools = await validateHome(candidate);
-          break;
-        }
-      } catch (error) {
-        if (error.code !== 'ENOENT') throw error;
-      }
-      const parent = dirname(candidate);
-      if (parent === candidate) {
-        tools = await resolveToolHome(options);
-        break;
-      }
-      candidate = parent;
+  if (!foundation) {
+    try { await access(join(local, 'package.json')); tools = await realpath(local); }
+    catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+      if (environment.SQL_APPS_TOOLING_HOME === undefined) throw new Error(`Project tooling is not restored in ${home}. Use the explicitly selected verified archive CLI to review setup and restore, or set SQL_APPS_TOOLING_HOME to its absolute installed package directory.`);
+      tools = await resolveToolHome(options);
     }
   }
   const toolingPackage = JSON.parse(await readFile(join(tools, 'package.json'), 'utf8'));
   const inspector = join(tools, ...(toolingPackage.name === '@microsoft/sql-apps' ? ['dist'] : []), 'scripts', 'workspace-check.mjs');
   const { checkWorkspace } = await import(pathToFileURL(inspector).href);
-  let source = 'checkout';
-  let explicit = false;
-  if (environment.SQL_APPS_HOME !== undefined) {
-    source = 'environment';
-    explicit = true;
-  } else if (await activeProject(userHome) === home) {
-    source = 'active-project';
-    explicit = true;
-  } else {
-    const configuredBinding = join(environment.COPILOT_HOME || join(userHome, '.copilot'), 'sql-apps-local.json');
-    try { await access(configuredBinding); source = 'installed-binding'; }
-    catch (error) { if (error.code !== 'ENOENT') throw error; }
-  }
   return checkWorkspace({
     home,
     activeDirectory: options.cwd ?? process.cwd(),
-    bindingSource: source,
-    explicitHome: explicit,
+    bindingSource: environment.SQL_APPS_HOME !== undefined ? 'environment' : 'checkout',
+    explicitHome: environment.SQL_APPS_HOME !== undefined,
     tooling: tools,
     foundation,
   });
@@ -193,30 +114,26 @@ export async function status(fetcher = fetch, origins = { app: 'http://127.0.0.1
     scope: 'HTTP liveness/data readiness only; not SQL authorization or cloud acceptance' };
 }
 
-const commands = new Set(['app', 'serve', 'role-based-app', 'role-based-serve',
-  'start-sql', 'verify', 'init', 'test', 'data', 'app-test', 'app-check', 'stop',
-  'workspace-plan', 'workspace-init', 'recover-sql', 'selected-app', 'selected-serve', 'selected-stop', 'selected-test']);
+const commands = new Set(['app', 'serve', 'start-sql', 'verify', 'app-test', 'stop', 'recover-sql']);
 const consentCommands = new Set(['consent-plan', 'consent-status', 'consent-grant', 'consent-grant-once',
   'consent-terms', 'consent-revoke', 'consent-run']);
 
 export async function main(args = process.argv.slice(2)) {
   const [command = 'help', container = 'sql-apps-sql'] = args;
   if (command === 'projects') {
-    if (args.length > 5) throw new Error('Usage: projects <create-plan <name>|create <name> [--approval <id>]|root|list|open>');
     await dispatchProjects(args.slice(1));
     return;
   }
   const journey = command === 'setup';
-  const creation = command === 'creation';
-  if (!journey && !creation && !consentCommands.has(command) && args.length > 2) throw new Error('Expected a command and its optional selection');
+  if (!journey && !consentCommands.has(command) && args.length > 2) throw new Error('Expected a command and its optional selection');
   if (command === 'help') {
-    console.log('SQL Apps local plugin: projects <root|create|list|open> | home | workspace-check | guide | guide-save <absolute-brief.json> | status | setup-check [existing-sql-container] | ' + [...commands].join(' | '));
-    console.log('role-based-setup-check [existing-sql-container] is an alias of setup-check. Local commands use the configured checkout; no cloud deployment command is exposed.');
+    console.log('SQL Apps local plugin: projects <root|create-plan|create|list|open> | home | workspace-check | guide | guide-save <absolute-brief.json> | status | setup-check [existing-sql-container] | ' + [...commands].join(' | '));
+    console.log('Project creation requires --archive <absolute-tgz> and a current reviewed --approval <id>; it never starts services or opens a browser. Local commands use project-owned tooling; no cloud deployment command is exposed.');
     console.log('Pre-build consent: consent-plan|consent-status|consent-run <operation> [selection] | consent-grant|consent-grant-once <absolute-plan.json> | consent-terms <absolute-reviewed-document> | consent-revoke [scope|terms]. Record only explicitly approved scopes.');
-    console.log('Pre-build journey: setup plan|status|run|resume [--workspace <base-port|legacy>] [--json]; setup approval|approve [--workspace <n>] [--approval <id>] is the one local approval; setup install-plan <tool> | setup install <absolute-reviewed-plan.json>. Install only after explicit approval.');
+    console.log('Pre-build journey: setup plan|status|run [--workspace <base-port>] [--json]; setup run --approval <id> applies the reviewed setup plan. setup install-plan <tool> | setup install <absolute-reviewed-plan.json> remain separate tool-install approvals.');
     return;
   }
-  if (!['home', 'workspace-check', 'guide', 'guide-save', 'status', 'setup-check', 'role-based-setup-check', 'setup', 'creation'].includes(command) && !commands.has(command) && !consentCommands.has(command)) throw new Error(`Unsupported plugin command: ${command}`);
+  if (!['home', 'workspace-check', 'guide', 'guide-save', 'status', 'setup-check', 'setup'].includes(command) && !commands.has(command) && !consentCommands.has(command)) throw new Error(`Unsupported plugin command: ${command}`);
   if (consentCommands.has(command)) {
     if (['consent-plan', 'consent-status', 'consent-run'].includes(command)) {
       if (args.length < 2 || args.length > 3) throw new Error('Provide an operation and its optional selection');
@@ -227,11 +144,7 @@ export async function main(args = process.argv.slice(2)) {
     if (args.length !== 2 || !isAbsolute(container)) throw new Error('Provide an absolute project brief JSON path');
   } else if (command === 'guide') {
     if (args.length !== 1) throw new Error('guide takes no arguments');
-  } else if (['selected-app', 'selected-serve', 'selected-test'].includes(command)) {
-    if (args.length !== 2 || !isAbsolute(container)) throw new Error('Provide an absolute artifact directory for the selected application');
-  } else if (command === 'selected-stop') {
-    if (args.length !== 2 || !/^[a-z][a-z0-9-]{0,31}$/.test(container)) throw new Error('Invalid application selection');
-  } else if (!journey && !creation && !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(container)) throw new Error('Invalid SQL container name');
+  } else if (!journey && !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(container)) throw new Error('Invalid SQL container name');
   const home = await resolveHome();
   if (command === 'home') { console.log(home); return; }
   const workspace = await workspaceReport(home);
@@ -252,16 +165,16 @@ export async function main(args = process.argv.slice(2)) {
     return;
   }
   const guided = command === 'guide' || command === 'guide-save';
-  const setup = command === 'setup-check' || command === 'role-based-setup-check';
+  const setup = command === 'setup-check';
   const consent = consentCommands.has(command);
   if (workspace.bound.bootstrap &&
-      (!journey && !creation && !guided && !setup && !consent || command === 'consent-run' && container !== 'restore')) {
+      (!journey && !guided && !setup && !consent || command === 'consent-run' && container !== 'restore')) {
     throw new Error('Restore the pinned project tooling first, then run setup plan through the installed package and review its approvals before build or runtime execution.');
   }
   const tools = workspace.bound.toolingHome;
   const toolingPackage = JSON.parse(await readFile(join(tools, 'package.json'), 'utf8'));
   const scripts = join(tools, ...(toolingPackage.name === '@microsoft/sql-apps' ? ['dist'] : []), 'scripts');
-  const cli = journey ? join(scripts, 'setup.mjs') : creation ? join(scripts, 'creation.mjs') :
+  const cli = journey ? join(scripts, 'setup.mjs') :
     consent ? join(scripts, 'local-consent.mjs') : guided ? join(scripts, 'guide.mjs') :
     setup ? join(scripts, 'setup-check.mjs') : join(tools, 'dist', 'src', 'local-cli.js');
   try { await access(cli); }
@@ -270,12 +183,12 @@ export async function main(args = process.argv.slice(2)) {
       setup ? 'Setup diagnostic missing from the bound checkout; obtain the updated project.' :
       'Local CLI not built. Review consent-plan build, then after approval use consent-run build in the configured checkout', { cause: error });
   }
-  if (!journey && !creation && !guided && !setup && !consent && !workspace.bound.build.ready) {
+  if (!journey && !guided && !setup && !consent && !workspace.bound.build.ready) {
     throw new Error(`Runtime build is not verified: ${workspace.bound.build.code}. ${workspace.bound.build.nextAction}`);
   }
-  const childArgs = journey || creation ? [cli, ...args.slice(1)] : consent ? [cli, command.replace('consent-', ''), ...args.slice(1)] :
+  const childArgs = journey ? [cli, ...args.slice(1)] : consent ? [cli, command.replace('consent-', ''), ...args.slice(1)] :
     guided ? [cli, ...(command === 'guide-save' ? ['--save', container] : []), '--json'] :
-    setup ? [cli, '--json', ...(command === 'role-based-setup-check' ? ['--profile', 'role-based-data'] : []),
+    setup ? [cli, '--json',
       ...(args.length === 2 ? ['--container', container] : [])] :
     [cli, command, ...(args.length === 2 ? [container] : [])];
   await new Promise((done, reject) => {

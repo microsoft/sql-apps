@@ -36,7 +36,7 @@ $env:AZURE_TENANT_ID = Read-Host 'Development tenant ID'
 $env:API_CLIENT_ID = Read-Host 'Application client ID'
 ```
 
-Both identifiers must be UUIDs. Use the already approved profile-matched setup start/resume path, `role-based-serve` for the role-based-data profile, or foundation `serve` against its existing services. Do not start excluded services.
+Both identifiers must be UUIDs. Use the already approved profile-matched setup start/resume path, `serve` for the role-based-data profile, or foundation `serve` against its existing services. Do not start excluded services.
 
 The registration must expose `access_as_user` and request v2 delegated access tokens. Role-authorized applications also need the required human application-role definition and approved assignments. Use the existing separately approved identity and assignment workflow; there is no browser role editor.
 

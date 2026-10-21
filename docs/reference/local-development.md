@@ -10,7 +10,7 @@ browser/design gates for Ready. Existing direct-start workspaces are unchanged.
 
 ## One local profile
 
-SQL Apps runs one profile locally and in the cloud: [role-based-data](role-based-data.md). `app` (alias `role-based-app`) starts SQL, publishes the schema, starts Data API builder (DAB) and serves the browser gateway, then checks the configured authorized readiness procedure before listening. `serve` (alias `role-based-serve`) resumes the gateway against running SQL/DAB. Both read `role-based-data.json` and the authorized stored-procedure entities in `dab/dab-config.json`. Saved brief capabilities do not turn services on or off; the brief's capabilities are always `["data"]`.
+SQL Apps runs one profile locally and in the cloud: [role-based-data](role-based-data.md). `app` starts SQL, publishes the schema, starts Data API builder (DAB) and serves the browser gateway, then checks the configured authorized readiness procedure before listening. `serve` resumes the gateway against running SQL/DAB. Both read `role-based-data.json` and the authorized stored-procedure entities in `dab/dab-config.json`. Saved brief capabilities do not turn services on or off; the brief's capabilities are always `["data"]`.
 
 SQL Apps does not run file storage, queues, background workers or tracing. Add those with the maintained Azure skills (for example `azure-storage`, `azure-prepare` and `azure-deploy`), outside SQL Apps.
 
@@ -18,11 +18,11 @@ Implement domain UI/schema/procedures, configure authorized DAB permissions and 
 
 Follow [scoped consent and readiness](../guides/run-locally.md#approvals-and-readiness). A proposed origin or successful build is not a running app. Publish the intended origin only after response/readiness probes, then report workflow acceptance separately.
 
-Local mutations enforce [remembered permissions](local-consent.md) before dispatch, including when invoked directly. Obtain them with the single `setup approval` bundle (or individual grants from the pre-build operation plan) before the commands below. Read-only checks remain ungated; restore/build grants and existing workspace selection are reused across sessions.
+Local mutations enforce [remembered permissions](local-consent.md) before dispatch, including when invoked directly. Review `setup plan`, then record its bundle with `setup run --approval <id>` (or use individual grants from the pre-build operation plan). Read-only checks remain ungated; restore/build grants and existing workspace selection are reused across sessions.
 
 ## Prerequisites
 
-First time installing development tools? Use [guided setup](../guides/getting-started.md) rather than treating this list as instructions. Copilot can offer approved installations, explain access/license conditions, guide restarts and verify each step on Windows, macOS or Linux. After tooling restore, `npm run setup:check` needs no application build and never installs or mutates resources. Before restore, use the installed plugin's `setup plan --json` through its explicit foundation selection (`SQL_APPS_FOUNDATION_HOME` or the Copilot installer binding).
+First time installing development tools? Use [guided setup](../guides/getting-started.md) rather than treating this list as instructions. Copilot can offer approved installations, explain access/license conditions, guide restarts and verify each step on Windows, macOS or Linux. After tooling restore, `npm run setup:check` needs no application build and never installs or mutates resources. Before restore, use the verified archive CLI, or the installed plugin's `setup plan --json` with explicit `SQL_APPS_TOOLING_HOME`.
 
 - Node.js 22 or 24 LTS and npm.
 - .NET SDK 8 or later. The CLI restores this repository's SqlPackage tool.
@@ -30,7 +30,7 @@ First time installing development tools? Use [guided setup](../guides/getting-st
   review side-by-side SDK 8 installation if only a newer SDK is present.
 - For the container route, Docker with Linux containers. The SQL preview image requires x64; `start-sql` requests `linux/amd64`, including on emulated hosts.
 - Access to the current preview container image, or an already running current Azure SQL container. Obtain preview access using the [official announcement](https://devblogs.microsoft.com/azure-sql/azure-sql-database-container-prpr/) and its linked instructions. This project does not distribute registry credentials or circumvent preview access.
-- A free selected workspace port block. Explicit legacy compatibility uses 18080 (gateway) and 15000 (DAB).
+- A free selected isolated workspace port block.
 - Initial access to download the pinned DAB image, npm packages, .NET SQL build dependencies and SqlPackage.
 
 No Azure CLI login, subscription, Entra registration, or billable resources are required for default local preview. The explicit [real Entra sign-in opt-in](authentication.md#real-entra-sign-in-locally) requires a development registration, not an Azure deployment. First use needs package/image downloads; cached dependencies and images can be used afterward.
@@ -49,13 +49,16 @@ npm run local -- workspace-plan
 
 `workspace-plan` proposes a deterministic port block from the canonical checkout path and reports conflicts plus a free alternative, without writing state or changing Docker. Within the block, the gateway uses base+0, DAB base+1 and SQL base+5; these fixed offsets keep existing isolated workspaces on their SQL port. Approve `npm run local -- workspace-init <base-port>` using the proposed block for a new isolated stack. The selected descriptor persists in `.sql-apps/workspace.json`; resource names, SQL credentials and DAB configuration are derived from the workspace ID. A descriptor copied from another checkout fails closed. Free-port observations are not reservations: startup rechecks conflicts, and bind races remain explicit failures.
 
-For an existing legacy stack, approve `npm run local -- workspace-init legacy` instead. This preserves its names, ports (gateway 18080, DAB 15000), credential paths and volumes. Do not select isolation expecting old data to move automatically. The legacy stack remains separately available; no automatic transfer or schema cleanup is performed. `workspace-check` reports the selected mode, ports and origins.
+Only isolated workspaces are supported. Fixed-port and helper-front-door
+descriptors fail explicitly without changing resources. No automatic data
+transfer or schema cleanup is performed. `workspace-check` reports the selected
+mode, ports and origins.
 
 Workspace identity uses the native resolved checkout path, including expansion of Windows 8.3 short names. Short and long aliases of the same checkout therefore select the same workspace. Existing descriptors with a different recorded home or ID still fail closed; they are not rewritten automatically because that would change resource ownership.
 
-Isolated mode also derives a database and least-privilege SQL login from the workspace ID. Explicitly reusing the same external SQL container from two workspaces therefore does not implicitly share their application database/login. Existing legacy databases are not renamed or copied.
+Isolated mode also derives a database and least-privilege SQL login from the workspace ID. Explicitly reusing the same external SQL container from two workspaces therefore does not implicitly share their application database/login. Existing databases are not renamed or copied.
 
-Local mutating commands require this explicit selection. For existing fixed-port workflows, select `workspace-init legacy` and record the applicable consent grants; agents must still confirm ownership. An external SQL container can be explicitly selected for `verify`/`init`; an isolated workspace will not stop or take ownership of it.
+Local mutating commands require this explicit selection and the applicable consent grants; agents must still confirm ownership. An external SQL container can be explicitly selected for `verify`/`init`; an isolated workspace will not stop or take ownership of it.
 
 After selection and startup approval:
 
@@ -65,7 +68,7 @@ npm run local -- app
 
 `app` runs four stages and names the stage that fails: **start-sql** (start/reuse the project-owned SQL container), **init** (publish the schema and grants and run the read-only SQL acceptance check), **data** (recreate only the project-labeled DAB container) and **serve** (start the browser gateway on a single loopback origin). It stays in the foreground. Ctrl+C stops the browser gateway; SQL and DAB keep running. In preview mode, open local preview again after restarting the browser server because its sessions are held only in server memory.
 
-After the intended server responds and `/health/ready` passes, open the URL printed by startup (**http://127.0.0.1:18080** in legacy mode) and select **Sign in**. The product signs in the simulated **Test user** and the starter page calls the configured `readinessPath` (default `/api/AppReady`) with the required role. For authorization checks, open the reported developer page in the same tab: Development Alice has the required role and Development Bob does not. Switching revokes the previous session. Reloading preserves the session within the browser tab; SQL rows persist independently of browser sessions.
+After the intended server responds and `/health/ready` passes, open the URL printed by startup and select **Sign in**. The product signs in the simulated **Test user** and the starter page calls the configured `readinessPath` (default `/api/AppReady`) with the required role. For authorization checks, open the reported developer page in the same tab: Development Alice has the required role and Development Bob does not. Switching revokes the previous session. Reloading preserves the session within the browser tab; SQL rows persist independently of browser sessions.
 
 For individual SQL/data steps:
 
@@ -135,7 +138,7 @@ Do not deploy the local generated DAB configuration to Azure.
 
 ## SQL container and schema
 
-`start-sql` creates `sql-apps-sql` using the current canonical `azure-sql/db-dev:latest` preview image. It generates a bootstrap password without printing it, publishes SQL only to a loopback port (the workspace SQL port in isolated mode, a randomly allocated port in legacy mode), and stores data in the `sql-apps-sql-data` named volume. Subsequent runs restart the same project-labeled container instead of replacing it. Docker may use its cached `latest` image; refreshing/upgrading is an explicit operator action, not an automatic destructive upgrade.
+`start-sql` creates the workspace-derived SQL container using the current canonical `azure-sql/db-dev:latest` preview image. It generates a bootstrap password without printing it, publishes SQL only to the workspace's loopback SQL port, and stores data in its workspace-derived named volume. Subsequent runs restart the same project-labeled container instead of replacing it. Docker may use its cached `latest` image; refreshing/upgrading is an explicit operator action, not an automatic destructive upgrade.
 
 Readiness includes a fresh completion marker from the current preview image's control-plane initialization, not just an early `SELECT 1`. A measured preview recovery race (error 904 during control-plane reconciliation) receives at most three explicitly logged restart attempts; other failures are not silently reset. An exhausted reconcile failure is reported as preview control-plane recovery, not proof that registry access was revoked. The existing volume is preserved.
 
@@ -147,7 +150,7 @@ Live two-workspace testing observed this failure on the already-current preview 
 
 `init` verifies the engine, creates the workspace database, builds/publishes the shared DACPAC, creates the mapped least-privilege application login/user, grants only `EXECUTE` and object-scoped `VIEW DEFINITION` on the authorized DAB procedures, and runs the read-only SQL acceptance check as that user (no `db_owner`, `CONTROL`, `db_datareader` or `db_datawriter`). SA is used only for provisioning, not the application. Publication blocks possible data loss and does not drop unspecified objects.
 
-`data` reapplies the procedure grants, writes a separate development DAB configuration, and restarts only the project-labeled DAB container (**http://127.0.0.1:15000** in legacy mode). It does not rerun SQL acceptance; use `npm run local -- test` for that. SQL and DAB communicate on the SQL container's Docker network, not through a Docker Desktop-specific hostname. Restart `data` after restarting/recreating SQL, because its container IP may change.
+`data` reapplies the procedure grants, writes a separate development DAB configuration, and restarts only the workspace-labeled DAB container. It does not rerun SQL acceptance; use `npm run local -- test` for that. SQL and DAB communicate on the SQL container's Docker network, not through a Docker Desktop-specific hostname. Restart `data` after restarting/recreating SQL, because its container IP may change.
 
 After changing schema, DAB configuration, `role-based-data.json` or code:
 
@@ -217,7 +220,7 @@ npm run local -- stop
 npm run local -- data
 ```
 
-`stop` removes only the project-labeled DAB container; `data` recreates it. To stop project-created SQL separately, use Docker's standard `docker stop sql-apps-sql`. Restart with `start-sql`, then `data`. Stopping/removing containers does not delete named data volumes. Never remove volumes unless you intentionally want to discard data.
+`stop` removes only the workspace-labeled DAB container; `data` recreates it. To stop workspace-created SQL separately, use Docker's standard `docker stop <workspace-sql-container>` with the name reported by `workspace-check`. Restart with `start-sql`, then `data`. Stopping/removing containers does not delete named data volumes. Never remove volumes unless you intentionally want to discard data.
 
 Gitignored `.sql-apps` holds per-container SQL credentials and generated local DAB configuration. Preserve credentials alongside their persistent volumes and protect them as secrets. Lost/mismatched credentials fail explicitly; the CLI does not silently reset an existing login. Bootstrap secrets remain in Docker configuration, not repository files. Do not check in state files or share Docker inspections.
 

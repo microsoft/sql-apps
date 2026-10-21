@@ -38,7 +38,7 @@ Example input:
 
 Required text fields are nonblank, at most 500 characters, without control characters. `records` and `actions` contain 1-12 unique nonblank strings. `capabilities` must be exactly `["data"]`. File storage or background jobs are outside SQL Apps; add them with the maintained Azure skills (for example `azure-storage`, `azure-prepare` and `azure-deploy`).
 
-The brief is a scope decision, not a switch that composes services. Apps use the [role-based-data profile](role-based-data.md): `app` (alias `role-based-app`) starts SQL, Data API builder and the browser gateway, and `serve` (alias `role-based-serve`) resumes the gateway. The selected Todo reference has a separate synthetic-only startup. See [Run locally](../guides/run-locally.md).
+The brief is a scope decision, not a switch that composes services. Apps use the [role-based-data profile](role-based-data.md): `app` starts SQL, Data API builder and the browser gateway, and `serve` resumes the gateway. The selected Todo reference has a separate synthetic-only startup. See [Run locally](../guides/run-locally.md).
 
 Optional `costPreference` is `zero-azure-spend` or `review-paid-costs`. It is never spending consent.
 
@@ -87,4 +87,4 @@ Brief/state files must be regular files at most 16 KiB. Invalid JSON, oversized 
 
 Keep credentials and actual application records out of the brief. Preserve local state when moving or troubleshooting the checkout.
 
-The plugin equivalents are `guide` and `guide-save "<absolute-brief-path>"`; see [runtime binding](plugins.md#runtime-binding-and-direct-checks).
+The plugin equivalents are `guide` and `guide-save "<absolute-brief-path>"`; see [runtime binding](plugins.md#project-selection-and-direct-checks).

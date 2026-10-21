@@ -7,8 +7,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { createProject } from './projects.mjs';
 import { inspectToolingArchive } from './bind-tooling-archive.mjs';
-import { creationSession } from '../src/creation-session.mjs';
-import { stopCreationProcess } from './creation.mjs';
 
 const execute = promisify(execFile);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -42,7 +40,6 @@ async function verifyArchive(expected, archive, registry) {
   assert.deepEqual(inspected.metadata.dependencies ?? {}, expected.dependencies ?? {},
     'Archive dependencies must match the release.');
   const userHome = await realpath(await mkdtemp(join(tmpdir(), 'sql-apps-archive bootstrap ')));
-  let sessionDirectory;
   try {
     const incoming = join(userHome, 'incoming');
     const bootstrap = join(userHome, 'bootstrap');
@@ -66,16 +63,14 @@ async function verifyArchive(expected, archive, registry) {
         throw error;
       }
     }
-    const plan = JSON.parse((await cli(['projects', 'create-plan', 'Archive Verification', '--no-browser'])).stdout);
+    const plan = JSON.parse((await cli(['projects', 'create-plan', 'Archive Verification', '--archive', candidate])).stdout);
     assert.match(plan.approval, /^[a-f0-9]{12}$/);
-    const project = JSON.parse((await cli(['projects', 'create', 'Archive Verification', '--no-browser',
+    const project = JSON.parse((await cli(['projects', 'create', 'Archive Verification', '--archive', candidate,
       '--approval', plan.approval])).stdout);
-    sessionDirectory = (await creationSession(project.path)).directory;
     assert.equal(project.path, plan.home);
-    const bindingArgs = ['bind-archive', '--project', project.path, '--archive', candidate];
-    const binding = JSON.parse((await cli(bindingArgs)).stdout);
-    assert.equal(binding.sha256, inspected.sha256);
-    await cli([...bindingArgs, '--approve', binding.approval]);
+    assert.equal(plan.archive.sha256, inspected.sha256);
+    const lock = JSON.parse(await readFile(join(project.path, 'package-lock.json'), 'utf8'));
+    const relativeArchive = lock.packages['node_modules/@microsoft/sql-apps'].resolved.slice('file:'.length);
     const before = JSON.parse((await cli(['setup', 'plan', '--json'], project.path, true)).stdout);
     assert.equal(before.home, project.path);
     assert.equal(before.bootstrap, true);
@@ -88,11 +83,9 @@ async function verifyArchive(expected, archive, registry) {
     assert.equal(handoff.bound.bootstrap, false);
     assert.equal(handoff.bound.toolingHome, await realpath(installed.tools));
 
-    await stopCreationProcess(sessionDirectory);
-    sessionDirectory = undefined;
     await execute('git', ['add', '-A'], { cwd: project.path, windowsHide: true });
     const tracked = (await execute('git', ['ls-files', '-z'], { cwd: project.path, windowsHide: true })).stdout.split('\0').filter(Boolean);
-    assert.ok(tracked.includes(binding.relativeArchive), 'The relative runtime archive must be retained in Git.');
+    assert.ok(tracked.includes(relativeArchive), 'The relative runtime archive must be retained in Git.');
     assert.equal(tracked.some(path => path.startsWith('.sql-apps/')), false);
     const independent = join(userHome, 'independent-app');
     for (const file of tracked) {
@@ -109,7 +102,6 @@ async function verifyArchive(expected, archive, registry) {
     return { name: restored.pkg.name, version: restored.pkg.version, archive, registry, cliOutput: stdout,
       bootstrapCreated: true, bootstrapPlanning: true, installedHandoff: true, independentRestore: true, installOnly: true };
   } finally {
-    if (sessionDirectory) await stopCreationProcess(sessionDirectory);
     await rm(userHome, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   }
 }

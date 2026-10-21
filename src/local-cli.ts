@@ -4,17 +4,28 @@ import { readSqlTarget } from './sql-target.mjs';
 
 const [command = 'help', selection] = process.argv.slice(2);
 const projectRoot = resolve(process.env.SQL_APPS_PROJECT_HOME ?? process.cwd());
-const profileCommands = ['app', 'serve', 'role-based-app', 'role-based-serve', 'app-test', 'init', 'data'];
+const profileCommands = ['app', 'serve', 'app-test', 'init', 'data'];
 if (command === 'help') {
-  console.log('Usage: npm run local -- <app|serve|app-test|app-check|start-sql|verify|init|test|data|stop> [sql-container-name]\nWorkspace: workspace-plan | workspace-init <base-port|legacy>. Select isolation or explicit legacy compatibility before app startup. workspace-plan is read-only; initialization records selection, never deletes existing resources. app starts SQL, Data API builder and the browser gateway using role-based-data.json and the authorized procedures in dab/dab-config.json; serve reuses running SQL and DAB. app-check inspects legacy sample objects without dropping data. No Azure subscription or Entra registration required. Loopback-only claim simulation is not production authentication. role-based-app and role-based-serve remain as aliases of app and serve.');
+  console.log('Usage: npm run local -- <app|serve|app-test|start-sql|verify|stop|recover-sql> [sql-container-name]\nReview npm run setup -- plan and run its approved missing work before local startup. One isolated workspace per project; initialization never deletes existing resources. app starts SQL, Data API builder and the browser gateway using role-based-data.json and the authorized procedures in dab/dab-config.json; serve reuses running SQL and DAB. No Azure subscription or Entra registration required. Loopback-only claim simulation is not production authentication.');
   console.log('SQL recovery: recover-sql [workspace-sql-container] explicitly recreates only a stopped isolated SQL container, preserving its image version, credentials, ports and labeled volume. Obtain approval first; no volume reset or external/legacy recovery.');
   console.log('Authentication: default local preview is simulated. SQL_APPS_LOCAL_AUTH=entra requires AZURE_TENANT_ID and API_CLIENT_ID and a registered workspace callback; local DAB still uses claim simulation.');
   console.log('Express maintenance: configure-express enables containment/loopback TCP and restarts the selected instance. configure-express-auth separately enables mixed-mode SQL authentication and restarts it, without enabling SA. Each requires its own reviewed one-operation administrator approval; ordinary startup never changes instance configuration.');
-  console.log('Selected application: selected-app <artifact directory> provisions only its isolated SQL database/login and DAB, then serves the browser. selected-serve <artifact directory> reuses verified running services. selected-stop <application name> removes only that owned DAB container and preserves SQL data. Build with npm run app:build -- <name> local-simulation first. These commands never select an example in the default application.');
-  console.log('Selected acceptance: selected-test <artifact directory> runs the opted-in example acceptance suite against its already-running local app; obtain approval for synthetic writes and scoped cleanup first.');
+  let foundation = false;
+  try { foundation = JSON.parse(await readFile(join(projectRoot, 'package.json'), 'utf8')).name === 'sql-apps'; }
+  catch (error) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+  }
+  if (foundation) {
+    console.log('Foundation examples only: selected-app <artifact directory> starts its isolated SQL/DAB/gateway; selected-serve <artifact directory> reuses services; selected-stop <application name> stops only its owned DAB; selected-test <artifact directory> runs approved synthetic acceptance. Build with npm run app:build -- <name> local-simulation. Generated apps do not expose example commands.');
+  }
 } else {
   const zod = await import('zod');
   try {
+    if (['role-based-app', 'role-based-serve'].includes(command)) throw new Error('Use app or serve; compatibility aliases are not part of v0.1.');
+    const pkg = JSON.parse(await readFile(join(projectRoot, 'package.json'), 'utf8'));
+    if (pkg.sqlApps?.project && (command.startsWith('selected-') || ['test', 'app-check'].includes(command))) {
+      throw new Error('Example-only commands are not available in generated apps. Use app, serve, app-test and the application checks.');
+    }
     const [
       { localCommand, localOrigin, sqlImage, dabImage },
       { readRoleBasedProfile, validateRoleBasedDab },
@@ -51,8 +62,8 @@ if (command === 'help') {
       const procedureProblem = roleBasedProcedureProblem(dab, await readSqlSources(projectRoot));
       if (procedureProblem) throw new Error(`${procedureProblem} Add each procedure to the SQL project under sql/ before startup.`);
     }
-    const app = command === 'app' || command === 'role-based-app';
-    const serve = command === 'serve' || command === 'role-based-serve';
+    const app = command === 'app';
+    const serve = command === 'serve';
     if (app || serve) readLocalAuthentication();
     await assertConsent(projectRoot, { operation: command, ...(selection === undefined ? {} : { selection }) });
     if (sqlTarget.provider !== 'container' && !command.startsWith('selected-') && !['workspace-plan', 'workspace-init'].includes(command)) {
@@ -76,8 +87,8 @@ if (command === 'help') {
       if (selection) throw new Error('workspace-plan takes no arguments');
       console.log(JSON.stringify(await proposeWorkspace(projectRoot), null, 2));
     } else if (command === 'workspace-init') {
-      if (!selection) throw new Error('Explicitly select workspace-init <base-port> or workspace-init legacy after reviewing workspace-plan.');
-      console.log(JSON.stringify(await initializeWorkspace(projectRoot, selection === 'legacy' ? 'legacy' : Number(selection)), null, 2));
+      if (!selection) throw new Error('Explicitly select workspace-init <base-port> after reviewing setup plan.');
+      console.log(JSON.stringify(await initializeWorkspace(projectRoot, Number(selection)), null, 2));
     } else if ((app || serve) && profile) {
       if (process.env.NODE_ENV === 'production') throw new Error('Local development server is disabled in production');
       const { serveLocalApp } = await import('./local-app.js');
@@ -85,7 +96,7 @@ if (command === 'help') {
         await startLocalApplication(container, {
           command: async (step, name) => {
             if (step === 'start-sql') {
-              if (runtimeFor(name, projectRoot).mode === 'legacy-unselected') throw new Error('Explicit workspace selection required: run workspace-plan, then approve workspace-init <base-port> or workspace-init legacy.');
+              if (runtimeFor(name, projectRoot).mode === 'unselected') throw new Error('Explicit workspace selection required: review setup plan and run its approved workspace initialization.');
               await checkWorkspacePorts(name, run, { sql: sqlImage, data: dabImage });
             }
             await localCommand(step === 'start-sql' && !runtimeFor(name, projectRoot).ownsSqlName ? 'verify' : step, name, run, profile);

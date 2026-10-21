@@ -12,7 +12,6 @@ import { readSqlSources, roleBasedDabProblem, roleBasedProcedureProblem, roleBas
 import { readProjectManifest } from '../src/project-contract.mjs';
 import { projectHome, toolingHome } from '../src/tooling-context.mjs';
 import { recommendSqlRoutes, resolveSqlTarget } from '../src/sql-target.mjs';
-import { loopbackFetch } from '../src/creation-checks.mjs';
 
 const execute = promisify(execFile);
 const containerPattern = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;
@@ -56,10 +55,10 @@ export function parseArguments(args) {
     if (args[i] === '--json' && !options.json) options.json = true;
     else if (args[i] === '--container' && !options.container && containerPattern.test(args[i + 1] ?? '')) options.container = args[++i];
     else if (args[i] === '--profile' && !options.profile && args[i + 1] === 'role-based-data') options.profile = args[++i];
-    else if (args[i] === '--workspace' && !options.workspace && (args[i + 1] === 'legacy' || /^\d{5}$/.test(args[i + 1] ?? ''))) options.workspace = args[++i];
+    else if (args[i] === '--workspace' && !options.workspace && /^\d{5}$/.test(args[i + 1] ?? '')) options.workspace = args[++i];
     else if (args[i] === '--sql-provider' && !options.sqlProvider && ['container', 'azure', 'express'].includes(args[i + 1])) options.sqlProvider = args[++i];
     else if (args[i] === '--sql-target' && !options.sqlTarget && isAbsolute(args[i + 1] ?? '')) options.sqlTarget = args[++i];
-    else throw new Error('Usage: node scripts/setup-check.mjs [--json] [--container <existing-sql-container>] [--profile role-based-data] [--workspace <base-port|legacy>]');
+    else throw new Error('Usage: node scripts/setup-check.mjs [--json] [--container <existing-sql-container>] [--profile role-based-data] [--workspace <base-port>]');
   }
   return options;
 }
@@ -69,13 +68,13 @@ export async function checkSetup(options = {}, injected = {}, context = {}) {
   const root = resolve(options.root ?? (Object.keys(injected).length ? tools : await projectHome()));
   let proposed;
   if (options.workspace !== undefined) {
-    if (typeof options.workspace !== 'string' || options.workspace !== 'legacy' && !/^\d{5}$/.test(options.workspace)) {
+    if (typeof options.workspace !== 'string' || !/^\d{5}$/.test(options.workspace)) {
       throw new Error('Invalid setup workspace selection');
     }
-    proposed = describeWorkspace(root, options.workspace === 'legacy' ? 'legacy' : Number(options.workspace));
+    proposed = describeWorkspace(root, Number(options.workspace));
   }
   const selected = runtimeFor(options.container, root);
-  if (proposed && selected.mode !== 'legacy-unselected' &&
+  if (proposed && selected.mode !== 'unselected' &&
       (proposed.mode !== selected.mode || proposed.mode === 'isolated' && proposed.basePort !== selected.ports.gateway)) {
     throw new Error('Requested workspace differs from the existing selection; inspect it without overwriting.');
   }
@@ -224,9 +223,13 @@ export async function checkSetup(options = {}, injected = {}, context = {}) {
         if (!Array.isArray(cached) || cached[0]?.Architecture !== 'amd64' || cached[0]?.Os !== 'linux') throw new Error('wrong image platform');
         add('sql-image', 'ready', 'SQL_IMAGE_CACHED', 'Project SQL preview image is cached locally.',
           'No registry download is needed for this image. Engine identity is verified during startup.');
-      } catch {
-        add('sql-image', 'action-required', 'SQL_IMAGE_ACCESS_REQUIRED', 'Project SQL preview image could not be verified in the local cache.',
-          'Follow the official preview signup/registry access steps, or select an existing verified Azure SQL container. Do not paste credentials into chat.');
+      } catch (error) {
+        const absent = error.code === 1 && /(?:^|\n)(?:Error response from daemon:\s*)?No such image:/i.test(error.stderr ?? '');
+        add('sql-image', absent ? 'ready' : 'action-required', absent ? 'SQL_IMAGE_DOWNLOAD_REQUIRED' : 'SQL_IMAGE_ACCESS_REQUIRED',
+          absent ? 'Project SQL preview image is not cached; startup must download it under the reviewed SQL grant.' :
+            'Project SQL preview image inspection failed; its local availability and registry access are not verified.',
+          absent ? 'Confirm official preview access and approve SQL startup/image download. No image was pulled by this check.' :
+            'Diagnose the Docker image inspection failure before startup. Review official preview access if needed; never paste credentials into chat.');
       }
     }
   } else add('sql-image', 'not-checked', 'SQL_NOT_CHECKED', 'SQL image/container not checked without the engine.', 'Start Docker, then rerun setup-check.');
@@ -286,7 +289,6 @@ export async function checkSetup(options = {}, injected = {}, context = {}) {
     }
   }
   const ports = [[runtime.ports.gateway, null], [runtime.ports.data, 'data']];
-  if (runtime.ports.internalGateway) ports.push([runtime.ports.internalGateway, null]);
   for (const [port, owner] of ports) {
     const state = await deps.port(port);
     if (state === 'free') add(`port-${port}`, 'ready', 'PORT_FREE', `Local port ${port} is free.`, 'Available for application startup.');
@@ -299,13 +301,11 @@ export async function checkSetup(options = {}, injected = {}, context = {}) {
         'Check the intended checkout/container before reuse; a label alone does not prove readiness.');
     } else {
       let healthy = false;
-      if ([runtime.ports.gateway, runtime.ports.internalGateway].includes(port) && state === 'occupied') {
+      if (runtime.ports.gateway === port && state === 'occupied') {
         try {
-          const response = port === runtime.ports.internalGateway && !injected.fetch
-            ? await loopbackFetch(`http://127.0.0.1:${port}/health/live`, { headers: { host: new URL(runtime.origins.app).host }, signal: AbortSignal.timeout(2000) })
-            : await deps.fetch(`${runtime.origins.app}/health/live`, { signal: AbortSignal.timeout(2000), redirect: 'error' });
+          const response = await deps.fetch(`${runtime.origins.app}/health/live`, { signal: AbortSignal.timeout(2000), redirect: 'error' });
           await response.text();
-          healthy = response.ok || runtime.ports.internalGateway && response.status === 503 && response.headers.get('x-sql-apps-creation') === 'pending';
+          healthy = response.ok;
         } catch { healthy = false; }
       }
       add(`port-${port}`, 'action-required', healthy ? 'EXISTING_GATEWAY_CHECK_OWNERSHIP' : state === 'occupied' ? 'PORT_OCCUPIED' : 'PORT_NOT_CHECKED',
@@ -670,7 +670,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     if (process.argv.includes('--json')) console.log(JSON.stringify({
       version: 1, ready: false, checks: [{
         id: 'diagnostic', status: 'action-required', code: 'DIAGNOSTIC_FAILED', message,
-        nextAction: 'Confirm this checkout, file permissions and usage: node scripts/setup-check.mjs [--json] [--container <existing-sql-container>] [--profile role-based-data] [--workspace <base-port|legacy>].',
+        nextAction: 'Confirm this checkout, file permissions and usage: node scripts/setup-check.mjs [--json] [--container <existing-sql-container>] [--profile role-based-data] [--workspace <base-port>].',
         required: true,
       }],
     }, null, 2));

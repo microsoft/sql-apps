@@ -141,8 +141,8 @@ test('local test principal carries owner and scope without tenant infrastructure
     [{ typ: 'oid', val: 'alice' }, { typ: 'scp', val: 'access_as_user' }]);
 });
 
-for (const selection of ['legacy', 42000] as const) {
-  const mode = selection === 'legacy' ? 'legacy' : 'isolated';
+for (const selection of [42000] as const) {
+  const mode = 'isolated';
   test(`starting SQL binds loopback, uses durable volume, and avoids password command arguments (${mode})`, async t => {
     const runtime = await localWorkspaceFixture(t, selection);
     const calls: string[][] = [];

@@ -10,13 +10,12 @@ import { readLocalAuthentication, localAuthenticationMatches } from '../src/loca
 import { runtimeFor, proposeWorkspace } from '../src/workspace.mjs';
 import { projectHome, toolingHome } from '../src/tooling-context.mjs';
 import { resolveSqlTarget, readSqlTarget, sqlTargetFingerprint } from '../src/sql-target.mjs';
-import { creationSession } from '../src/creation-session.mjs';
 
 const profiles = ['role-based-data'];
 
 export function parseSetupArguments(args) {
   const [command = 'help', ...rest] = args;
-  if (!['help', 'plan', 'status', 'run', 'resume', 'approval', 'approve', 'install-plan', 'install', 'azure-plan', 'azure-provision'].includes(command)) throw new Error('Unsupported setup command; run setup help.');
+  if (!['help', 'plan', 'status', 'run', 'install-plan', 'install', 'azure-plan', 'azure-provision'].includes(command)) throw new Error('Unsupported setup command; run setup help.');
   if (command === 'help') {
     if (rest.length) throw new Error('setup help takes no arguments.');
     return { command, options: {} };
@@ -41,55 +40,52 @@ export function parseSetupArguments(args) {
       continue;
     }
     if (key === 'approval') {
-      if (command !== 'approve' || !/^[a-f0-9]{12}$/.test(value ?? '')) throw new Error('--approval takes the 12-character id shown by setup approval, only with setup approve.');
+      if (command !== 'run' || !/^[a-f0-9]{12}$/.test(value ?? '')) throw new Error('--approval takes the 12-character id shown by setup plan, only with setup run.');
       options.approval = value;
       continue;
     }
     if (!value || (key === 'profile' && !profiles.includes(value)) ||
         (key === 'container' && !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(value)) ||
-        (key === 'workspace' && value !== 'legacy' && !/^\d{5}$/.test(value))) throw new Error('Invalid setup profile, container or workspace selection.');
-    if (key === 'workspace' && value !== 'legacy' && (Number(value) < 20000 || Number(value) > 60000 || Number(value) % 10 !== 0)) {
+        (key === 'workspace' && !/^\d{5}$/.test(value))) throw new Error('Invalid setup profile, container or workspace selection.');
+    if (key === 'workspace' && (Number(value) < 20000 || Number(value) > 60000 || Number(value) % 10 !== 0)) {
       throw new Error('Workspace port block must be aligned to 10 between 20000 and 60000.');
     }
     options[key] = value;
   }
   options.profile ??= 'role-based-data';
-  if (command === 'approval' || command === 'approve') {
-    if (options.container) throw new Error(`setup ${command} covers the workspace-owned SQL container only.`);
-    if (command === 'approve' && !options.approval) throw new Error('setup approve needs --approval <id> from setup approval.');
-  }
+  if (options.approval && options.container) throw new Error('Setup approval covers the workspace-owned SQL container only; external container permissions must be reviewed separately.');
   return { command, options };
 }
 
 // Uses the existing selection, the requested block, or the free proposed block, so one review needs no extra flags.
 async function bundleWorkspace(home, options, injected = {}) {
-  if (options.workspace || runtimeFor(undefined, home).mode !== 'legacy-unselected') return options.workspace;
+  if (options.workspace || runtimeFor(undefined, home).mode !== 'unselected') return options.workspace;
   const target = await resolveSqlTarget(home, runtimeFor(undefined, home).defaultSql, options);
   const proposal = await (injected.propose ?? proposeWorkspace)(home, undefined, { includeSql: target.provider === 'container' });
   const suggested = proposal.conflicts?.length ? proposal.alternative?.basePort : proposal.descriptor?.basePort;
-  if (!suggested) throw new Error('No free isolated port block was found; review occupied ports, then pass --workspace <base-port|legacy>.');
+  if (!suggested) throw new Error('No free isolated port block was found; review occupied ports, then pass --workspace <base-port>.');
   return String(suggested);
 }
 
 export async function planApproval(value, options, injected = {}) {
   const home = await realpath(value);
-  const workspace = await bundleWorkspace(home, options, injected);
-  const candidate = options.sqlTarget || options.sqlProvider ?
+  const workspace = injected.bootstrap ? undefined : await bundleWorkspace(home, options, injected);
+  const candidate = !injected.bootstrap && (options.sqlTarget || options.sqlProvider) ?
     await resolveSqlTarget(home, runtimeFor(options.container, home).sqlContainer, options) : undefined;
   return planBundle(home, { profile: options.profile, ...(workspace ? { workspace } : {}),
     ...(candidate ? { sqlTarget: candidate } : {}) });
 }
 
 export function renderApproval(bundle, options = {}) {
-  const command = `--profile ${bundle.profile} --workspace ${bundle.workspace}` +
+  const command = `--profile ${bundle.profile}` + (bundle.workspace ? ` --workspace ${bundle.workspace}` : '') +
     (options.sqlTarget ? ` --sql-target "${options.sqlTarget}"` : '') + (options.sqlProvider ? ` --sql-provider ${options.sqlProvider}` : '');
-  if (bundle.allowed) return [`Already approved for ${bundle.profile} in ${bundle.home} (workspace ${bundle.workspace}).`, `Next: setup run ${command}`];
+  if (bundle.allowed) return [`Already approved for ${bundle.profile} in ${bundle.home} (${bundle.phase ?? 'local'} phase).`, `Next: setup run ${command}`];
   return [
-    `One local approval for ${bundle.profile} in ${bundle.home} (workspace ${bundle.workspace}):`,
+    `One ${bundle.phase ?? 'local'} approval for ${bundle.profile} in ${bundle.home}${bundle.workspace ? ` (workspace ${bundle.workspace})` : ''}:`,
     ...bundle.requirements.map(item => `- ${item.scope}${bundle.missing.some(other => other.contract === item.contract) ? '' : ' (already approved)'}: ${item.effects.join(' ')}`),
     ...(bundle.terms.required ? [`- SQL terms (${bundle.terms.acknowledged ? 'already accepted' : 'accepting'}): ${bundle.terms.statement}`] : []),
     'Not included: tool installs, Express instance configuration/restarts, stopping or recovering resources, retention maintenance or Azure resource provisioning.',
-    `After explicit approval: setup approve ${command} --approval ${bundle.approval}`,
+    `After explicit approval: setup run ${command} --approval ${bundle.approval}`,
   ];
 }
 
@@ -98,17 +94,6 @@ async function liveWorkspace(runtime, profile, fetcher, sourceFingerprint, authe
   try { response = await fetcher(`${runtime.origins.app}/local/workspace`, { signal: AbortSignal.timeout(2000), redirect: 'error' }); }
   catch { return { ready: false, code: 'GATEWAY_UNAVAILABLE' }; }
   if (!response.ok) {
-    if (response.status === 503 && runtime.ports.internalGateway && response.headers.get('x-sql-apps-creation') === 'pending') {
-      const session = await creationSession(runtime.home);
-      if (session) {
-        const door = await fetcher(`${runtime.origins.app}/__sql_apps/identity`, { signal: AbortSignal.timeout(2000), redirect: 'error' });
-        const owner = await door.json();
-        if (door.ok && owner.sessionId === session.snapshot.sessionId && owner.workspaceId === runtime.id &&
-            owner.home === runtime.home && owner.gatewayOrigin === session.snapshot.gatewayOrigin) {
-          return { ready: false, frontDoor: true, code: 'FRONT_DOOR_WAITING' };
-        }
-      }
-    }
     return { ready: false, conflict: true, code: 'WORKSPACE_ENDPOINT_UNAVAILABLE' };
   }
   let identity;
@@ -116,8 +101,7 @@ async function liveWorkspace(runtime, profile, fetcher, sourceFingerprint, authe
   catch { return { ready: false, conflict: true, code: 'WORKSPACE_IDENTITY_INVALID' }; }
   if (identity?.version !== 1 || identity.id !== runtime.id || identity.mode !== runtime.mode ||
       identity.profile !== profile || identity.origins?.app !== runtime.origins.app || identity.origins?.data !== runtime.origins.data ||
-      identity.container !== runtime.sqlContainer || identity.sourceFingerprint !== sourceFingerprint ||
-      runtime.ports.internalGateway && identity.gatewayOrigin !== `http://127.0.0.1:${runtime.ports.internalGateway}`) {
+      identity.container !== runtime.sqlContainer || identity.sourceFingerprint !== sourceFingerprint) {
     return { ready: false, conflict: true, code: 'WORKSPACE_IDENTITY_MISMATCH' };
   }
   if (!localAuthenticationMatches(identity.authentication, authentication)) {
@@ -182,13 +166,13 @@ export async function planSetup(value, options = {}, injected = {}) {
   result.sqlTarget = sqlTarget;
   const selectionChanged = sqlTargetFingerprint(sqlTarget) !== sqlTargetFingerprint(selectedSql);
   result.workspace = { id: runtime.id, mode: runtime.mode, origins: runtime.origins };
-  const live = runtime.mode === 'legacy-unselected' ? { ready: false } : await liveWorkspace(runtime, options.profile, injected.fetch ?? fetch, source.fingerprint, authentication, sqlTarget);
+  const live = runtime.mode === 'unselected' ? { ready: false } : await liveWorkspace(runtime, options.profile, injected.fetch ?? fetch, source.fingerprint, authentication, sqlTarget);
   result.gatewayReachable = Boolean(live.reachable);
   if (live.conflict) {
     add('ownership', 'blocked', 'A responding gateway does not match this checkout/workspace/profile/authentication. Inspect it; never stop or replace it automatically.', { code: live.code });
     return finish();
   }
-  const proposal = runtime.mode === 'legacy-unselected' ? await proposeWorkspace(home, undefined, { includeSql: sqlTarget.provider === 'container' }) : undefined;
+  const proposal = runtime.mode === 'unselected' ? await proposeWorkspace(home, undefined, { includeSql: sqlTarget.provider === 'container' }) : undefined;
   const suggested = proposal?.conflicts?.length ? proposal.alternative?.basePort : proposal?.descriptor?.basePort;
   const workspace = options.workspace ?? (suggested ? String(suggested) : undefined);
   const check = await (injected.check ?? checkSetup)({ root: home, profile: options.profile,
@@ -197,15 +181,22 @@ export async function planSetup(value, options = {}, injected = {}) {
     ...(options.container ? { container: options.container } : {}), ...(workspace ? { workspace } : {}) },
   {}, { project: source.project !== undefined });
   const blockers = check.checks.filter(item => item.required && item.status !== 'ready' &&
-    !((live.reachable || live.frontDoor && item.id === `port-${runtime.ports.gateway}`) && item.code === 'EXISTING_GATEWAY_CHECK_OWNERSHIP'));
+    !(live.reachable && item.code === 'EXISTING_GATEWAY_CHECK_OWNERSHIP'));
   result.prerequisitesReady = blockers.length === 0;
   result.sqlRoutes = check.sqlRoutes;
-  if (selectionChanged) add('sql-selection', 'blocked',
-    'Review setup approval with the same --sql-provider/--sql-target selection, then approve its id. Selecting a new database never moves existing data.');
+  if (selectionChanged && !source.bootstrap) add('sql-selection', 'blocked',
+    'Review setup plan with the same --sql-provider/--sql-target selection, then pass its approval id to setup run. Selecting a new database never moves existing data.');
   const profileConfig = check.checks.find(item => item.id === 'role-based-config' && item.status !== 'ready');
-  add('prerequisites', blockers.length ? 'blocked' : 'done', blockers.length ?
-    'Resolve the named checks. Use install-plan only for missing tools; preview access, terms and credentials remain human steps.' : 'Prerequisites checked.',
-  { checks: check.checks, blockers });
+  if (!options.container && (source.toolingHome || !injected.source)) {
+    result.approval = await planApproval(home, { ...options, ...(workspace ? { workspace } : {}) },
+      { ...injected, bootstrap: source.bootstrap === true });
+  }
+  const runtimeChecks = new Set(['docker-cli', 'docker-engine', 'capacity', 'sql-platform', 'sql-image',
+    'sql-endpoint', 'sql-express', 'azure-account', 'host-dab-runtime', 'ownership']);
+  const toolingBlockers = blockers.filter(item => !runtimeChecks.has(item.id) && !item.id.startsWith('port-'));
+  if (toolingBlockers.length) add('tooling', 'blocked',
+    'Resolve the named restore/build prerequisites. Review install-plan only for missing tools.',
+    { blockers: toolingBlockers });
   const dependencies = await (injected.dependencies ?? inspectDependencies)(home);
   const restore = dependencies.ready || dependencies.probeTimedOut ? undefined : await (injected.consent ?? planConsent)(home, { operation: 'restore' });
   add('restore', dependencies.ready ? 'done' : restore?.allowed ? 'next' : 'blocked',
@@ -215,19 +206,22 @@ export async function planSetup(value, options = {}, injected = {}) {
   add('build', source.build.ready ? 'done' : !source.bootstrap && build.allowed ? 'next' : 'blocked',
     source.bootstrap ? 'Restore the pinned project tooling first, then review setup through that installed package before building.' :
       'Build only missing/stale source or artifacts after approval.', { code: source.build.code, ...(build ? { consent: build } : {}) });
-  if (runtime.mode === 'legacy-unselected') {
+  add('prerequisites', blockers.length ? 'blocked' : 'done', blockers.length ?
+    'Resolve the named startup checks. Use install-plan only for missing tools; preview access, terms and credentials remain human steps.' : 'Prerequisites checked.',
+  { checks: check.checks, blockers });
+  if (runtime.mode === 'unselected') {
     const permission = options.workspace ? await (injected.consent ?? planConsent)(home, { operation: 'workspace-init', selection: options.workspace }) : undefined;
-    const approval = selected => `setup approval --profile ${options.profile} --workspace ${selected}`;
+    const approval = selected => `setup plan --profile ${options.profile} --workspace ${selected}`;
     add('workspace', permission?.allowed ? 'next' : 'blocked', options.workspace ?
       `Workspace ${options.workspace} creates only the workspace descriptor. Review ${approval(options.workspace)}: one approval covers restore, build, this workspace, startup and the SQL terms.` :
       `${suggested ? `Proposed isolated port block ${suggested} (free when checked, not reserved). Review ${approval(suggested)} (one approval covers restore, build, this workspace, startup and the SQL terms), then setup run --profile ${options.profile} --workspace ${suggested}` :
-        'No free isolated port block was found; review occupied ports, then choose --workspace <base-port>'}, or --workspace legacy to keep an existing legacy stack.`,
+        'No free isolated port block was found; review occupied ports, then choose --workspace <base-port>'}.`,
       { proposal, ...(permission ? { consent: permission } : {}) });
     add('launch', 'blocked', profileConfig ? `${profileConfig.message} ${profileConfig.nextAction}` :
       `After workspace initialization, app starts under the same setup approval (startup scopes and SQL terms).`,
     profileConfig ? { code: profileConfig.code } : {});
   } else {
-    if (options.workspace && (options.workspace !== 'legacy' ? runtime.mode !== 'isolated' || Number(options.workspace) !== runtime.ports.gateway : runtime.mode !== 'legacy')) {
+    if (options.workspace && Number(options.workspace) !== runtime.ports.gateway) {
       throw new Error('Requested workspace differs from the existing selection; inspect it without overwriting.');
     }
     add('workspace', 'done', 'Existing workspace selected; ownership still checked before startup.');
@@ -246,7 +240,7 @@ export async function planSetup(value, options = {}, injected = {}) {
       const operation = 'app';
       const permission = await (injected.consent ?? planConsent)(home, { operation,
         ...(options.container ? { selection: options.container } : {}) });
-      const review = options.container ? `consent-plan ${operation} ${options.container}` : `setup approval --profile ${options.profile}`;
+      const review = options.container ? `consent-plan ${operation} ${options.container}` : `setup plan --profile ${options.profile}`;
       add('launch', permission.allowed ? 'next' : 'blocked',
         `Review ${review} for the startup scopes and any required SQL terms. Run only the approved profile; changed launcher effects require renewed review.`,
         { consent: permission, code: live.code });
@@ -309,10 +303,19 @@ export async function launchSetup(home, operation, container, runtime, profile, 
 }
 
 export async function runSetup(home, options, injected = {}) {
+  const { approval, ...planningOptions } = options;
   const execute = injected.execute ?? runSetupCommand;
   let previous;
   for (let attempt = 0; attempt < 6; attempt++) {
-    const report = await planSetup(home, options, injected);
+    const report = await planSetup(home, planningOptions, injected);
+    if (approval && attempt === 0) {
+      if (!report.approval) throw new Error('Setup has no approvable plan; resolve its named blockers before approving.');
+      const bundle = report.approval;
+      await grantBundle(home, { profile: bundle.profile, workspace: bundle.workspace, approval,
+        ...(bundle.sqlTarget ? { sqlTarget: bundle.sqlTarget } : {}) });
+      if (bundle.workspace) planningOptions.workspace = bundle.workspace;
+      continue;
+    }
     if (report.gatewayReachable && !report.running) return report;
     if (report.next.status !== 'next') return report;
     const stage = report.next;
@@ -327,7 +330,7 @@ export async function runSetup(home, options, injected = {}) {
         const operation = 'app';
         started = await (injected.launch ?? launchSetup)(home, operation, options.container, runtime, options.profile, injected.fetch ?? fetch,
           injected.environment === undefined ? {} : { environment: injected.environment });
-        const after = await planSetup(home, options, injected);
+        const after = await planSetup(home, planningOptions, injected);
         if (!after.running) throw new Error('Started process did not verify the selected gateway.');
         return { ...after, completion: started.completion };
       }
@@ -338,7 +341,7 @@ export async function runSetup(home, options, injected = {}) {
           await execute(file, args, cwd);
         });
       if (report.bootstrap && stage.id === 'restore') {
-        const after = await planSetup(home, options, injected);
+        const after = await planSetup(home, planningOptions, injected);
         return { ...after, next: { ...after.next, status: 'blocked',
           code: after.bootstrap ? 'TOOLING_RESTORE_UNVERIFIED' : 'TOOLING_RESTORED',
           nextAction: after.bootstrap ? 'The restore command finished but the pinned tooling is still missing. Inspect dependency readiness before retrying.' :
@@ -347,14 +350,14 @@ export async function runSetup(home, options, injected = {}) {
     } catch (error) {
       if (started) await started.stop();
       return { ...report, next: { ...stage, status: 'blocked', code: 'SETUP_STAGE_FAILED',
-        nextAction: `Setup stopped at ${stage.id}. Review safe process output and its approvals, preserve resources and run resume after fixing the cause.`,
-        diagnostic: error instanceof Error ? error.name : 'UnknownError' } };
+        nextAction: `Setup stopped at ${stage.id}. Review its diagnostic and approvals, preserve resources and rerun setup plan after fixing the cause.`,
+        diagnostic: error instanceof Error ? error.message : 'Local setup operation failed.' } };
     }
   }
   throw new Error('Setup reached its bounded continuation limit; inspect status before retrying.');
 }
 
-export function renderSetup(report) {
+export function renderSetup(report, options = {}) {
   const describe = stage => {
     const failing = [...(stage.blockers ?? []), ...(stage.dependencies?.checks ?? []).filter(check => !check.ready)]
       .map(check => `${check.id} (${check.code})`);
@@ -363,13 +366,14 @@ export function renderSetup(report) {
     const request = stage.consent?.request;
     const workspace = request?.operation === 'workspace-init' ? ` --workspace ${request.selection}` : '';
     const external = request?.selection && request.operation !== 'workspace-init';
-    const review = report.profile && !external ? `setup approval --profile ${report.profile}${workspace}` :
+    const review = report.profile && !external ? `setup plan --profile ${report.profile}${workspace}` :
       `consent-plan ${request?.operation}${request?.selection ? ` ${request.selection}` : ''}`;
     const approval = missing.length ? ` Needs approval: ${missing.join(', ')}; review ${review} first.` : '';
     return `${stage.id}${stage.code ? ` (${stage.code})` : ''} - ${stage.nextAction}${failing.length ? ` Failing: ${failing.join(', ')}.` : ''}${approval}`;
   };
   const lines = report.stages.map(stage => stage.status === 'done' ? `Done: ${stage.id}` :
     `${stage.status === 'blocked' ? 'Blocked' : 'Next'}: ${describe(stage)}`);
+  if (report.approval) lines.push(...renderApproval(report.approval, options));
   if (report.launchUrl) lines.push(`Running: ${report.launchUrl}; browser/SQL workflow verification is still required.`);
   if (report.sqlRoutes?.recommended && report.sqlRoutes.recommended !== 'container') {
     const route = report.sqlRoutes.routes.find(item => item.provider === report.sqlRoutes.recommended);
@@ -390,8 +394,8 @@ export async function main(args = process.argv.slice(2), home) {
   }
   const { command, options, selection } = parseSetupArguments(args);
   if (command === 'help') {
-    console.log('SQL Apps setup: plan|status|run|resume [--profile role-based-data] [--workspace <base-port|legacy>] [--container <name>] [--json]');
-    console.log('One local approval: approval --profile <profile> [--workspace <base-port|legacy>] lists restore, build, workspace, startup and SQL terms; approve ... --approval <id> records it after explicit human approval.');
+    console.log('SQL Apps setup: plan|status|run [--profile role-based-data] [--workspace <base-port>] [--container <name>] [--json]');
+    console.log('setup plan lists exact effects and an approval id; setup run --approval <id> records that reviewed approval and runs missing work. Rerun the same flow to resume. Bootstrap stops after restore for a fresh app-local review.');
     console.log('External SQL selection uses the individual consent-plan/grant workflow for that container; the setup approval bundle covers only workspace-owned SQL.');
     console.log('Database: --sql-provider <container|azure|express> --sql-target <absolute-nonsecret.json>. Selection is bound to setup approval; no data is moved. Azure resources and Express instance configuration are separate approvals.');
     console.log('Installation: install-plan <node|npm|dotnet|docker|sql-express> | install <absolute-reviewed-plan.json>. Execute only after explicit human approval.');
@@ -410,28 +414,13 @@ export async function main(args = process.argv.slice(2), home) {
     console.log(JSON.stringify(output, null, 2));
     return;
   }
-  if (command === 'approval' || command === 'approve') {
-    const bundle = await planApproval(home, options);
-    if (command === 'approve') {
-      await grantBundle(bundle.home, { profile: options.profile, workspace: bundle.workspace, approval: options.approval,
-        ...(bundle.sqlTarget ? { sqlTarget: bundle.sqlTarget } : {}) });
-      const recorded = await planApproval(home, { ...options, workspace: bundle.workspace });
-      if (options.json) console.log(JSON.stringify(recorded, null, 2));
-      else console.log(`Recorded one local approval for ${recorded.profile} (workspace ${recorded.workspace}). Next: setup run --profile ${recorded.profile} --workspace ${recorded.workspace}`);
-      if (!recorded.allowed) process.exitCode = 1;
-      return;
-    }
-    if (options.json) console.log(JSON.stringify(bundle, null, 2));
-    else for (const line of renderApproval(bundle, options)) console.log(line);
-    return;
-  }
   let report;
   if (command === 'install-plan') report = await planInstallation(home, selection);
   else if (command === 'install') report = await installReviewed(selection, home);
-  else report = await (command === 'run' || command === 'resume' ? runSetup : planSetup)(home, options);
+  else report = await (command === 'run' ? runSetup : planSetup)(home, options);
   const { completion, ...output } = report;
   if (options.json || command.startsWith('install')) console.log(JSON.stringify(output, null, 2));
-  else for (const line of renderSetup(report)) console.log(line);
+  else for (const line of renderSetup(report, options)) console.log(line);
   if (report.outcome ? report.outcome !== 'ready' : !report.running) process.exitCode = 1;
   if (completion) await completion;
 }

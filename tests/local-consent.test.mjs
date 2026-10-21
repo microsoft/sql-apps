@@ -107,22 +107,22 @@ test('Express instance changes are separate, target-bound one-operation grants, 
 
 test('composite startup lists every missing scope before any mutation', async t => {
   const home = await fixture(t, true);
-  const plan = await planConsent(home, { operation: 'role-based-app' });
+  const plan = await planConsent(home, { operation: 'app' });
   assert.equal(plan.allowed, false);
   assert.deepEqual(plan.requirements.map(item => item.scope), ['restore', 'build', 'sql-start', 'schema', 'services', 'synthetic']);
-  await assert.rejects(assertConsent(home, { operation: 'role-based-app' }), /Missing local permission/);
+  await assert.rejects(assertConsent(home, { operation: 'app' }), /Missing local permission/);
   await assert.rejects(readFile(join(home, '.sql-apps', 'consent.json')), { code: 'ENOENT' });
 });
 
 test('unknown operations and missing workspace fail explicitly', async t => {
   const home = await fixture(t);
-  await assert.rejects(planConsent(home, { operation: 'azure' }), /Unsupported consent operation: azure.*role-based-app/);
-  await assert.rejects(planConsent(home, { operation: 'app' }), /workspace selection.*consent-plan workspace-init/);
+  await assert.rejects(planConsent(home, { operation: 'azure' }), /Unsupported consent operation: azure.*app/);
+  await assert.rejects(planConsent(home, { operation: 'app' }), /workspace selection.*setup plan/);
   await assert.rejects(planConsent(home, { operation: 'workspace-init', selection: '30001' }), /port block/);
   await assert.rejects(planConsent(home, { operation: 'app-test', selection: 'external-sql' }), /takes no container selection/);
   const configless = await fixture(t, true);
   await rm(join(configless, 'role-based-data.json'));
-  assert.deepEqual((await planConsent(configless, { operation: 'role-based-app' })).requirements.map(item => item.scope),
+  assert.deepEqual((await planConsent(configless, { operation: 'app' })).requirements.map(item => item.scope),
     ['restore', 'build', 'sql-start', 'schema', 'services', 'synthetic'],
     'permission planning must not require domain configuration that launch validates separately');
 });
@@ -409,21 +409,14 @@ test('CLI grants a freshly reviewed plan without a temporary file', async t => {
   await assert.rejects(execute(process.execPath, [cli, 'grant', '--plan-from', 'app'], options), /workspace selection/);
 });
 
-test('setup approval lists one bundle and setup approve records it without a temporary file', async t => {
+test('setup exposes no separate approval, approve or resume command', async t => {
   const home = await fixture(t);
   const setupCli = resolve('scripts/setup.mjs');
   const options = { cwd: home };
-  const shown = (await execute(process.execPath, [setupCli, 'approval', '--profile', 'role-based-data', '--workspace', '30000'], options)).stdout;
-  assert.match(shown, /One local approval for role-based-data/);
-  for (const scope of ['workspace', 'restore', 'build', 'sql-start', 'schema', 'services']) assert.match(shown, new RegExp(`^- ${scope}: `, 'm'));
-  assert.match(shown, /^- SQL terms \(accepting\): .*ACCEPT_EULA=Y/m);
-  assert.match(shown, /Not included: tool installs/);
-  const id = shown.match(/--approval ([a-f0-9]{12})/)[1];
-  await assert.rejects(execute(process.execPath, [setupCli, 'approve', '--profile', 'role-based-data', '--workspace', '30000'], options), /--approval/);
-  await assert.rejects(execute(process.execPath, [setupCli, 'approval', '--profile', 'role-based-data', '--approval', id], options), /only with setup approve/);
-  const recorded = (await execute(process.execPath, [setupCli, 'approve', '--profile', 'role-based-data', '--workspace', '30000', '--approval', id], options)).stdout;
-  assert.match(recorded, /Next: setup run --profile role-based-data --workspace 30000/);
-  assert.match((await execute(process.execPath, [setupCli, 'approval', '--profile', 'role-based-data', '--workspace', '30000'], options)).stdout, /Already approved/);
+  for (const command of ['approval', 'approve', 'resume']) {
+    await assert.rejects(execute(process.execPath, [setupCli, command], options), /Unsupported setup command/);
+  }
+  await assert.rejects(readFile(join(home, '.sql-apps', 'consent.json')), { code: 'ENOENT' });
 });
 
 test('guarded execution denies before the runner and passes only approved operations', async t => {
@@ -476,12 +469,12 @@ test('direct local CLI denies before workspace mutation', { skip: !existsSync(lo
 
 test('startup planning includes the implicit SQL acceptance check; data restarts only DAB', async t => {
   const home = await fixture(t, true);
-  for (const operation of ['app', 'role-based-app', 'init']) {
+  for (const operation of ['app', 'init']) {
     const plan = await planConsent(home, { operation });
     assert.ok(plan.requirements.some(item => item.scope === 'synthetic'), operation);
   }
   assert.deepEqual((await planConsent(home, { operation: 'data' })).requirements.map(item => item.scope), ['services']);
-  for (const removed of ['services', 'maintain', 'serve-sql', 'stop-services', 'services-test', 'api-test']) {
+  for (const removed of ['services', 'maintain', 'serve-sql', 'stop-services', 'services-test', 'api-test', 'role-based-app', 'role-based-serve']) {
     await assert.rejects(planConsent(home, { operation: removed }), /Unsupported consent operation/, removed);
   }
 });
@@ -489,7 +482,7 @@ test('startup planning includes the implicit SQL acceptance check; data restarts
 test('SQL startup grant is shared across matching profiles, not container targets', async t => {
   const home = await fixture(t, true);
   await grantConsent(home, await planConsent(home, { operation: 'start-sql' }));
-  assert.ok(!(await planConsent(home, { operation: 'role-based-app' })).missing.some(item => item.scope === 'sql-start'));
+  assert.ok(!(await planConsent(home, { operation: 'app' })).missing.some(item => item.scope === 'sql-start'));
   assert.ok((await planConsent(home, { operation: 'start-sql', selection: 'different-sql' })).missing.some(item => item.scope === 'sql-start'));
 });
 
@@ -500,8 +493,7 @@ test('every runtime command declares its required scopes', async t => {
     init: ['restore', 'build', 'schema', 'synthetic'],
     data: ['services'],
     serve: ['services'],
-    'role-based-app': ['restore', 'build', 'sql-start', 'schema', 'services', 'synthetic'],
-    'role-based-serve': ['services'], 'start-sql': ['sql-start'],
+    'start-sql': ['sql-start'],
     test: ['synthetic'], 'app-test': ['synthetic'],
     stop: ['stop'], 'recover-sql': ['sql-start'],
   };
@@ -515,17 +507,17 @@ test('every runtime command declares its required scopes', async t => {
 test('application content edits keep grants; launcher and worker changes invalidate only relevant grants', async t => {
   const home = await fixture(t, true);
   await grantConsent(home, await planConsent(home, { operation: 'app' }));
-  await grantConsent(home, await planConsent(home, { operation: 'role-based-app' }));
+  await grantConsent(home, await planConsent(home, { operation: 'app' }));
   await writeFile(join(home, 'sql', 'database.sqlproj'), '<Project Changed="true" />');
   await writeFile(join(home, 'sql', 'shifts.sql'), 'CREATE TABLE dbo.Shift (Id int);');
   await writeFile(join(home, 'dab', 'dab-config.json'), '{"entities":{}}');
   await writeFile(join(home, 'role-based-data.json'), '{"profile":"role-based-data","requiredRole":"Volunteer","readinessPath":"/api/Ready"}');
   assert.deepEqual((await planConsent(home, { operation: 'app' })).missing, []);
-  assert.deepEqual((await planConsent(home, { operation: 'role-based-app' })).missing, []);
+  assert.deepEqual((await planConsent(home, { operation: 'app' })).missing, []);
   await writeFile(join(home, 'src', 'local-app.ts'), '// changed gateway');
   assert.deepEqual((await planConsent(home, { operation: 'app' })).missing.map(item => item.scope), ['services']);
   await writeFile(join(home, 'src', 'role-based-profile.ts'), '// changed grant code');
-  assert.deepEqual((await planConsent(home, { operation: 'role-based-app' })).missing.map(item => item.scope), ['schema', 'services']);
+  assert.deepEqual((await planConsent(home, { operation: 'app' })).missing.map(item => item.scope), ['schema', 'services']);
 });
 
 test('one bundle approval covers workspace, startup scopes and inline SQL terms', async t => {
@@ -545,7 +537,7 @@ test('one bundle approval covers workspace, startup scopes and inline SQL terms'
   assert.equal((await planConsent(home, { operation: 'workspace-init', selection: '30000' })).allowed, true);
   assert.equal((await planConsent(home, { operation: 'build' })).allowed, true);
   await initializeWorkspace(home, 30000, async () => 'free');
-  const startup = await planConsent(home, { operation: 'role-based-app' });
+  const startup = await planConsent(home, { operation: 'app' });
   assert.deepEqual(startup.missing, []);
   assert.equal(startup.termsAcknowledged, true);
   assert.equal(startup.allowed, true);
@@ -554,7 +546,7 @@ test('one bundle approval covers workspace, startup scopes and inline SQL terms'
   const terms = JSON.parse(await readFile(join(home, '.sql-apps', 'terms.json')));
   assert.equal(terms.url, SQL_TERMS.url);
   await writeFile(join(home, '.sql-apps', 'terms.json'), JSON.stringify({ ...terms, sha256: '0'.repeat(64) }));
-  assert.equal((await planConsent(home, { operation: 'role-based-app' })).termsAcknowledged, false);
+  assert.equal((await planConsent(home, { operation: 'app' })).termsAcknowledged, false);
 });
 
 test('bundle planning validates profile and workspace and reuses an existing selection', async t => {

@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
-import { createServer } from 'node:http';
 import { after, before, test } from 'node:test';
 
 const execute = promisify(execFile);
@@ -173,11 +172,11 @@ test('installed tooling mismatches and incomplete packages fail instead of falli
   const manifestPath = join(tooling, 'package.json');
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
   await writeFile(manifestPath, JSON.stringify({ ...manifest, version: '999.0.0' }));
-  await assert.rejects(context.installedTooling(project), /does not match the project pin/);
+  await assert.rejects(context.installedTooling(project), /requires @microsoft\/sql-apps@0\.1\.0.*999\.0\.0.*Restore the exact project pin/);
   const plugin = await import('../plugins/sql-apps/scripts/sql-apps.mjs');
   await assert.rejects(plugin.workspaceReport(project, {
     cwd: root, environment: { SQL_APPS_HOME: project }, userHome: project,
-  }), /does not match the project pin/);
+  }), /requires @microsoft\/sql-apps@0\.1\.0.*999\.0\.0.*Restore the exact project pin/);
   await rm(manifestPath);
   await assert.rejects(context.installedTooling(project), { code: 'ENOENT' });
 });
@@ -391,50 +390,22 @@ test('every packaged command target resolves outside the project and read-only c
     assert.equal(resolve(tooling, target).startsWith(tooling), true);
     assert.equal(resolve(tooling, target).startsWith(project + '\\dist'), false);
   }
-  for (const args of [['--help'], ['setup', 'help'], ['creation', 'help'], ['consent', 'help'], ['local', 'help']]) {
+  for (const args of [['--help'], ['setup', 'help'], ['consent', 'help'], ['local', 'help']]) {
     const result = await run(process.execPath, [bin, ...args], join(project, 'src'));
     assert.equal(result.code, undefined, `${args.join(' ')}: ${result.stderr}`);
+    if (args[0] === 'local') assert.doesNotMatch(result.stdout, /selected-app|selected-test|app:build/);
   }
 });
 
-test('installed tooling owns a pre-build front door and bundles every creation asset outside the foundation', async t => {
+test('installed tooling rejects the removed creation lifecycle and does not ship helper topology', async t => {
   const { project, tooling } = await projectFixture(t);
-  const load = path => import(pathToFileURL(join(tooling, 'dist', path)).href);
-  const { initialProgress } = await load('src/creation-progress.mjs');
-  const { writeCreationJson, readCreationJson } = await load('src/creation-session.mjs');
-  const { startCreationProcess, stopCreationProcess } = await load('scripts/creation.mjs');
-  const reserve = createServer();
-  await new Promise(done => reserve.listen(0, '127.0.0.1', done));
-  const port = reserve.address().port;
-  await new Promise(done => reserve.close(done));
-  const directory = join(dirname(project), 'creation-session');
-  const snapshot = initialProgress({ home: project, name: 'Installed project', workspaceId: 'installed-fixture',
-    publicOrigin: `http://127.0.0.1:${port}`, gatewayOrigin: `http://127.0.0.1:${port === 65535 ? port - 1 : port + 1}` });
-  await writeCreationJson(join(directory, 'progress.json'), snapshot);
-  await writeCreationJson(join(project, '.sql-apps', 'creation-session.json'),
-    { version: 1, home: project, directory, sessionId: snapshot.sessionId });
-  await startCreationProcess(directory, tooling);
-  try {
-    for (const path of ['/', '/__sql_apps/style.css', '/__sql_apps/progress.js', '/__sql_apps/endpoint', '/__sql_apps/endpoint.js']) {
-      const response = await fetch(`${snapshot.publicOrigin}${path}`);
-      assert.equal(response.status, 200, `${path} must be bundled and served by installed tooling`);
-      assert.ok((await response.text()).length);
-    }
-    const result = await run(process.execPath, [join(tooling, 'bin', 'sql-apps.mjs'), 'creation', 'status'], join(project, 'src'));
-    assert.equal(result.code, undefined, result.stderr);
-    const status = JSON.parse(result.stdout);
-    assert.equal(status.sessionId, snapshot.sessionId);
-    assert.equal(status.connected, true);
-    assert.equal(status.ready, false);
-    assert.equal(status.usable, false);
-    const receipt = await readCreationJson(join(directory, 'process.json'));
-    await writeCreationJson(join(directory, 'process.json'), { ...receipt, pid: receipt.pid + 1 });
-    await assert.rejects(stopCreationProcess(directory), /ownership/i);
-    await writeCreationJson(join(directory, 'process.json'), receipt);
-    assert.equal((await fetch(`${snapshot.publicOrigin}/__sql_apps/identity`)).status, 200);
-  } finally {
-    await stopCreationProcess(directory);
+  const result = await run(process.execPath, [join(tooling, 'bin', 'sql-apps.mjs'), 'creation', 'status'], project);
+  assert.notEqual(result.code, undefined);
+  assert.match(result.stderr, /Unknown command/);
+  for (const path of ['scripts/creation.mjs', 'src/creation-front-door.mjs', 'src/creation-web']) {
+    await assert.rejects(readFile(join(tooling, 'dist', path)), { code: 'ENOENT' });
   }
+  await assert.rejects(readFile(join(project, '.sql-apps', 'creation-session.json')), { code: 'ENOENT' });
 });
 
 test('generated project consent preserves domain grants and invalidates changed tooling scopes', async t => {
@@ -448,7 +419,7 @@ test('generated project consent preserves domain grants and invalidates changed 
     const consent = await import(`${pathToFileURL(join(tooling, 'dist', 'src', 'local-consent.mjs')).href}?consent=${nonce}`);
     const workspace = await import(`${pathToFileURL(join(tooling, 'dist', 'src', 'workspace.mjs')).href}?workspace=${nonce}`);
     await workspace.initializeWorkspace(project, 33000, async () => 'free');
-    const request = { operation: 'role-based-app' };
+    const request = { operation: 'app' };
     await consent.grantConsent(project, await consent.planConsent(project, request));
     await writeFile(join(project, 'sql', 'ready.sql'), 'CREATE PROCEDURE dbo.Ready AS SELECT 2 AS ready;\n');
     await writeFile(join(project, 'dab', 'dab-config.json'), '{"entities":{}}\n');

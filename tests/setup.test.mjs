@@ -50,10 +50,10 @@ test('read-only pre-build diagnostics work on Windows, macOS and Linux without d
   }
 });
 
-test('missing preview access offers Azure SQL before Express without running login or installation', async () => {
+test('missing Docker offers Azure SQL before Express without running login or installation', async () => {
   const base = fixture();
   const deps = fixture({ run: async (command, args) => {
-    if (command === 'docker' && args[0] === 'image') throw new Error('not cached');
+    if (command === 'docker') throw Object.assign(new Error('not installed'), { code: 'ENOENT' });
     return base.run(command, args);
   } });
   const report = await checkSetup({ root: process.cwd() }, deps);
@@ -61,6 +61,21 @@ test('missing preview access offers Azure SQL before Express without running log
   assert.deepEqual(report.sqlRoutes.routes.map(route => route.provider), ['container', 'azure', 'express']);
   assert.equal(report.ready, false, 'an alternative is not approval or database readiness');
   assert.equal(base.calls.some(call => call.includes('login') || call.includes('install')), false);
+});
+
+test('a cold image cache permits an approved download but unknown image failures remain blockers', async () => {
+  for (const missing of [true, false]) {
+    const base = fixture();
+    const report = await checkSetup({}, fixture({ run: async (command, args) => {
+      if (command === 'docker' && args[0] === 'image') throw Object.assign(new Error('image inspection failed'),
+        { code: 1, stderr: missing ? 'Error response from daemon: No such image: preview.example/azure-sql/db-dev:latest' : 'permission denied' });
+      return base.run(command, args);
+    } }));
+    const image = report.checks.find(check => check.id === 'sql-image');
+    assert.equal(image.code, missing ? 'SQL_IMAGE_DOWNLOAD_REQUIRED' : 'SQL_IMAGE_ACCESS_REQUIRED');
+    assert.equal(image.status, missing ? 'ready' : 'action-required');
+    assert.equal(report.ready, missing);
+  }
 });
 
 test('unsupported hosts do not recommend an Express installation', async () => {
@@ -208,9 +223,8 @@ test('pre-build diagnostics check proposed workspace ports instead of an occupie
   assert.equal(report.workspace.mode, 'isolated');
   assert.deepEqual(parseArguments(['--workspace', '30000']), { workspace: '30000' });
   checked.length = 0;
-  const legacy = await checkSetup({ root, workspace: 'legacy' }, deps);
-  assert.equal(legacy.ready, false, 'explicit legacy selection still checks its occupied gateway');
-  assert.equal(checked[0], 18080);
+  await assert.rejects(checkSetup({ root, workspace: 'legacy' }, deps), /workspace selection/);
+  assert.deepEqual(checked, []);
 });
 
 test('role-based procedure check accepts real declaration forms and ignores commented-out code', async () => {
@@ -451,8 +465,8 @@ test('SQL cache, preview access, ARM and selected-container states are not confu
   await assert.rejects(checkSetup({ container: 'bad;name' }, deps), /container name/);
 });
 
-for (const selection of [undefined, 'legacy', 33000]) {
-  const mode = selection === undefined ? 'legacy-unselected' : selection === 'legacy' ? 'legacy' : 'isolated';
+for (const selection of [undefined, 33000]) {
+  const mode = selection === undefined ? 'unselected' : 'isolated';
   test(`port conflicts never authorize killing services; healthy gateway alone is not proof of ownership (${mode})`, async t => {
     const root = await mkdtemp(join(tmpdir(), 'sql-apps-setup-conflicts-'));
     t.after(() => rm(root, { recursive: true, force: true }));

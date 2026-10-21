@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -40,8 +40,9 @@ test('cloud runtime rejects insecure or credential-bearing upstream URLs', () =>
 test('role-based local commands require their profile before starting any services', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'sql-apps-role-based-cli-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
+  await writeFile(join(directory, 'package.json'), JSON.stringify({ sqlApps: { project: true } }));
   const cli = pathToFileURL(resolve('dist', 'src', 'local-cli.js')).href;
-  for (const command of ['role-based-app', 'role-based-serve']) {
+  for (const command of ['app', 'serve', 'init', 'data']) {
     await assert.rejects(run(process.execPath, ['--input-type=module', '-e',
       `process.chdir(${JSON.stringify(directory)}); process.argv = [process.execPath, 'local-cli', ${JSON.stringify(command)}]; await import(${JSON.stringify(cli)});`,
     ], { env: { NODE_ENV: 'test' } }), /role-based-data\.json/);

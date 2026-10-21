@@ -17,8 +17,8 @@ review a creation plan and create your first application. Projects default to
 Creation refuses to merge into an existing folder.
 
 The archive contains its own allowlisted scaffold; no foundation checkout or
-existing app is needed for `projects` or `bind-archive`. The new path targets
-unreleased **0.2.5**, not the published 0.2.4 archive. To change the
+existing app is needed for `projects` or `bind-archive`. The initial release
+candidate is **0.1.0**; old demo projects are not migration targets. To change the
 root for future projects, choose an absolute path before creating them:
 
 ```powershell
@@ -34,14 +34,17 @@ node $cli projects open "C:\path\to\project"
 
 Here `$cli` is the absolute installed archive executable from the guide. Open
 the app and restart your optional assistant there after restore. The archive
-CLI requires `create-plan` followed by `create --approval <id>`; use
-`--no-browser` on both for headless creation. The owned loopback helper and
-readiness checks are retained.
+CLI requires `create-plan --archive <absolute-tgz>` followed by
+`create --archive <absolute-tgz> --approval <id>`. Planning blocks an existing
+destination and application rechecks it. Creation copies and binds the reviewed
+archive before the initial Git commit. It starts no helper, reserves no ports,
+opens no browser and grants no setup permissions.
 
 The foundation's existing `npm run projects -- ...` commands remain available.
-For that source-backed alternative, keep `SQL_APPS_FOUNDATION_HOME` on the
-foundation and set `SQL_APPS_HOME` to the app using creation's printed command.
-The foundation is a tool source, not the application repository.
+They require the same explicit archive and current approval. Contributor tooling
+can be selected explicitly with `SQL_APPS_TOOLING_HOME`; `SQL_APPS_HOME`
+selects an app. The foundation is not an ambient runtime source.
+The registry is a list/picker, never execution authority.
 
 ## Project manifest
 
@@ -59,15 +62,14 @@ has this shape:
   "scaffoldVersion": 1,
   "tooling": {
     "package": "@microsoft/sql-apps",
-    "version": "0.2.5"
+    "version": "0.1.0"
   }
 }
 ```
 
-`starter` must be `data` and `profile` must be `role-based-data`. The
-`files-jobs` starter and its `foundation` profile were removed in 0.2.0;
-manifests that still name them are rejected, so keep such a project on 0.1.x
-tooling. New projects copy `.config`, `content`, `dab`, `docs`, `public` and
+`starter` must be `data` and `profile` must be `role-based-data`. Other starters
+and old demo contracts are unsupported, not automatically migrated.
+New projects copy `.config`, `content`, `dab`, `docs`, `public` and
 `sql`, write `role-based-data.json`, and start with only `src/web/app.ts` as
 application source. The entry point imports the typed
 `@microsoft/sql-apps/browser` facade for client, authentication and local creation
@@ -107,9 +109,9 @@ must be an absolute path to the same validated project.
 Before the first restore, use the explicitly selected archive CLI from the app
 directory for `guide`, `setup plan` and the approved restore. It remains
 bootstrap-only even when its package name and version match the app pin.
-The installed plugin launcher is a source-backed alternative; its foundation selection
-(`SQL_APPS_FOUNDATION_HOME` or the Copilot installer binding) supplies
-supplies only bootstrap commands. Bootstrap setup stops after restore: re-run setup
+An optional plugin can use explicitly selected bootstrap tooling through
+`SQL_APPS_TOOLING_HOME`; it never adopts a provider binding or globally active app.
+Bootstrap setup stops after restore: re-run setup
 through the installed pinned package and review any changed approval scopes.
 Build, runtime execution and subsequent provenance checks all use the app-local
 package, even when invoked via the external archive executable. An ancestor's
@@ -122,8 +124,9 @@ Generation records the exact tooling package and its runtime dependency metadata
 in `package-lock.json`, not only in the root dependency declaration. Dependencies
 that were development-only in the foundation are promoted when the tooling needs
 them at runtime, so `npm ci --omit=dev` does not remove required tooling
-dependencies. By default, package downloads use the configured npm registry;
-generation does not silently vendor an artifact or substitute a different version.
+dependencies. Creation explicitly copies the approved release archive and binds
+the tooling lock entry to it. Other dependencies use the configured npm feed.
+No version or source is substituted silently.
 
 ## Install from a release archive
 
@@ -134,11 +137,11 @@ in PowerShell). The archive must match the exact version in your project's
 manifest and package metadata. A local foundation build can produce the same
 format; see [runtime releases](../../CONTRIBUTING.md#releasing-the-runtime-package).
 
-Using your selected archive CLI, select **absolute** paths and review a read-only
-binding plan:
+Normal creation already binds its reviewed archive; no separate binding step
+is needed. For advanced repair, use **absolute** paths and review a read-only plan:
 
 ```powershell
-node $cli bind-archive --project "C:\SqlAppsProjects\my-app" --archive "C:\Downloads\microsoft-sql-apps-0.2.5.tgz"
+node $cli bind-archive --project "C:\SqlAppsProjects\my-app" --archive "C:\Downloads\microsoft-sql-apps-0.1.0.tgz"
 ```
 
 For existing source-backed workflows, the foundation's
@@ -194,10 +197,10 @@ created after a failure. The foundation exposes project creation through
 `npm run projects -- create "<name>"`; generated projects use this package-based
 contract and are independent of the foundation checkout.
 
-For reviewed creation, run `node $cli projects create-plan "<name>"`, then
-`node $cli projects create "<name>" --approval <id>`. Add `--no-browser` to both
-commands when appropriate. The source-backed `npm run projects -- ...`
-equivalents remain supported. The dependency-free helper
-opens before application restore and keeps the public origin through app startup.
-See [progressive creation](progressive-creation.md) for separate setup approvals,
-version-2 topology, diagnostics and current-evidence Ready gates.
+For reviewed creation, run
+`node $cli projects create-plan "<name>" --archive "<absolute-tgz>"`, then
+`node $cli projects create "<name>" --archive "<absolute-tgz>" --approval <id>`.
+The contributor `npm run projects -- ...` equivalents use the same archive and
+approval contract. Creation starts no helper, service or browser.
+See [creation lifecycle](progressive-creation.md) for setup approvals, isolated
+ownership and current-evidence acceptance gates.

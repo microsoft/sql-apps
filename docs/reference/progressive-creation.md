@@ -1,213 +1,70 @@
-# Progressive application creation
+# Application creation and acceptance
 
-New guided projects open one loopback browser origin before dependency restore.
-The page reveals **Data -> Data access -> Application services -> Application**
-as working capabilities are verified. It becomes the application at that same
-origin; it does not redirect to a different server port.
+The initial v0.1 workflow is **scaffold -> restore -> review -> run -> verify**.
+Creation is a deterministic file/Git operation, not a second process lifecycle.
+It does not start a front door, reserve ports, open a browser or maintain a
+cross-session helper receipt. Old progressive-demo workspaces are not migrated.
 
-## Create with a reviewed plan
+## Create with a reviewed archive
 
-From any directory, using the [explicitly installed archive CLI](../guides/getting-started.md#2-select-the-cli-and-optional-assistant-guidance),
-without restoring the application's dependencies:
-
-```powershell
-node $cli projects create-plan "My App" --no-browser
-node $cli projects create "My App" --no-browser --approval <printed-id>
-```
-
-This archive bootstrap path is new in unreleased 0.2.5. It requires a current
-creation approval; creation is not an implicit install/build/startup approval.
-`--no-browser` is part of that approval: it suppresses browser opening, not the
-owned helper, readiness checks or session. Omit it from both commands for
-browser-first creation. Template content changes also invalidate approval.
-Each creation attempt validates and generates the app from one captured snapshot
-of its scaffold and tooling metadata. Updates during creation cannot change the
-approved files or exact tooling pin.
-
-The foundation's `npm run projects -- ...` wrapper and installed plugin launcher accept the same
-`projects` commands. Review the printed destination, new Git repository, port
-block, local helper, browser launch and nonsecret session files before approving.
-The helper starts before scaffold copying and survives the creating command.
-If automatic browser opening fails, open the printed loopback URL manually.
-Ports are checked, not reserved; a competing listener fails explicitly.
-
-Creation approval does **not** authorize dependency installation, SQL terms,
-schema publication, service recovery or cloud resources. The plan lists those
-known later effects together, but the existing [setup approval](setup.md) remains
-their authority. Surface new blockers or milestones, not repeated waiting messages.
-
-The foundation's original `projects create "My App"` remains a nonprogressive
-compatibility path; the packaged CLI does not allow unreviewed creation.
-Existing projects/workspaces keep their direct-start behavior.
-
-## What each check means
-
-| Milestone | Required evidence |
-| --- | --- |
-| Data | Successful configured least-privilege SQL acceptance/query, not container startup. |
-| Data access | Owned, current DAB/gateway identity and readiness backed by an authorized SQL procedure query. |
-| Application services | Authenticated configured readiness response with a row envelope, plus every declared endpoint contract. |
-| Application | Actual HTML document response and verified required data path. |
-| Ready | All current capabilities, primary browser journey evidence, and accepted desktop/narrow design evidence. |
-
-A build exit, process listener, liveness response or historical checkpoint never
-grants Ready. **Usable - review pending** means the application is available,
-not that browser or design acceptance passed. A compact local-only strip links
-back to checks. After acceptance the message becomes secondary; no status strip
-is added to the cloud app.
-
-Capabilities retain their own diagnostics. A failed sibling endpoint does not
-hide healthy verified endpoints: local preview offers a read-only **Inspect**
-link while other work continues. Inspector sessions are short-lived and revoked
-after the request. It never invokes MCP tools or retries mutations.
-
-The default contract verifies only the configured REST readiness procedure.
-Declare additional *required*, app-relevant surfaces in `creation-checks.json`:
-
-```json
-{
-  "version": 1,
-  "checks": [
-    { "kind": "rest", "path": "/api/ContactSummary" },
-    { "kind": "graphql", "path": "/graphql", "query": "query Contacts { contacts { items { id } } }" },
-    { "kind": "mcp", "path": "/mcp" },
-    { "kind": "openapi", "path": "/openapi" }
-  ]
-}
-```
-
-Use only configured gateway paths. REST checks are GETs requiring `value` arrays;
-GraphQL accepts named read-only queries and rejects mutation tokens; MCP sends
-only JSON-RPC `tools/list` and requires a JSON tools result; OpenAPI requires
-`openapi` and `paths`. Unsupported/stream-only responses fail visibly rather than
-being assumed healthy. At most 12 additional contracts are allowed. The file is
-included in source provenance; modifying it requires rebuilding and revalidation.
-Do not declare services the application does not use.
-
-In real Entra mode, sign in through the application and exercise its configured
-readiness path. A previous helper's authenticated observations cannot establish
-readiness after restart. The helper and gateway must use the same authentication
-mode/tenant/client; changing them requires an approved helper restart with the
-matching environment, not adoption of the mismatched service.
-To probe additional protected contracts, the helper can
-read `SQL_APPS_ACCEPTANCE_TOKEN` from its process environment; supply it through
-your secure terminal/session, never source, URL, chat or evidence. Tokens are
-not written to status snapshots. Without authenticated evidence the appropriate
-stage remains blocked; preview identities do not prove Entra authorization.
-
-## Status, retry and ownership
-
-Using the installed launcher (or `npx --no-install sql-apps` after restore):
+Using the verified archive CLI from [Get started](../guides/getting-started.md):
 
 ```powershell
-npx --no-install sql-apps creation status
-npx --no-install sql-apps creation check
-npx --no-install sql-apps creation start --approval <startApproval-from-status>
-npx --no-install sql-apps creation stop
+node $cli projects create-plan "My App" --archive $archive
+node $cli projects create "My App" --archive $archive --approval <printed-id>
 ```
 
-`status` observes without starting resources. `check` repeats bounded read-only
-capability probes; in preview mode it creates/revokes an in-memory preview
-identity, but performs no SQL mutations or resource recovery. Both expose
-diagnostics and historical/stale states if the owned helper is unavailable.
-`start` needs its current reviewed approval; `stop` verifies the responding
-session and PID before stopping only that front door. Neither stops SQL/DAB.
-Keep normal application `app`/`serve` processes attached and use their existing
-Ctrl+C/stop semantics. Restarting the helper never silently starts services.
+Both the packaged CLI and the contributor/plugin wrapper require the archive and
+current approval. Browser flags and unreviewed public creation are not supported.
+Existing destinations block planning as well as application.
 
-The helper verifies once at startup. Repeated deep source/evidence/capability
-checks run only with an active browser event subscriber; an idle helper does
-not keep hashing files or creating preview sessions. Status/page requests
-trigger a coalesced refresh when due, and explicit `check` still waits for a
-bounded check. Cached capabilities and surfaces become stale after two check
-intervals without a completed observation; reopening a page re-verifies them.
+Review the destination, Git initialization, archive SHA-256, copy destination,
+lockfile integrity and Docker build changes. The generated repository retains
+the archive, so later restores do not depend on the original download.
+Scaffold, tooling and archive changes invalidate approval. Creation never grants
+dependency installation, SQL terms, schema publication or cloud permission.
 
-Version-2 workspace descriptors mark `topology: "front-door"`: public
-`ports.gateway` stays base+0, DAB base+1, `ports.internalGateway` base+2, SQL
-base+5. The private gateway requires the public Host/Origin. Only the fixed owned
-loopback upstream is proxied; caller forwarding headers are removed.
+## One lifecycle owner
 
-The project stores `.sql-apps/creation-session.json`, pointing to the canonical
-user `.sql-apps/creation-sessions/<session-id>` directory. Bounded snapshots and
-process receipts use restricted files and serialized atomic updates. This
-filesystem control channel is not a browser write API. Source, tooling, selected
-SQL target or authentication changes invalidate prior acceptance. Missing or
-changed evidence artifacts also invalidate acceptance. Disconnect/reconnect
-never turns persisted green checks into current health.
+From the app, run `setup plan`; approve its displayed effects using
+`setup run --approval <id>`. Before restore use the selected archive CLI.
+Bootstrap grants restore only and stops afterward; review a fresh plan through
+the app's exact installed package before build or startup.
 
-## Import actual browser and design evidence
+Setup selects one isolated version-1 workspace and verifies ownership before
+reuse. A listening port or remembered PID never proves ownership. Unknown
+processes block startup and are never stopped automatically.
+See [setup](setup.md) and [local development](local-development.md).
 
-First verify one primary interaction in the browser: save, open a fresh browser
-document and observe refetched persisted state, then observe a rejected save
-with visible error feedback. Do this before expanding to other workflows.
-Complete the independent [render-critique-improve review](design-acceptance.md).
+## Assistant progress and previews
 
-Retain artifacts inside the project and write an evidence JSON file, for example
-`docs/evidence/creation.json`:
+Keep milestones and blockers in chat using read-only `setup status` and
+`setup plan` observations. There is no public `creation` command.
+Prefer available, authorized in-app browser/preview tools for real interaction
+at the verified application origin. Reuse only the matching session.
+A tool controlling an external window is not necessarily an embedded preview.
 
-```json
-{
-  "version": 1,
-  "build": "<current creation status build fingerprint>",
-  "origin": "http://127.0.0.1:30000",
-  "observedAt": "2026-01-01T12:00:00.000Z",
-  "workflow": {
-    "primaryAction": "Save customer contact",
-    "save": { "persisted": true, "artifact": "docs/evidence/save.txt" },
-    "reload": { "freshDocument": true, "persisted": true, "artifact": "docs/evidence/reload.txt" },
-    "failedSave": { "visibleFeedback": true, "artifact": "docs/evidence/failed-save.txt" }
-  },
-  "design": {
-    "desktop": { "width": 1280, "height": 800, "artifact": "docs/evidence/desktop.png" },
-    "narrow": { "width": 390, "height": 844, "artifact": "docs/evidence/narrow.png" }
-  }
-}
-```
+If a tool is missing, denied or cannot reach localhost, name the unobserved
+workflow/design evidence and continue other authorized work. Do not silently
+open an external browser, install tools, forward ports or expose services.
+External browser opening requires its own explicit user request.
 
-PNG dimensions must match actual CSS viewport dimensions (capture at CSS scale),
-with desktop width at least 1024 and narrow width at most 768.
-`docs/design-review.md` must record the exact current origin and source fingerprint
-under Review target, complete unblocked matrix coverage, critique and accepted
-quality verdict. Coverage alone is not acceptance. Artifacts must be nonempty,
-project-contained regular files without symlinks, at most 10 MiB each.
+## Acceptance is not readiness
 
-```powershell
-npx --no-install sql-apps creation accept "C:\path\to\My App\docs\evidence\creation.json"
-npx --no-install sql-apps creation check
-```
+- SQL data requires an actual configured least-privilege query/save/reload.
+- Data access requires authorized procedure execution, not DAB liveness.
+- Browser acceptance requires the primary user journey and visible error handling.
+- Design acceptance requires rendered desktop and narrow review.
 
-The importer validates and hashes retained evidence; it does not manufacture
-observations or prove that a human's report is truthful. Synthetic fixtures test
-the evidence protocol, not SQL persistence or a generated application's quality.
-Missing browser tools, blocked design, missing artifacts or a stale build leave
-acceptance incomplete. Final Ready still requires live capabilities.
+Build success, a process listener, an HTTP health response or historical notes
+do not establish these results. Follow [design acceptance](design-acceptance.md)
+and the validation skill's four-verdict report. No helper status or additional
+`creation accept` approval is needed.
 
-## Release prerequisite
+## Release prerequisites
 
-Independent projects pin an exact `@microsoft/sql-apps` version. The supported
-archive release includes a versioned tarball and checksum. Verification installs
-that archive in isolated bootstrap tooling with scripts disabled, creates via its
-own CLI/scaffold, reviews binding and setup, restores the exact app-local pin,
-then removes fixture-owned bootstrap/original app inputs and restores a copy of
-tracked app inputs with another empty cache. Transient `.sql-apps` receipts are
-not copied. This is installation/handoff evidence, not SQL/browser acceptance.
-Users explicitly
-[review and bind the archive](projects.md#install-from-a-release-archive) before
-restore; no npm publishing permission is required.
-
-For registry distribution, verify a clean install from the intended feed.
-An E404 blocks that route. Neither a local build nor archive acceptance proves
-npm publication. Never silently switch registries, versions or installation
-sources to report success.
-
-The generated lockfile includes the pinned package entry and promotes its
-runtime dependencies from the foundation's dev-only tree. A real `npm ci`
-regression uses a bounded loopback registry and an empty package cache to prove
-fresh-install and production dependency behavior independently of public-feed
-availability. That test is not evidence that the package has been published.
-
-Maintainers should use the explicit
-[runtime packaging workflow and source-specific verification](../../CONTRIBUTING.md#releasing-the-runtime-package).
-It produces a checked archive without npm credentials. A successful GitHub
-merge alone does not unblock restoration; distribute and explicitly bind the
-release archive, or publish and verify the optional registry route.
+This checkout prepares an unpublished 0.1.0 candidate. A source merge or plugin
+installation does not publish the runtime. Run the packaging, integrity and
+independent empty-cache archive-restore checks in
+[Contributing](../../CONTRIBUTING.md#releasing-the-runtime-package).
+Do not reuse an older demo archive or overwrite a released asset.
