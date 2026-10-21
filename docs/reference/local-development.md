@@ -12,7 +12,7 @@ browser/design gates for Ready. Existing direct-start workspaces are unchanged.
 
 SQL Apps runs one profile locally and in the cloud: [role-based-data](role-based-data.md). `app` starts SQL, publishes the schema, starts Data API builder (DAB) and serves the browser gateway, then checks the configured authorized readiness procedure before listening. `serve` resumes the gateway against running SQL/DAB. Both read `role-based-data.json` and the authorized stored-procedure entities in `dab/dab-config.json`. Saved brief capabilities do not turn services on or off; the brief's capabilities are always `["data"]`.
 
-SQL Apps does not run file storage, queues, background workers or tracing. Add those with the maintained Azure skills (for example `azure-storage`, `azure-prepare` and `azure-deploy`), outside SQL Apps.
+SQL Apps does not run file storage, queues, background workers or tracing. Add those outside SQL Apps through the [Azure Skills workflow routing](plugins.md#azure-workflow-routing); a local-only app does not need Azure plugins or cloud login.
 
 Implement domain UI/schema/procedures, configure authorized DAB permissions and verify the real SQL procedure/browser save-reload flow. The selected reference path below is anonymous synthetic-only, not a substitute for your app. Cloud publishing uses the separate [personal-free path](personal-free-deployment.md).
 

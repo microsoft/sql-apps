@@ -18,8 +18,12 @@ no DAB or database.
 Use the [App Service-first, free-first reference](../reference/free-first.md) to
 infer reasonable proposed defaults and show one review card. Ask only about
 material ambiguity, requirements and consent, not every infrastructure flag.
-Maintained Azure preparation, validation and deployment skills own this
-app-specific infrastructure; it is not a bundled SQL Apps deployment.
+The official [Azure Skills plugin and workflow routing](../reference/plugins.md#azure-workflow-routing)
+own this app-specific infrastructure; it is not a bundled SQL Apps deployment.
+Use `azure-app-onboard-prereq` for a readiness-only request, `azure-app-onboard`
+for requested non-azd onboarding, and the preparation/validation/deployment
+sequence only when azd is requested or the project already has `azure.yaml`.
+Assessment alone does not authorize provisioning or publication.
 
 ACA can remain inside free allowances for light use, but its subscription-wide
 grants are not a spending cap: overage and supporting resources can bill.

@@ -21,7 +21,7 @@ Read the saved brief with `guide`; the requested change is the useful slice. Ask
 
 Consult `docs/guides/build-your-app.md` for unresolved scope; apply `docs/maintainers/application-boundary.md` before edits.
 
-Keep `application.json` named for the app with `selectedExamples: []`. Use only `role-based-data`, capabilities `["data"]`. No copied examples, alternate runtime or unrequested capabilities. File storage/jobs belong outside SQL Apps, using maintained Azure skills.
+Keep `application.json` named for the app with `selectedExamples: []`. Use only `role-based-data`, capabilities `["data"]`. No copied examples, alternate runtime or unrequested capabilities. File storage/jobs remain outside SQL Apps; route Azure additions through `docs/reference/plugins.md#azure-workflow-routing`.
 
 Before implementing a new user-facing app or meaningful UI change, use `sql-apps-design`. Keep database/access decisions separate from visuals. A basic shell is an implementation milestone, not final design acceptance: small scope, not unfinished visual quality.
 

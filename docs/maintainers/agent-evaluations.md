@@ -42,6 +42,10 @@ Use the existing detailed scenarios below, plus these boundary cases:
 | Domain change or meaningful UI change | Application/design hand off to scoped validation and four independent verdicts | Equating source/build checks with rendered, browser, SQL or design acceptance |
 | Cloud assessment without deployment approval | Cloud-preview explains fit, constraints and missing capabilities | Provisioning, publishing, accepting terms, or installing companion plugins |
 | Unavailable cloud companion | Name the missing specialist and preserve the evidence handoff | Automatic plugin installation or an invented substitute workflow |
+| Code readiness only, without deployment approval | Cloud-preview routes to Azure Skills `azure-app-onboard-prereq` and reports readiness evidence | Starting onboarding/provisioning or treating assessment as publication approval |
+| Deploy the existing app without choosing azd | Cloud-preview hands the app/access/free-first contract to `azure-app-onboard` | Forcing azd, replacing the app, or bypassing cost/access approval |
+| Explicit azd deployment or existing `azure.yaml` | `azure-prepare` -> `azure-validate` -> `azure-deploy`, retaining approved plan and validation prerequisites | Deploying with missing/stale validation or adding another publisher |
+| Add Azure storage, messaging, AI or telemetry while building | Application skill routes the requested Azure boundary through the companion routing table, outside the SQL Apps runtime | Requiring cloud for unrelated local work or silently adding capabilities/costs |
 
 For each actual run, retain the prompt, harness/model/version, fixture identity,
 skills used, relevant commands/results, forbidden-action checks and final verdict.

@@ -18,7 +18,8 @@ choice, then implement your own screens, data and workflows.
   separate from the SQL Apps tooling.
 - **A guided workflow:** provider-neutral guides and an optional
   [assistant plugin](docs/reference/plugins.md) with packaging for Claude Code,
-  GitHub Copilot, Codex, Cursor and Gemini CLI.
+  GitHub Copilot, Codex, Cursor and Gemini CLI, plus
+  [Azure Skills integration](#optional-azure-deployment-plugins) for Azure work.
 - **Free-tier-first planning:** explore hosting for POCs and quick ideas with
   eligibility, quotas and cost trade-offs reviewed before deployment.
 
@@ -138,9 +139,13 @@ selection, updates and troubleshooting.
 
 ## Optional Azure deployment plugins
 
-SQL Apps guides the application workflow; maintained Azure plugins own cloud
-infrastructure preparation, validation, deployment and diagnostics. Install the
-companions when you choose to share or assess the app in Azure, not as
+SQL Apps guides the application workflow; the official
+[Azure Skills plugin](https://github.com/microsoft/azure-skills#azure-skills-plugin)
+owns Azure onboarding, infrastructure preparation, validation, deployment and
+diagnostics. Use it for requested Azure capabilities during development too,
+such as storage, messaging, AI and telemetry, without adding them to the SQL Apps
+runtime. The [workflow routing table](docs/reference/plugins.md#azure-workflow-routing)
+defines the handoffs. These are companion plugins, not bundled dependencies or
 prerequisites for local-only development:
 
 | Plugin | Role |
@@ -148,6 +153,11 @@ prerequisites for local-only development:
 | `microsoft-sql@microsoft-sql` | Azure SQL provisioning, identity, schema, Data API Builder and database diagnostics |
 | `azure@azure-skills` | Azure onboarding, preparation, validation, deployment and production diagnostics |
 | `azure-cost@azure-skills` | Account-aware estimates, cost analysis, optimization and governance |
+
+For **VS Code**, follow the upstream
+[Azure MCP extension setup](https://github.com/microsoft/azure-skills#vs-code),
+which supplies the Azure skills companion and MCP integration. Host installation
+and skill availability are separate from installing the SQL Apps plugin.
 
 In GitHub Copilot CLI or the Copilot App, run:
 

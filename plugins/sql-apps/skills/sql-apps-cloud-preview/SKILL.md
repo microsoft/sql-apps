@@ -6,19 +6,28 @@ description: "Use when a user wants to publish, share, deploy, price, or assess 
 # Publish SQL Apps
 
 Sharing is optional: **App Service first**, **Container Apps second**, **SWA last**
-as a qualifying free fallback. Omit unnecessary DAB/SQL. Follow
-`docs/reference/free-first.md` for defaults, approvals and acceptance.
+only for a complete-free-setup fallback. Follow `docs/reference/free-first.md`.
 
-Resolve `../../scripts/sql-apps.mjs` relative to this skill, not cwd. Quote its
-absolute path; `home` selects the project containing input `docs/...`.
-Run `workspace-check` before changes. Missing reference/specialist: name the
-blocker; never invent guidance or install companions automatically.
+Resolve/quote `../../scripts/sql-apps.mjs` from this skill, not cwd. `home`
+selects the app containing input `docs/...`. Run `workspace-check` before edits.
+Missing reference/specialist: name the blocker; never invent guidance or auto-install.
+
+## Azure Skills handoff
+
+`azure@azure-skills` from `microsoft/azure-skills` owns Azure infrastructure.
+Follow `docs/reference/plugins.md#azure-workflow-routing`:
+
+- Readiness-only: `azure-app-onboard-prereq`; no deployment.
+- Requested non-azd onboarding: `azure-app-onboard`, preserving the existing app.
+- Explicit azd or existing `azure.yaml`: `azure-prepare` -> `azure-validate` ->
+  `azure-deploy`; require their approved plan and successful validation.
+
+Assessment/pricing never authorizes deployment.
 
 ## App Service-first planning
 
-Infer settings from validated context/brief; present one recommendation/review
-card. Ask only about ambiguity, requirements or consent, not infrastructure flags.
-Preserve deployments/access rules.
+Infer from validated context/brief; show one review card. Ask only about
+consequential ambiguity/consent, never infrastructure flags. Preserve deployments/access.
 
 Verify App Service Free (`F1`) runtime, OS, region, quotas and auth. Disclose
 development/testing limits, quota stops and no SLA; never silently upgrade.
@@ -36,8 +45,7 @@ ACA costs $0; assess compatible App Service Free, local use or a qualifying fall
 Preferences are not spending consent. Guaranteed $0/continuous availability or
 policy can block cloud.
 
-Hand infrastructure to `azure-prepare` -> `azure-validate` -> `azure-deploy`,
-never another publisher. Review all resources before writes; obtain separate
+Review all resources before writes; obtain separate
 explicit approval for provisioning/cost risk, identity/firewall changes,
 publication and optional interruption. Re-plan changed inputs/paid additions;
 obtain fresh acceptance.
@@ -74,9 +82,8 @@ provider plus immutable user ID, never email. The guard excludes other resources
 
 ## Evidence
 
-For foundation publisher changes, run regressions; routine publishing need not.
-Disclose unverified implementation or live canary checks.
-Use `sql-apps-validation`'s four-verdict report. Report live Azure validation and
-cost safeguards: configured, exercised, partial or blocked.
+Run regressions for foundation publisher changes. Use `sql-apps-validation`'s
+four-verdict report; disclose unverified implementation/canaries. Report live
+validation and cost safeguards: configured, exercised, partial or blocked.
 Estimates/settings/builds/loaders never prove guaranteed free, private networking
 or live certification.

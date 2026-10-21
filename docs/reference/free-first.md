@@ -129,8 +129,12 @@ Show one recommendation and a review card before writes:
 | Undo | Cleanup scope, persistent data retained, export/backup option, shutdown behavior and manual recovery. Deletion needs its own approval. |
 | Revision | Source hash or artifact fingerprint plus resource/configuration inputs. Re-plan and reapprove changed regions, resources, images/source, permissions or cost posture. |
 
-Use `azure-prepare` -> `azure-validate` -> `azure-deploy` for app-specific
-infrastructure, with maintained SQL identity and Azure cost guidance as needed.
+Use the official Azure Skills plugin's
+[workflow routing](plugins.md#azure-workflow-routing) for app-specific infrastructure:
+`azure-app-onboard-prereq` for readiness-only assessment, `azure-app-onboard` for
+requested non-azd onboarding, or `azure-prepare` -> `azure-validate` ->
+`azure-deploy` when azd is explicitly requested or `azure.yaml` already exists.
+Use maintained SQL identity and Azure cost guidance as needed.
 Pass the app/access contract, inventory, approved defaults, free constraints,
 unknowns and acceptance criteria intact. A paid addition requires an approved
 delta, not a fresh generic architecture that discards these constraints.

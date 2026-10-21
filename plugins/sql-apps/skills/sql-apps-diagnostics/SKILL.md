@@ -23,6 +23,6 @@ Load specialists only for evidenced boundaries; report unavailable companions, n
 
 - Slow SQL: `diagnose-slow-query`; plans: `read-execution-plan`; blocking: `diagnose-blocking-and-deadlocks`; resource/governance pressure: `diagnose-resource-pressure`.
 - Publishing/cost guards: `sql-apps-cloud-preview`.
-- Azure incidents: `azure-diagnostics`; platform costs: `azure-cost-optimization`.
+- Azure incidents/telemetry: `azure-diagnostics` or `appinsights-instrumentation`; costs: the `azure-cost` plugin.
 - Cloud SQL connections: `diagnose-connection-errors`; local preview: `azuresql-db-faq`.
 - DAB exposure/configuration: `dab-rest-and-graphql` or `azuresql-db-dab`, matching target.

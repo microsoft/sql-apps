@@ -242,7 +242,15 @@ test('actual guide and plugin CLIs save/resume before build and reject invalid r
   });
   let result = invoke([script, '--json']);
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(JSON.parse(result.stdout).nextStage, 'describe');
+  const initial = JSON.parse(result.stdout);
+  assert.equal(initial.nextStage, 'describe');
+  assert.match(initial.cloud.note, /Azure Skills plugin \(azure@azure-skills\)/);
+  assert.equal(initial.cloud.authorized, false);
+  result = invoke([script]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Azure Skills plugin \(azure@azure-skills\)/);
+  assert.equal((await readdir(home)).includes('.sql-apps'), false,
+    'identifying the cloud companion must not install it or create local state');
   const input = join(home, 'equipment brief.json');
   await writeFile(input, JSON.stringify(brief()));
   result = invoke([script, '--save', input, '--json']);

@@ -1,6 +1,6 @@
 # Role-based data-only applications
 
-`role-based-data` is the only SQL Apps profile, locally and in the cloud. Use it for an implemented domain application that needs SQL/DAB/browser access restricted to users assigned the required role. File storage and background jobs are outside SQL Apps; add them with maintained Azure skills such as `azure-storage`, `azure-prepare` and `azure-deploy`. It is a runtime/deployment path, not an application generator. Keep the original foundation checkout and unrelated databases unchanged; use the intended application checkout.
+`role-based-data` is the only SQL Apps profile, locally and in the cloud. Use it for an implemented domain application that needs SQL/DAB/browser access restricted to users assigned the required role. File storage and background jobs are outside SQL Apps; add them through the [Azure Skills workflow routing](plugins.md#azure-workflow-routing). It is a runtime/deployment path, not an application generator. Keep the original foundation checkout and unrelated databases unchanged; use the intended application checkout.
 
 > **Cloud publishing:** [Assess App Service, then Container Apps, then SWA](free-first.md), with maintained Azure skills owning infrastructure. Required DAB stays on ACA with SQL managed identity, so do not force it onto App Service. The [personal-free publisher](personal-free-deployment.md) remains for existing deployments and qualifying complete-free-setup SWA fallbacks. This reference describes the local DAB data contract; it is not a second cloud deployment profile.
 

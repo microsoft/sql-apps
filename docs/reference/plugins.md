@@ -136,6 +136,35 @@ For Claude, select the `@anthropic-ai` / `claude-code` package and
 `$manifest.bin.claude` instead. CI resolves these entrypoints from the pinned
 packages on both operating systems rather than relying on npm shims.
 
+If PATH contains different CLI versions, keep the strict version gates and
+install the pinned tools in a separate directory instead of upgrading or
+downgrading your everyday CLIs. On Windows, explicitly provision and run them
+from the foundation checkout:
+
+```powershell
+$loaderTools = Join-Path $env:LOCALAPPDATA 'sql-apps\plugin-loader-clis'
+npm install --prefix "$loaderTools" --no-save --package-lock=false --no-audit --no-fund @anthropic-ai/claude-code@2.1.296 @github/copilot@1.0.98
+if ($LASTEXITCODE -ne 0) { throw 'Pinned loader CLI installation failed.' }
+
+$packages = @{
+  claude = '@anthropic-ai\claude-code'
+  copilot = '@github\copilot'
+}
+foreach ($loader in @('claude', 'copilot')) {
+  $packagePath = Join-Path $loaderTools "node_modules\$($packages[$loader])"
+  $manifest = Get-Content -Raw (Join-Path $packagePath 'package.json') | ConvertFrom-Json
+  $entrypoint = (Resolve-Path -LiteralPath (Join-Path $packagePath $manifest.bin.$loader)).Path
+  npm run "plugin:check:$loader" -- "$entrypoint"
+  if ($LASTEXITCODE -ne 0) { throw "$loader native loader check failed." }
+}
+```
+
+The tools persist at that dedicated location for subsequent runs; rerun just the
+loop to verify again. This does not change PATH or global installations.
+Without an explicit entrypoint, the checks still use PATH and intentionally
+reject mismatched versions. Keep these pins aligned with `loaderVersions` in
+[check-plugin-loaders.mjs](../../scripts/check-plugin-loaders.mjs).
+
 They use disposable profiles and copied bundles, remove their fixtures, and make
 no model calls. They do not upgrade tools, use the real profile's credentials,
 create a runtime binding, or start services. Their stdout records source,
@@ -210,12 +239,17 @@ Only [plugins/sql-apps](../../plugins/sql-apps) is the installed package: manife
 
 ## Install companion plugins for cloud work
 
-The SQL Apps plugin is enough for local setup, application work and validation. It does not install or update other plugins. Before planning or operating a cloud deployment, install the maintained plugins that own the workflows referenced by SQL Apps:
+The SQL Apps plugin is enough for local setup, application work and validation.
+It does not install or update other plugins. The official
+[Azure Skills plugin](https://github.com/microsoft/azure-skills#azure-skills-plugin)
+owns Azure workflows; SQL Apps routes to it rather than copying its skills or
+implementing another general-purpose deployer. Install the relevant companions
+for requested Azure capabilities or cloud work:
 
 | Plugin | Why SQL Apps uses it |
 | --- | --- |
 | `microsoft-sql@microsoft-sql` | Azure SQL provisioning, identity, schema, Data API builder, connection and database diagnostics skills such as `build-app-on-azure-sql`, `entra-id-auth` and `dab-rest-and-graphql`. |
-| `azure@azure-skills` | Azure onboarding, preparation, validation, deployment and production diagnostics. |
+| `azure@azure-skills` | Azure onboarding, preparation, validation, deployment, storage, messaging, AI, telemetry and production diagnostics. |
 | `azure-cost@azure-skills` | Account-aware estimates, actual cost analysis, optimization and governance. |
 
 Run these slash commands in GitHub Copilot CLI or the Copilot App:
@@ -231,6 +265,52 @@ Run these slash commands in GitHub Copilot CLI or the Copilot App:
 Marketplace registration is safe to repeat when it already points to the same source. Restart the App or begin a fresh session after installation, then use `/plugin list` to verify that all four plugins, including `sql-apps@sql-apps-skills`, are enabled. See the current [Azure plugin catalog](https://learn.microsoft.com/azure/developer/azure-skills/plugins/) because specialized Azure plugins can change independently.
 
 These companion plugins are not prerequisites for local-only development. Install them when you choose to share, estimate, deploy or diagnose the app in Azure.
+
+For VS Code, upstream recommends installing the
+[Azure MCP extension](https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-azure-mcp-server),
+which also installs the Azure skills companion extension and configures MCP.
+For Claude Code, Codex, Cursor or Gemini CLI, follow the
+[host-specific Azure Skills instructions](https://github.com/microsoft/azure-skills#install-in-60-seconds);
+do not assume Copilot's installation commands work in every host.
+Installation of a plugin, extension or MCP server alone is not evidence that a
+particular skill is available in the current session. Verify its discovery
+after restarting; do not claim an unavailable handoff completed.
+
+## Azure workflow routing
+
+SQL Apps owns the local-first application, design, access contract and acceptance
+checks. Load Azure companions only for the requested Azure boundary, including
+capabilities added while building an app. Preserve the existing project, SQL/DAB
+contracts and [free-first constraints](free-first.md); do not let onboarding
+replace the application or silently introduce cloud requirements.
+
+| Requested work | Maintained skill or plugin |
+| --- | --- |
+| Assess code readiness only, without infrastructure work or deployment | `azure-app-onboard-prereq` from `azure@azure-skills` |
+| Plan and onboard an existing SQL Apps app to Azure without choosing azd | `azure-app-onboard` from `azure@azure-skills`; use its reviewed plan, cost and pre-deploy approval workflow |
+| Prepare an explicitly requested azd deployment, or a project with `azure.yaml` | `azure-prepare` -> `azure-validate` -> `azure-deploy` from `azure@azure-skills`; retain their required approved plan and successful validation before execution |
+| Resume an already prepared azd deployment | `azure-deploy` only after its plan and validation prerequisites pass; re-plan changed inputs |
+| Add uploads or object/file storage outside the SQL Apps runtime | `azure-storage` from `azure@azure-skills` |
+| Add messaging or event-driven work outside the SQL Apps runtime | Discover the applicable current Azure skill with `discover-azure-skills`; `azure-messaging` diagnoses Event Hubs/Service Bus SDK issues, while the selected onboarding workflow owns new infrastructure |
+| Add AI search, speech or document processing | `azure-ai` from `azure@azure-skills`; use `microsoft-foundry` for Foundry model/agent workflows |
+| Add application telemetry or diagnose a deployed app | `appinsights-instrumentation` or `azure-diagnostics` from `azure@azure-skills` |
+| Inspect subscriptions/resources or verify capacity before provisioning | `azure-resource-lookup` and `azure-quotas` from `azure@azure-skills` |
+| Estimate, analyze or govern Azure costs | `azure-cost@azure-skills`; discover its current estimation, analysis, optimization or governance skill |
+| Provision SQL, configure Entra/managed identity, schema or DAB | `microsoft-sql@microsoft-sql`; keep runtime permissions least-privilege and preserve application access rules |
+
+For other Azure boundaries, use `discover-azure-skills` rather than inventing a
+workflow or copying a service cookbook. Skill names and availability can change;
+read the selected skill's current scope and prerequisites before executing it.
+`azure-prepare` is not a universal starting point for non-azd apps.
+
+Assessment or pricing requests are read-only scope, not approval to run an
+end-to-end deployment pipeline. Confirm the current plan, exact target,
+resource inventory, costs and access changes before writes. Missing skills
+are explicit blockers: name the skill and companion, preserve the evidence
+handoff and provide the host's installation instructions. Never auto-install,
+silently substitute another publisher or infer spending permission from plugin
+availability. The existing `personal-free` publisher remains a separately
+approved qualifying fallback, not a replacement for Azure Skills.
 
 ## Use the GitHub Copilot App
 

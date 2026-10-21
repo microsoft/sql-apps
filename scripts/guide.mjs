@@ -151,7 +151,7 @@ export async function readGuide(home) {
       origin: runtime.mode === 'unselected' ? null : runtime.origins.app },
     localServices: ['SQL', 'Data API', 'Browser/API'],
     cloud: { authorized: false, optional: true,
-      note: 'Assess App Service Free first, Container Apps second and SWA last, with maintained Azure skills owning infrastructure. Keep required DAB on ACA with SQL managed identity. The existing personal-free publisher is a fallback only when the complete required setup fits Free; it does not host DAB or provide SQL managed identity. See docs/reference/free-first.md.' },
+      note: 'Assess App Service Free first, Container Apps second and SWA last, with the Azure Skills plugin (azure@azure-skills) owning infrastructure. See docs/reference/plugins.md#azure-workflow-routing for onboarding, readiness and deployment handoffs. Keep required DAB on ACA with SQL managed identity. The existing personal-free publisher is a fallback only when the complete required setup fits Free; it does not host DAB or provide SQL managed identity. See docs/reference/free-first.md.' },
     cost: {
       preference: state?.brief.costPreference ?? 'zero-azure-spend',
       phase: nextStage === 'share-optionally' ? 'deployment-cost-review' :

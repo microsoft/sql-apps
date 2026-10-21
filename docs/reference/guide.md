@@ -36,7 +36,7 @@ Example input:
 }
 ```
 
-Required text fields are nonblank, at most 500 characters, without control characters. `records` and `actions` contain 1-12 unique nonblank strings. `capabilities` must be exactly `["data"]`. File storage or background jobs are outside SQL Apps; add them with the maintained Azure skills (for example `azure-storage`, `azure-prepare` and `azure-deploy`).
+Required text fields are nonblank, at most 500 characters, without control characters. `records` and `actions` contain 1-12 unique nonblank strings. `capabilities` must be exactly `["data"]`. File storage or background jobs are outside SQL Apps; use the [Azure Skills workflow routing](plugins.md#azure-workflow-routing) for these additions.
 
 The brief is a scope decision, not a switch that composes services. Apps use the [role-based-data profile](role-based-data.md): `app` starts SQL, Data API builder and the browser gateway, and `serve` resumes the gateway. The selected Todo reference has a separate synthetic-only startup. See [Run locally](../guides/run-locally.md).
 
@@ -55,7 +55,7 @@ Never silently change saved preferences, drop required managed identity, or
 convert historical evidence into spending approval. Missing preference still
 means `zero-azure-spend`.
 
-The report's `profile` is `role-based-data` when `role-based-data.json` exists in the checkout, otherwise `null`. `suggestedProfile` is always `role-based-data`, the only profile. Cloud cost review routes to the Azure Cost plugin. The suggestion is advice, not configuration: it still needs `role-based-data.json`, which `setup plan` reports.
+The report's `profile` is `role-based-data` when `role-based-data.json` exists in the checkout, otherwise `null`. `suggestedProfile` is always `role-based-data`, the only profile. Its cloud note identifies the Azure Skills companion plugin and links to readiness, onboarding and deployment routing; it does not install or verify that companion. Cloud cost review routes to the Azure Cost plugin. The suggestion is advice, not configuration: it still needs `role-based-data.json`, which `setup plan` reports.
 
 ## Record historical evidence
 
