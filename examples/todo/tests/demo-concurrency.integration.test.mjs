@@ -27,12 +27,13 @@ before(async () => {
     .withExposedPorts(1433)
     .withPlatform('linux/amd64')
     .withWaitStrategy(Wait.forSuccessfulCommand(
-      `/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '${password}' -C -b -l 2 -d master -Q "IF DB_ID('appdb') IS NULL CREATE DATABASE appdb; SELECT 1;"`,
+      `/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '${password}' -C -b -l 2 -d master -Q "IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = N'appdb') CREATE DATABASE appdb;" && ` +
+      `/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '${password}' -C -b -l 2 -d appdb -Q "SELECT 1;"`,
     ))
     .withStartupTimeout(120_000)
     .start();
   assert.ok(container.getMappedPort(1433) > 0);
-  await query('master', "IF DB_ID('appdb') IS NULL CREATE DATABASE appdb;");
+  await query('master', "IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = N'appdb') CREATE DATABASE appdb;");
   assert.equal(await query('appdb', "SET NOCOUNT ON; SELECT CAST(SERVERPROPERTY('EngineEdition') AS int);"), '5');
   for (const file of ['schema.sql', 'procedures.sql', 'post-deploy.sql']) {
     const batches = (await readFile(new URL(`../demo/${file}`, import.meta.url), 'utf8'))

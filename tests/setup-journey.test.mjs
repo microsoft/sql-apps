@@ -79,6 +79,12 @@ test('setup run records its reviewed bundle and executes the approved proposed w
   let launched = false;
   const report = await setup.runSetup(home, { ...options, approval: plan.approval.approval }, {
     ...probes, progress: () => {},
+    execute: async (command, args, cwd) => {
+      assert.equal(command, process.execPath);
+      assert.equal(cwd, home);
+      assert.equal(args[1], 'workspace-init');
+      await initializeWorkspace(home, Number(args[2]), async () => 'free');
+    },
     launch: async () => { launched = true; return { completion: Promise.resolve(), stop: async () => {} }; },
     fetch: async url => {
       if (!launched) throw new Error('not launched');

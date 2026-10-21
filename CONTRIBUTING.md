@@ -61,6 +61,17 @@ Its local runtime identity is a least-privilege login mapped to a database user;
 the container does not support the cloud publisher's contained SQL user.
 Do not report mocked tests as equivalent to this real-engine check.
 
+CI pulls the current preview image on a fresh runner. To reproduce against that
+image locally rather than an older cached `latest`, refresh it before testing:
+
+```powershell
+docker pull sqldbpreview-dpgaeqhmgphzd4bk.azurecr.io/azure-sql/db-dev:latest
+npm run test:sql-integration
+```
+
+Database existence checks use `sys.databases`; current preview images can return
+`NULL` for another database's `DB_ID` even from a `master` connection.
+
 The manually dispatched [real SQL workflow](.github/workflows/sql-integration.yml)
 runs these tests on `main` and is also a required predecessor of runtime
 packaging, at the same commit. Maintainers must create the `sql-integration`

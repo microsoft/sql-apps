@@ -295,7 +295,7 @@ export async function initLocal(container: string, run: Run, authorized: RoleBas
     catch (error) {
       if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error;
       const existing = await adminQuery(container,
-        `SET NOCOUNT ON; SELECT CASE WHEN DB_ID(N'${database}') IS NOT NULL OR SUSER_ID(N'${login}') IS NOT NULL THEN 1 ELSE 0 END;`, run);
+        `SET NOCOUNT ON; SELECT CASE WHEN EXISTS (SELECT 1 FROM sys.databases WHERE name = N'${database}') OR SUSER_ID(N'${login}') IS NOT NULL THEN 1 ELSE 0 END;`, run);
       if (existing.trim() !== '0') {
         throw new Error('Cannot verify new SQL objects: objects may exist without recorded credentials; restore the credential receipt instead of resetting data or passwords');
       }
@@ -303,7 +303,7 @@ export async function initLocal(container: string, run: Run, authorized: RoleBas
       await saveJson(stateFile, state);
     }
     await adminQuery(container, `
-IF DB_ID(N'${database}') IS NULL CREATE DATABASE [${database}];
+IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = N'${database}') CREATE DATABASE [${database}];
 IF SUSER_ID(N'${login}') IS NULL CREATE LOGIN [${login}] WITH PASSWORD = N'${state.password}';
 `, run, [state.password]);
     await publishLocalSchema(container, {

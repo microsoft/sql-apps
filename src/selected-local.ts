@@ -115,14 +115,14 @@ async function initializeDatabase(runtime: WorkspaceRuntime, manifest: Applicati
     catch (error) {
       if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error;
       const existing = await localAdminQuery(runtime.sqlContainer, 'master',
-        `SET NOCOUNT ON; SELECT CASE WHEN DB_ID(N'${target.database}') IS NOT NULL OR SUSER_ID(N'${target.login}') IS NOT NULL THEN 1 ELSE 0 END;`, runner);
+        `SET NOCOUNT ON; SELECT CASE WHEN EXISTS (SELECT 1 FROM sys.databases WHERE name = N'${target.database}') OR SUSER_ID(N'${target.login}') IS NOT NULL THEN 1 ELSE 0 END;`, runner);
       if (existing.trim() !== '0') throw new Error('Selected SQL objects exist without recorded credentials; review binding instead of resetting data or passwords');
       state = { version: 1, workspace: runtime.id, name: manifest.name, container: runtime.sqlContainer,
         database: target.database, login: target.login, password: `SqlApps1!${randomBytes(32).toString('hex')}` };
       await saveJson(target.stateFile, state);
     }
     await localAdminQuery(runtime.sqlContainer, 'master', `
-IF DB_ID(N'${target.database}') IS NULL CREATE DATABASE [${target.database}];
+IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = N'${target.database}') CREATE DATABASE [${target.database}];
 IF SUSER_ID(N'${target.login}') IS NULL CREATE LOGIN [${target.login}] WITH PASSWORD=N'${state.password}';
 `, runner, [state.password]);
     await publishLocalSchema(runtime.sqlContainer, { database: target.database,

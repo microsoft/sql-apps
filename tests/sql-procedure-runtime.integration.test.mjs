@@ -23,7 +23,8 @@ before(async () => {
     .withExposedPorts(1433)
     .withPlatform('linux/amd64')
     .withWaitStrategy(Wait.forSuccessfulCommand(
-      `/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '${password}' -C -b -l 2 -d master -Q "IF DB_ID('appdb') IS NULL CREATE DATABASE appdb; SELECT 1;"`,
+      `/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '${password}' -C -b -l 2 -d master -Q "IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = N'appdb') CREATE DATABASE appdb;" && ` +
+      `/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '${password}' -C -b -l 2 -d appdb -Q "SELECT 1;"`,
     ))
     .withStartupTimeout(120_000)
     .start();
@@ -35,7 +36,7 @@ before(async () => {
   admin = new sql.ConnectionPool({ ...endpoint, database: 'master', user: 'sa', password });
   await admin.connect();
   assert.equal((await admin.request().query("SELECT CAST(SERVERPROPERTY('EngineEdition') AS int) AS engine")).recordset[0].engine, 5);
-  await admin.request().query("IF DB_ID('appdb') IS NULL CREATE DATABASE appdb;");
+  await admin.request().query("IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = N'appdb') CREATE DATABASE appdb;");
   await admin.request().query(`CREATE LOGIN sql_apps_runtime WITH PASSWORD = '${appPassword}';`);
   await admin.close();
   admin = new sql.ConnectionPool({ ...endpoint, database: 'appdb', user: 'sa', password });

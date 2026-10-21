@@ -111,8 +111,11 @@ for (const existing of ['database', 'login', 'unknown']) {
       const statement = options?.input ?? '';
       statements.push(statement);
       if (statement.includes("SERVERPROPERTY('EngineEdition')")) return '5|SQL Azure';
-      if (statement.includes('DB_ID(') && statement.includes('SUSER_ID(') && !statement.includes('CREATE')) {
-        return existing === 'unknown' ? '' : '1';
+      if (statement.includes('SELECT CASE WHEN')) {
+        if (existing === 'unknown') return '';
+        return existing === 'database' ?
+          (statement.includes('sys.databases') ? '1' : '0') :
+          (statement.includes('SUSER_ID(') ? '1' : '0');
       }
       throw new Error('Unexpected SQL mutation before credentials were verified');
     };
@@ -139,7 +142,7 @@ test('local init creates credentials only for fresh SQL objects and reuses them 
     if (args.some(arg => arg.includes('.NetworkSettings.Ports'))) return '[{"HostIp":"127.0.0.1","HostPort":"54321"}]';
     const statement = options?.input ?? '';
     if (statement.includes("SERVERPROPERTY('EngineEdition')")) return '5|SQL Azure';
-    if (statement.includes('SELECT CASE WHEN DB_ID(')) { probes++; return '0'; }
+    if (statement.includes('SELECT CASE WHEN')) { probes++; return '0'; }
     if (options?.env?.SQLCMDPASSWORD) return 'LOCAL SQL ACCEPTANCE PASSED';
     assert.match(statement, /CREATE|GRANT/);
     return '';
