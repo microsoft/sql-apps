@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { cp, mkdir, mkdtemp, readFile, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises';
+import { cp, lstat, mkdir, mkdtemp, readFile, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -296,7 +296,17 @@ test('a factory project builds its UI and publishing artifact without foundation
   const installed = join(created.path, 'node_modules', '@microsoft', 'sql-apps');
   await mkdir(dirname(installed), { recursive: true });
   await cp(tooling, installed, { recursive: true });
-  for (const dependency of ['typescript', 'esbuild', '@esbuild', '@azure/msal-browser', '@azure/msal-common', 'zod', '@types/node', 'undici-types']) {
+  const lock = JSON.parse(await readFile(join(root, 'package-lock.json'), 'utf8'));
+  const runtimeDependencies = Object.entries(lock.packages)
+    .filter(([path, entry]) => path.startsWith('node_modules/') && !entry.dev &&
+      !path.slice('node_modules/'.length).includes('/node_modules/'))
+    .map(([path]) => path.slice('node_modules/'.length));
+  for (const dependency of new Set(['typescript', 'esbuild', '@esbuild', '@types/node', 'undici-types', ...runtimeDependencies])) {
+    try { await lstat(join(root, 'node_modules', dependency)); }
+    catch (error) {
+      if (error.code === 'ENOENT' && lock.packages[`node_modules/${dependency}`]?.optional) continue;
+      throw error;
+    }
     const destination = join(created.path, 'node_modules', dependency);
     await mkdir(dirname(destination), { recursive: true });
     await cp(join(root, 'node_modules', dependency), destination, { recursive: true });

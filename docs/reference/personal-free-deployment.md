@@ -44,7 +44,9 @@ JSON booleans to `bit`, 32-bit whole numbers to `int`, UUID strings to
 JSON or parameters return HTTP 400; internal SQL errors are logged without
 being returned to callers.
 
-Set `authenticationProvider` to `aad`, `github`, or `google`. The same provider must be used by `invite`.
+Set `authenticationProvider` to `aad` or `github`. The same provider must be used by `invite`.
+Google requires custom authentication on Static Web Apps Standard and is not
+supported by this Free-only publisher.
 
 Each route is owner-only unless it lists roles. To let invited team members call a route, add `"roles": ["owner", "member"]`:
 
@@ -100,6 +102,9 @@ Deploy only after reviewing that output:
 
 Planning also builds the SQL database package and compiles the infrastructure
 template locally, so .NET and the Azure CLI Bicep compiler must be available.
+It bundles the Functions API and its installed runtime dependencies into a
+self-contained Node.js entry before approval. The Azure Functions host supplies
+its own core API; deployment does not restore packages or rebuild the API.
 The site, API, SQL package, infrastructure JSON and SQL procedure allowlist are
 stored together under `.sql-apps/deployments/` and fingerprinted as one artifact.
 Deployment verifies and uses a private copy of that exact approved artifact.
@@ -153,6 +158,18 @@ Rotation saves the pending password and an in-progress stage before changing
 SQL. If interrupted, rerun the same command: it reuses that saved password,
 updates application settings and verifies readiness before recording `ready`.
 Do not delete protected state as a recovery step.
+
+Deployment state uses Windows current-user encryption (DPAPI) on Windows and
+owner-only file permissions on Unix. Valid older plaintext receipts are
+explicitly logged and rewritten with host protection on first read, without
+changing their credentials. Temporary plaintext infrastructure parameters live
+in a private directory restricted to the current Windows user (or Unix mode
+`0700`), and are removed after use.
+
+SQL connection pools report errors without logging credentials, discard failed
+connections and reconnect on subsequent calls. Resume retries preserve SQL
+login error numbers from the driver: temporary database-unavailable errors are
+retried with bounded delays, but permanent bad credentials are not.
 
 ## Invite people
 

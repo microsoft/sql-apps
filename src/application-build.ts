@@ -217,7 +217,8 @@ const app = await createApplication({profile, origin:process.env.PUBLIC_ORIGIN, 
 await app.listen({host:profile === 'public-demo' ? '0.0.0.0' : '127.0.0.1', port});
 for (const signal of ['SIGINT','SIGTERM']) process.once(signal, () => { void app.close(); });
 `);
-      const imageLabels = `LABEL io.sql-apps.application="${name}" \\
+      if (profile === 'public-demo') {
+        const imageLabels = `LABEL io.sql-apps.application="${name}" \\
       io.sql-apps.profile="${profile}" \\
       io.sql-apps.source-fingerprint="${source.fingerprint}" \\
       io.sql-apps.selected-inputs-fingerprint="${digest(JSON.stringify(sources))}" \\
@@ -228,7 +229,6 @@ for (const signal of ['SIGINT','SIGTERM']) process.once(signal, () => { void app
 !package-lock.json
 !server/
 !server/**
-${profile === 'local-simulation' ? '!public/\n!public/**' : ''}
 !dab/
 !dab/**
 `);
@@ -242,12 +242,12 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY --chown=node:node server ./server
-${profile === 'local-simulation' ? 'COPY --chown=node:node public ./public' : ''}
 ENV NODE_ENV=production PORT=8080
 USER node
 EXPOSE 8080
 CMD ["node","server/start.mjs"]
 `);
+      }
       const current = await inspectSelectedFoundation(home);
       if (current.fingerprint !== source.fingerprint || JSON.stringify(await snapshots(home, sources.map(item => item.path))) !== JSON.stringify(sources)) {
         throw new Error('Selected source changed during build; no artifact was published');

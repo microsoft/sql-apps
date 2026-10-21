@@ -1,10 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { cp, mkdir, mkdtemp, open, readFile, rename, rm } from 'node:fs/promises';
+import { cp, lstat, mkdir, mkdtemp, open, readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { createRequire } from 'node:module';
 import { z } from 'zod';
-import sql from 'mssql';
-import type { Run } from './process.js';
+import { run as execute, type Run } from './process.js';
+import { readProtectedJson, saveProtectedJson } from './sql-endpoint.js';
+import { createSqlPool, observeSqlPool } from './sql-pool.js';
 import {
   personalFreeConfigSchema,
   protectedDeploymentStateSchema,
@@ -133,21 +134,21 @@ export function createProtectedDeploymentState(approval: string): ProtectedDeplo
 }
 
 export async function saveProtectedDeploymentState(path: string, state: ProtectedDeploymentState): Promise<void> {
-  const validated = protectedDeploymentStateSchema.parse(state);
-  await mkdir(dirname(path), { recursive: true });
-  const temporary = `${path}.${randomBytes(12).toString('hex')}.tmp`;
-  let handle: Awaited<ReturnType<typeof open>> | undefined;
-  try {
-    handle = await open(temporary, 'wx', 0o600);
-    await handle.writeFile(`${JSON.stringify(validated, null, 2)}\n`);
-    await handle.sync();
-    await handle.close();
-    handle = undefined;
-    await rename(temporary, path);
-  } finally {
-    if (handle) await handle.close().catch(() => {});
-    await rm(temporary, { force: true });
+  await saveProtectedJson(path, protectedDeploymentStateSchema.parse(state), execute);
+}
+
+export async function readProtectedDeploymentState(path: string): Promise<ProtectedDeploymentState> {
+  const info = await lstat(path);
+  if (!info.isFile() || info.isSymbolicLink() || info.size > 65536) {
+    throw new Error('Deployment credentials require a protected regular file.');
   }
+  const legacy = protectedDeploymentStateSchema.safeParse(JSON.parse(await readFile(path, 'utf8')));
+  if (legacy.success) {
+    console.error('Protecting legacy plaintext deployment state; saved credentials are unchanged.');
+    await saveProtectedDeploymentState(path, legacy.data);
+    return legacy.data;
+  }
+  return protectedDeploymentStateSchema.parse(await readProtectedJson(path, execute));
 }
 
 export function approveProtectedDeploymentRevision(
@@ -184,7 +185,10 @@ export function personalFreeStatePath(config: PersonalFreeConfig): string {
     config: PersonalFreeConfig,
     state: ProtectedDeploymentState,
   ): Promise<string> {
-    const path = `${personalFreeStatePath(config)}.parameters.${randomBytes(8).toString('hex')}.json`;
+    const parent = dirname(personalFreeStatePath(config));
+    await mkdir(parent, { recursive: true });
+    const directory = await mkdtemp(join(parent, 'parameters-'));
+    const path = join(directory, 'parameters.json');
     const parameters = {
       parameters: {
         name: { value: config.name },
@@ -198,15 +202,28 @@ export function personalFreeStatePath(config: PersonalFreeConfig): string {
         runtimePassword: { value: state.runtimePassword },
       },
     };
-    await mkdir(dirname(path), { recursive: true });
-    const handle = await open(path, 'wx', 0o600);
     try {
-      await handle.writeFile(`${JSON.stringify(parameters, null, 2)}\n`);
-      await handle.sync();
-    } finally {
-      await handle.close();
+      if (process.platform === 'win32') {
+        await execute('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+          '$ErrorActionPreference="Stop";$path=[Console]::In.ReadToEnd();' +
+          '$acl=New-Object Security.AccessControl.DirectorySecurity;$acl.SetAccessRuleProtection($true,$false);' +
+          '$sid=[Security.Principal.WindowsIdentity]::GetCurrent().User;' +
+          '$rule=New-Object Security.AccessControl.FileSystemAccessRule($sid,"FullControl","ContainerInherit,ObjectInherit","None","Allow");' +
+          '$acl.AddAccessRule($rule);[IO.Directory]::SetAccessControl($path,$acl);'],
+        { input: directory, sensitiveOutput: true, timeoutMs: 15000 });
+      }
+      const handle = await open(path, 'wx', 0o600);
+      try {
+        await handle.writeFile(`${JSON.stringify(parameters, null, 2)}\n`);
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+      return path;
+    } catch (error) {
+      await rm(directory, { recursive: true, force: true });
+      throw error;
     }
-    return path;
   }
 
   function parseOutputs(text: string) {
@@ -296,7 +313,7 @@ export function personalFreeStatePath(config: PersonalFreeConfig): string {
         '--parameters', `@${parameters}`, '--query', 'properties.outputs', '-o', 'json',
       ], { redact: [state.sqlAdministratorPassword, state.runtimePassword] }));
     } finally {
-      await rm(parameters, { force: true });
+      await rm(dirname(parameters), { recursive: true, force: true });
     }
   }
 
@@ -321,14 +338,16 @@ export function personalFreeStatePath(config: PersonalFreeConfig): string {
       'account', 'get-access-token', '--subscription', config.subscriptionId,
       '--resource', 'https://database.windows.net/', '-o', 'json',
     ]))).accessToken;
-    const pool = await new sql.ConnectionPool({
+    const pool = createSqlPool({
       server,
       database: 'app',
       options: { encrypt: true, trustServerCertificate: false },
       authentication: { type: 'azure-active-directory-access-token', options: { token } },
       pool: { max: 1, min: 0, idleTimeoutMillis: 30_000 },
-    }).connect();
+    });
     try {
+      await pool.connect();
+      observeSqlPool(pool)();
       const password = state.runtimePassword.replaceAll("'", "''");
       await pool.request().query(`
   IF USER_ID(N'sql_apps_runtime') IS NULL
@@ -415,7 +434,7 @@ export async function deployPersonalFree(
     const statePath = personalFreeStatePath(config);
     let state: ProtectedDeploymentState;
     try {
-      state = protectedDeploymentStateSchema.parse(JSON.parse(await readFile(statePath, 'utf8')));
+      state = await readProtectedDeploymentState(statePath);
       const revised = approveProtectedDeploymentRevision(state, approval);
       if (revised.approval !== state.approval) await saveProtectedDeploymentState(statePath, revised);
       state = revised;
@@ -470,7 +489,7 @@ export async function rotatePersonalFreeRuntimeSecret(
 ): Promise<ProtectedDeploymentState> {
   return withApprovedArtifact(config, approval, async artifact => {
     const statePath = personalFreeStatePath(config);
-    let state = protectedDeploymentStateSchema.parse(JSON.parse(await readFile(statePath, 'utf8')));
+    let state = await readProtectedDeploymentState(statePath);
     if (state.approval !== approval) throw new Error('Rotation approval does not match this deployment');
     if (!state.sqlServer || !state.staticWebAppName || !state.staticWebAppHostname) {
       throw new Error('Deploy the application before rotating its runtime secret');

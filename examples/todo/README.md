@@ -35,9 +35,12 @@ The default local application now demonstrates selected foundation file/job capa
 
 The selected starter adds `application.ts`, a complete browser under `web/`, and a separate visitor-session SQL/DAB project under `demo/`. It does not replace the authenticated example files above or change the root `selectedExamples: []`.
 
-After building the foundation and explicitly initializing an isolated workspace, developers can build this selection with `npm run app:build -- todo local-simulation` or `npm run app:build -- todo public-demo`. The output is a unique artifact directory under that workspace's state. Validate it with `npm run app:check -- --selected "<artifact-directory>" <profile>`. Every use checks checkout/workspace binding, selected inputs, source/artifact checksums and the shared route/method contract. Other selections cannot import this example implicitly. The selected image copies only its compiled server and browser, not the examples or tests tree.
+After building the foundation and explicitly initializing an isolated workspace, developers can build this selection with `npm run app:build -- todo local-simulation` or `npm run app:build -- todo public-demo`. The output is a unique artifact directory under that workspace's state. Validate it with `npm run app:check -- --selected "<artifact-directory>" <profile>`. Every use checks checkout/workspace binding, selected inputs, source/artifact checksums and the shared route/method contract. Other selections cannot import this example implicitly. The public-demo API image copies only its compiled server; browser assets are delivered separately, and neither output includes the examples or tests tree.
 
 These build commands assemble and validate artifacts only; they do not provision or deploy resources.
+Only `public-demo` emits server and DAB Dockerfiles. `local-simulation` is a
+host-only, loopback development artifact and must use the local launcher below;
+its test transport remains disabled in production.
 
 ### Start and verify the selected local app
 

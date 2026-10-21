@@ -12,7 +12,10 @@ concurrency:
   group: runtime-archive-release
   cancel-in-progress: false
 jobs:
+  sql-integration:
+    uses: ./.github/workflows/sql-integration.yml
   package:
+    needs: sql-integration
     if: github.repository == 'microsoft/sql-apps' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20

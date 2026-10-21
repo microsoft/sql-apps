@@ -219,8 +219,10 @@ test('packaged check compares project UI with the shipped template', async t => 
     `${await readFile(join(project, 'src', 'web', 'app.ts'), 'utf8')}\ndocument.body.dataset.custom = "true";\n`);
   const customized = await runNode([checker, project]);
   assert.match(customized.stdout, /Design warning: customized UI/);
-  assert.match(customized.stdout, /Rendered coverage: partial: 22 unreviewed cells/);
-  assert.match(customized.stdout, /Design acceptance: partial: design intent missing; 22 unreviewed cells/);
+  assert.match(customized.stdout, /Rendered coverage: not summarized; no state matrix recorded/);
+  assert.match(customized.stdout, /Design evidence: intent missing; review missing/);
+  assert.match(customized.stdout, /Visual direction approval: not assessed by this check/);
+  assert.doesNotMatch(customized.stdout, /Design acceptance: accepted/);
 });
 
 test('bin help is project-independent and its validated command map targets packaged modules', async () => {

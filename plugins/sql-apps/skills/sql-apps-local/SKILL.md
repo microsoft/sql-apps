@@ -18,10 +18,12 @@ Afterward, review `setup plan` through the app's pinned package; no runtime fall
 
 Present effects together; obtain approval before `setup run --approval <id>`.
 Bootstrap covers restore only and stops; app-local approval covers missing local stages.
+Reuse matching recorded grants; re-ask only for changed effects or missing consent.
 Rerun plan/run after corrections. Never manufacture a grant, bypass a blocker or
 claim failure as success. Unavailable controls capture nothing; autonomy is not consent.
 
 Keep progress in chat using `setup status`; report milestones/blockers, not waits.
+Setup does not assess domain/browser evidence.
 Creation never starts a helper or browser.
 An external browser requires an explicit request; prefer authorized native
 previews at the verified app origin.

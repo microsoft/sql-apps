@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { copyFile, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
+import { build } from 'esbuild';
 import { z } from 'zod';
 import { parseBrowserConfig } from './browser-config.js';
 import { run as execute, type Run } from './process.js';
@@ -19,7 +20,7 @@ const routeSchema = z.strictObject({
 });
 const apiSchema = z.strictObject({
   version: z.literal(1),
-  authenticationProvider: z.enum(['aad', 'github', 'google']),
+  authenticationProvider: z.enum(['aad', 'github']),
   routes: z.array(routeSchema).min(1).superRefine((routes, context) => {
     const routeKeys = new Set<string>();
     const procedures = new Set<string>();
@@ -130,9 +131,6 @@ export async function buildPersonalFreeArtifact(
       provider: api.authenticationProvider,
       readinessPath,
     })}\n`);
-    for (const name of ['personal-free-app.js', 'swa-principal.js', 'sql-procedure-runtime.js']) {
-      await copyFile(join(toolingRoot, 'dist', 'src', name), join(temporary, 'api', 'dist', name));
-    }
     const entry = `import { app } from '@azure/functions';
 import { createPersonalFreeHandler, parsePersonalFreeBody } from './personal-free-app.js';
 import { createProcedureRuntime } from './sql-procedure-runtime.js';
@@ -162,7 +160,12 @@ app.http('sqlAppsApi', {
     return { status: response.status, headers: Object.fromEntries(response.headers.entries()), body: await response.text() };
   },
 });\n`;
-    await writeFile(join(temporary, 'api', 'dist', 'index.mjs'), entry);
+    await build({
+      stdin: { contents: entry, resolveDir: join(toolingRoot, 'dist', 'src'), sourcefile: 'personal-free-entry.mjs' },
+      bundle: true, platform: 'node', target: 'node22', format: 'cjs',
+      external: ['@azure/functions-core'],
+      outfile: join(temporary, 'api', 'dist', 'index.cjs'),
+    });
     await writeFile(join(temporary, 'api', 'host.json'), `${JSON.stringify({
       version: '2.0',
       extensionBundle: { id: 'Microsoft.Azure.Functions.ExtensionBundle', version: '[4.*, 5.0.0)' },
@@ -171,13 +174,8 @@ app.http('sqlAppsApi', {
       name: 'sql-apps-personal-free-api',
       private: true,
       type: 'module',
-      main: 'dist/index.mjs',
+      main: 'dist/index.cjs',
       engines: { node: '22' },
-      dependencies: {
-        '@azure/functions': '4.16.5',
-        mssql: '12.7.0',
-        zod: '4.6.5',
-      },
     }, null, 2)}\n`);
     const deployment = join(temporary, 'deployment');
     const sqlOutput = join(temporary, 'sql-build');

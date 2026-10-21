@@ -162,18 +162,30 @@ test('an intended ready gateway is reused without install, restore, build or lau
   const { home, deps, options } = await fixture(t);
   const runtime = runtimeFor(undefined, home);
   let calls = 0;
-  const result = await setup.runSetup(home, options, {
+  const probes = {
     ...deps,
     fetch: async url => new Response(JSON.stringify(String(url).endsWith('/local/workspace') ?
       { version: 1, id: runtime.id, mode: runtime.mode, profile: options.profile, origins: runtime.origins,
         container: runtime.defaultSql, sourceFingerprint: 'fixture-build', authentication: { mode: 'preview' } } : { status: 'ready' })),
     execute: async () => { calls++; },
     launch: async () => { calls++; },
-  });
+  };
+  const result = await setup.runSetup(home, options, probes);
   assert.equal(result.running, true);
   assert.equal(result.launchUrl, runtime.origins.app);
-  assert.equal(result.workflowVerified, false);
-  assert.equal(result.next.id, 'acceptance');
+  assert.equal(result.workflowVerification, 'not-assessed');
+  assert.equal(result.next, undefined);
+  assert.ok(result.stages.every(stage => stage.status === 'done'));
+  const rendered = setup.renderSetup(result).join('\n');
+  assert.match(rendered, /setup does not assess browser\/SQL workflow acceptance/);
+  assert.doesNotMatch(rendered, /Blocked: acceptance|verification is still required/);
+  await mkdir(join(home, 'docs'));
+  await writeFile(join(home, 'docs', 'design-review.md'), 'Browser save/reload observed. User approved the visual direction.');
+  const externalEvidence = await setup.planSetup(home, options, probes);
+  assert.equal(externalEvidence.workflowVerification, 'not-assessed',
+    'setup must not judge domain evidence or user approval from a document');
+  assert.equal(externalEvidence.running, true);
+  assert.equal(externalEvidence.next, undefined);
   assert.equal(calls, 0);
 });
 
@@ -304,7 +316,8 @@ test('setup reuses the explicitly selected external SQL container without launch
   });
   assert.equal(report.running, true);
   assert.equal(report.launchUrl, runtime.origins.app);
-  assert.equal(report.next.id, 'acceptance');
+  assert.equal(report.next, undefined);
+  assert.equal(report.workflowVerification, 'not-assessed');
   assert.equal(launches, 0);
 });
 
@@ -337,7 +350,7 @@ for (const health of [
     assert.equal(report.prerequisitesReady, true);
     assert.equal(report.running, false);
     assert.equal(report.launchUrl, undefined);
-    assert.equal(report.workflowVerified, false);
+    assert.equal(report.workflowVerification, 'not-assessed');
     assert.equal(report.next.id, 'launch');
     assert.equal(report.next.code, 'WORKSPACE_NOT_READY');
     assert.equal(executions, 0);

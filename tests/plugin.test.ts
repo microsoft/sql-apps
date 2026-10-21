@@ -149,7 +149,7 @@ test('SQL Apps routes new apps and meaningful UI changes through intentional des
   assert.doesNotMatch(gettingStarted, /optional design|design is optional/i);
 
   assert.match(design, /starter CSS.*not.*design direction/is);
-  assert.match(design, /typography, spacing, color, and layout.*hierarchy/i);
+  assert.match(design, /typography, spacing, color, and layout.*hierarchy and character/i);
   assert.match(design, /each surface one clear primary action/i);
   assert.match(design, /secondary and destructive actions.*distinct/i);
   assert.match(design, /wrapping long content/i);
@@ -161,7 +161,10 @@ test('SQL Apps routes new apps and meaningful UI changes through intentional des
     assert.match(design.toLowerCase(), new RegExp(state), `design guidance must cover ${state}`);
   }
   assert.match(design, /recurring task/i);
-  assert.match(design, /two distinct compositions/i);
+  assert.match(design, /two distinct visual directions/i);
+  assert.match(design, /concrete references or domain cues.*typography, proportions, materials and composition/i);
+  assert.match(design, /not palette swaps or rearrangements alone/i);
+  assert.match(design, /recognizable visual ambition/i);
   assert.match(design, /empty, single-record, and populated states/i);
   assert.match(design, /desktop and narrow widths/i);
   assert.match(design, /Fix observed problems and re-review/i);
@@ -169,16 +172,21 @@ test('SQL Apps routes new apps and meaningful UI changes through intentional des
   assert.match(design, /docs\/design-intent\.md/);
   assert.match(design, /docs\/design-review\.md/);
   assert.match(design, /sql-apps check/i);
-  assert.match(design, /Functional acceptance and design acceptance are separate/i);
+  assert.match(design, /Separate functional acceptance, agent usability review and user visual-direction approval/i);
   assert.match(design, /first implementation is a candidate, not an approved design/i);
   assert.match(design, /representative primary-task screen at desktop and narrow widths together/i);
   assert.match(design, /first viewport[\s\S]*defining information[\s\S]*unrelated app[\s\S]*removed or demoted[\s\S]*three highest-impact/i);
   assert.match(design, /visible problem, task consequence and concrete change/i);
   assert.match(design, /not a loop count/i);
-  assert.match(design, /Expand\*\* to remaining states once the composition stabilizes/i);
+  assert.match(design, /Expand\*\* to remaining states after the representative slice works/i);
   assert.match(design, /Coverage is not quality/i);
+  assert.match(design, /agent assessment is not user approval/i);
+  assert.match(design, /absent explicit feedback.*visual approval pending/i);
+  assert.match(design, /Flexible prose suffices.*matrix is optional/i);
+  assert.match(design, /no exact headings or extra approval ceremony/i);
   assert.match(validation, /render-critique-improve loop before broad coverage/i);
-  assert.match(validation, /rendered coverage and design quality separately/i);
+  assert.match(validation, /rendered coverage and agent usability assessment/i);
+  assert.match(validation, /Never infer approval from an agent verdict/i);
   assert.doesNotMatch(design, /references\/|craft floor|style recipes/i);
   assert.match(application, /basic shell is an implementation milestone, not final design acceptance/i);
   assert.match(application, /sql-apps-validation[\s\S]*four-verdict/i);
@@ -193,7 +201,7 @@ test('SQL Apps routes new apps and meaningful UI changes through intentional des
   }
   assert.doesNotMatch(pluginReference, /small routing adapter|routing adapter/i);
   assert.match(await readFile(resolve('plugins/sql-apps/skills/sql-apps-validation/SKILL.md'), 'utf8'),
-    /implemented\/built[\s\S]*running[\s\S]*functional acceptance[\s\S]*design acceptance/i);
+    /implemented\/built[\s\S]*running[\s\S]*functional acceptance[\s\S]*design review[\s\S]*user visual-direction approval/i);
 
   assert.match(runGuide, /route every new user-facing application and meaningful UI change through `sql-apps-design`/i);
   assert.doesNotMatch(runGuide, /all user-facing work/i);
@@ -222,7 +230,7 @@ test('SQL Apps design is self-contained and does not require external design ski
   for (const content of [design, gettingStarted, pluginReference]) {
     assert.match(content, /no companion skill is required/i);
   }
-  assert.match(acceptance, /^- Skill: sql-apps-design$/m);
+  assert.match(acceptance, /no exact[\s\S]*headings, comparison fields or capability declaration are required/i);
   assert.ok(design.trim().split(/\s+/).length <= 400, 'Keep the design skill within a 400-word context budget');
 });
 
@@ -251,6 +259,8 @@ test('SQL Apps requires rendered browser review with bounded evidence claims', a
   assert.match(validation, /never invent.*(?:page )?handles|do not invent.*(?:page )?handles/i);
   assert.match(validation, /opening a tab.*not.*visual review|source review.*not.*visual review/is);
   assert.match(validation, /discover.*supported.*alternatives/i);
+  assert.match(validation, /Before browser work.*supported open\/list operation returns the handle/i);
+  assert.match(validation, /opened preview need not be controllable/i);
   assert.match(validation, /if blocked[\s\S]*exact evidence not observed/i);
   assert.match(validation, /origin[\s\S]*source\/build[\s\S]*viewport[\s\S]*state[\s\S]*artifact[\s\S]*findings[\s\S]*re-review/i);
   assert.match(validation, /screenshots.*do not prove.*(?:persistence|access)/i);
@@ -270,6 +280,8 @@ test('assistant guidance keeps creation scaffold-only and browser use capability
   const local = await readSkill('local');
   assert.match(local, /progress in chat/i);
   assert.match(local, /Creation never starts a helper or browser/i);
+  assert.match(local, /Reuse matching recorded grants.*changed effects or missing consent/i);
+  assert.match(local, /Setup does not assess domain\/browser evidence/i);
   assert.match(local, /external browser[\s\S]*explicit.*request/i);
   const design = await readSkill('design');
   assert.match(design, /native browser\/preview sessions/i);
@@ -489,7 +501,7 @@ test('agent guidance stays concise, stack-neutral and script-led', async () => {
   assert.match(design, /test-persona selection off product screens/i);
   assert.doesNotMatch(design, /references\/|craft floor|style recipes/i);
 
-  const reportContract = /implemented\/built[\s\S]*running[\s\S]*functional acceptance[\s\S]*design acceptance/i;
+  const reportContract = /implemented\/built[\s\S]*running[\s\S]*functional acceptance[\s\S]*design review/i;
   assert.match(validation, reportContract);
   for (const [name, content] of [
     ['getting started', gettingStarted], ['application', application], ['local', local],

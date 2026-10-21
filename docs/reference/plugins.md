@@ -46,6 +46,11 @@ matching session; a browser tool that controls external Chrome is not
 necessarily an embedded preview. Native tools, permissions and localhost
 reachability vary by host and session.
 
+Discover the supported open/list operation and the handle required by
+inspection/actions before relying on automation. Opening a preview alone does
+not establish that it is controllable; never substitute an instance ID for a
+missing page handle.
+
 If no suitable tool is available, continue authorized headless work and name
 the unobserved workflow/design evidence. Never silently open an external browser
 or install tools/change settings. An explicit external-opening request is a
@@ -242,7 +247,12 @@ Restart the App or create a **fresh session** after installation. In **Customize
 | `sql-apps-design` | Apply intentional visual direction to every new user-facing app and meaningful UI change, then review its rendered desktop and narrow-width experience. |
 
 The `sql-apps-design` skill owns design direction and rendered review in the app's
-existing stack; no companion skill is required. It compares two compositions and
+existing stack; no companion skill is required. For a new identity it compares
+two distinct visual directions using concrete references or domain cues, then
+renders a representative screen before broad coverage. Brief prose replaces
+exact-heading document gates. Agent usability review and explicit user
+visual-direction approval are separate; neither a matrix nor `sql-apps check`
+can approve aesthetics. It
 retains SQL Apps requirements for real account/access states and truthful loading,
 empty, error, saving, success, and disabled states. SQL, identity, and runtime
 decisions remain in `sql-apps-application`.

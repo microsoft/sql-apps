@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cp, readFile, realpath, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { localCommand, localConnection, localDabConfig, localPrincipal, verifyLocal, startLocalSql, sqlImage, dabImage } from '../src/local.js';
+import { initLocal, localCommand, localConnection, localDabConfig, localPrincipal, verifyLocal, startLocalSql, sqlImage, dabImage } from '../src/local.js';
 import { run, type Run } from '../src/process.js';
 import { startLocalApplication } from '../src/local-startup.js';
 import { proposeWorkspace, runtimeFor, type WorkspaceRuntime } from '../src/workspace.mjs';
@@ -100,6 +100,58 @@ test('local workflow fails closed on SQL Server instead of Azure SQL', async () 
   let calls = 0;
   await assert.rejects(verifyLocal('bad;name', async () => { calls++; return ''; }));
   assert.equal(calls, 0);
+});
+
+for (const existing of ['database', 'login', 'unknown']) {
+  test(`local init preserves missing credential state when ${existing} is already present or cannot be verified`, async t => {
+    const runtime = await localWorkspaceFixture(t);
+    const statements: string[] = [];
+    const runner: Run = async (command, _args, options) => {
+      assert.equal(command, 'docker', 'Missing credentials must fail before building or publishing SQL');
+      const statement = options?.input ?? '';
+      statements.push(statement);
+      if (statement.includes("SERVERPROPERTY('EngineEdition')")) return '5|SQL Azure';
+      if (statement.includes('DB_ID(') && statement.includes('SUSER_ID(') && !statement.includes('CREATE')) {
+        return existing === 'unknown' ? '' : '1';
+      }
+      throw new Error('Unexpected SQL mutation before credentials were verified');
+    };
+    await assert.rejects(initLocal(runtime.sqlContainer, runner, {
+      profile: 'role-based-data', requiredRole: 'AppUser', readinessPath: '/api/AppReady',
+    }), /exist.*without.*credential|verify.*existing SQL/i);
+    assert.equal(statements.some(statement => /\b(CREATE|ALTER|GRANT)\b/.test(statement)), false);
+    await assert.rejects(readFile(runtime.names.sqlState), { code: 'ENOENT' });
+  });
+}
+
+test('local init creates credentials only for fresh SQL objects and reuses them on restart', async t => {
+  const runtime = await localWorkspaceFixture(t);
+  let probes = 0;
+  let publications = 0;
+  const runner: Run = async (command, args, options) => {
+    if (command === 'dotnet') {
+      if (args.includes('/Version')) return '170.5.96.0';
+      if (args.includes('/Action:Publish')) publications++;
+      return '';
+    }
+    assert.equal(command, 'docker');
+    if (args.includes('{{json .Config.Env}}')) return '["MSSQL_SA_PASSWORD=fixture-only-administrator-password"]';
+    if (args.some(arg => arg.includes('.NetworkSettings.Ports'))) return '[{"HostIp":"127.0.0.1","HostPort":"54321"}]';
+    const statement = options?.input ?? '';
+    if (statement.includes("SERVERPROPERTY('EngineEdition')")) return '5|SQL Azure';
+    if (statement.includes('SELECT CASE WHEN DB_ID(')) { probes++; return '0'; }
+    if (options?.env?.SQLCMDPASSWORD) return 'LOCAL SQL ACCEPTANCE PASSED';
+    assert.match(statement, /CREATE|GRANT/);
+    return '';
+  };
+  const profile = { profile: 'role-based-data', requiredRole: 'AppUser', readinessPath: '/api/AppReady' } as const;
+  await initLocal(runtime.sqlContainer, runner, profile);
+  const first = await readFile(runtime.names.sqlState, 'utf8');
+  assert.match(JSON.parse(first).password, /^SqlApps1![a-f0-9]{64}$/);
+  await initLocal(runtime.sqlContainer, runner, profile);
+  assert.equal(await readFile(runtime.names.sqlState, 'utf8'), first);
+  assert.equal(probes, 1);
+  assert.equal(publications, 2);
 });
 
 test('local verification uses master and passes SQL through stdin, not shell interpolation', async () => {

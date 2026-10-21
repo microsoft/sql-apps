@@ -61,6 +61,18 @@ Its local runtime identity is a least-privilege login mapped to a database user;
 the container does not support the cloud publisher's contained SQL user.
 Do not report mocked tests as equivalent to this real-engine check.
 
+The manually dispatched [real SQL workflow](.github/workflows/sql-integration.yml)
+runs these tests on `main` and is also a required predecessor of runtime
+packaging, at the same commit. Maintainers must create the `sql-integration`
+GitHub environment and restrict it to the `main` branch (not tags). Configure
+required reviewers if a human approval gate is desired; branch restrictions
+alone do not require approval. Store the preview registry's pull-only credentials
+directly in GitHub as environment secrets
+`SQL_PREVIEW_ACR_USERNAME` and `SQL_PREVIEW_ACR_PASSWORD`. Never use Azure
+subscription or administrator credentials for this registry login. Missing
+credentials, denied approval (when required) or failed SQL tests block packaging;
+ordinary pull request checks do not receive these secrets.
+
 Keep end-user walkthroughs in `docs/guides`, detailed commands in `docs/reference`, and contributor contracts in `docs/maintainers`. See the [documentation index](docs/README.md) and [application boundaries](docs/maintainers/application-boundary.md).
 
 ### Releasing the runtime package
@@ -73,7 +85,8 @@ The package name is retained inside the archive; applications still pin its
 exact semantic version.
 
 The manually dispatched [runtime packaging workflow](.github/workflows/package-runtime.yml)
-builds and tests `main`, checks the package inventory, packs the archive, proves
+first requires the protected real SQL integration job, then builds and tests
+`main`, checks the package inventory, packs the archive, proves
 clone-free creation from that archive plus an independent app restore with empty
 caches, and uploads the archive,
 pack metadata and `SHA256SUMS` as the `runtime-archive-release` Actions artifact:

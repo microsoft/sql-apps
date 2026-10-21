@@ -1,9 +1,7 @@
-import { readFile, readdir } from 'node:fs/promises';
-import { join, relative } from 'node:path';
-import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
-import { readSqlSources, roleBasedDabProblem, roleBasedProcedureProblem, roleBasedProfileProblem } from './role-based-rules.mjs';
-import { projectPath, projectRoot } from './runtime-roots.js';
+import { roleBasedDabProblem, roleBasedProfileProblem } from './role-based-rules.mjs';
+import { projectPath } from './runtime-roots.js';
 
 const reservedRoles = ['anonymous', 'authenticated', 'Function.Invoke', 'processor'];
 
@@ -61,51 +59,4 @@ export function roleBasedProcedureGrants(input: unknown, profile: RoleBasedProfi
     const [schema, name] = object.split('.');
     return `GRANT EXECUTE ON OBJECT::[${schema}].[${name}] TO [${user}];\nGRANT VIEW DEFINITION ON OBJECT::[${schema}].[${name}] TO [${user}];`;
   }).join('\n');
-}
-
-export function validateRoleBasedCloudDab(input: unknown, profile: RoleBasedProfile): void {
-  validateRoleBasedDab(input, profile);
-  z.object({ runtime: z.object({
-    rest: z.object({ enabled: z.literal(true), path: z.literal('/api') }),
-    host: z.object({ mode: z.literal('production'), authentication: z.object({
-      provider: z.literal('AzureAD'),
-      jwt: z.object({ audience: z.literal("@env('API_CLIENT_ID')"), issuer: z.literal("@env('ENTRA_ISSUER')") }),
-    }) }),
-  }) }).parse(input);
-}
-
-export async function validateRoleBasedCloudSource(profile: RoleBasedProfile, root = '.'): Promise<void> {
-  const localPath = join(root, 'role-based-data.json');
-  const local = await readFile(localPath, 'utf8').then(text => parseRoleBasedProfile(JSON.parse(text)),
-    (error: NodeJS.ErrnoException) => { if (error.code === 'ENOENT') return undefined; throw error; });
-  if (local) {
-    for (const key of ['requiredRole', 'readinessPath'] as const) {
-      if (local[key] !== profile[key]) {
-        throw new Error(`Azure configuration ${key} '${profile[key]}' does not match '${local[key]}' in role-based-data.json; ` +
-          'copy requiredRole and readinessPath from role-based-data.json into the Azure configuration.');
-      }
-    }
-  }
-  const dab: unknown = JSON.parse(await readFile(join(root, 'dab', 'dab-config.json'), 'utf8'));
-  validateRoleBasedCloudDab(dab, profile);
-  const procedureProblem = roleBasedProcedureProblem(dab, await readSqlSources(root));
-  if (procedureProblem) throw new Error(`${procedureProblem} Add each procedure to the SQL project under sql/ before building artifacts.`);
-}
-
-export async function roleBasedSchemaFingerprint(root = projectRoot): Promise<string> {
-  const hash = createHash('sha256').update(await readFile(join(root, 'dab', 'dab-config.json')));
-  async function add(directory: string): Promise<void> {
-    const entries = await readdir(directory, { withFileTypes: true });
-    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-      if (entry.isSymbolicLink()) throw new Error('Role-based schema inputs must not be symlinks');
-      const path = join(directory, entry.name);
-      if (entry.isDirectory()) {
-        if (!['obj', 'bin'].includes(entry.name)) await add(path);
-      } else if (/\.(sql|sqlproj)$/.test(entry.name)) {
-        hash.update(relative(root, path)).update('\0').update(await readFile(path)).update('\0');
-      }
-    }
-  }
-  await add(join(root, 'sql'));
-  return hash.digest('hex');
 }

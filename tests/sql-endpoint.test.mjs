@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import sql from 'mssql';
+import { EventEmitter } from 'node:events';
 import { mkdtemp, rm, realpath, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -68,9 +69,9 @@ async function fixture(t, target) {
   };
   t.mock.method(sql, 'ConnectionPool', function (config) {
     connections.push(config);
-    return { connect: async () => {}, close: async () => { closed++; }, request: () => ({
+    return Object.assign(new EventEmitter(), { connect: async () => {}, close: async () => { closed++; }, request: () => ({
       on() {}, query: async statement => { calls.push(['sql', statement]); return { recordset: rows(statement), recordsets: [rows(statement)] }; },
-    }) };
+    }) });
   });
   const runner = async (command, args, options) => {
     calls.push([command, ...args]);
@@ -87,9 +88,9 @@ test('endpoint queries preserve all SQL result sets, including trailing acceptan
   const f = await fixture(t, azure);
   const sets = [[{ outcome: 'missing' }], [{ '': 'PROCEDURE OWNERSHIP AND PERMISSIONS PASSED' }]];
   t.mock.method(sql, 'ConnectionPool', function () {
-    return { connect: async () => {}, close: async () => {}, request: () => ({
+    return Object.assign(new EventEmitter(), { connect: async () => {}, close: async () => {}, request: () => ({
       on() {}, query: async () => ({ recordset: sets[0], recordsets: sets }),
-    }) };
+    }) });
   });
   assert.deepEqual(await endpoint.endpointAdminQuery(azure, 'EXEC dbo.Example; SELECT marker;', f.runner), sets.flat());
 });
@@ -156,7 +157,9 @@ test('endpoint failures close their pool and redact the access token', async t =
   const f = await fixture(t, azure);
   let closed = false;
   t.mock.method(sql, 'ConnectionPool', function () {
-    return { connect: async () => { throw new Error('permission denied test-only-token'); }, close: async () => { closed = true; } };
+    return Object.assign(new EventEmitter(), {
+      connect: async () => { throw new Error('permission denied test-only-token'); }, close: async () => { closed = true; },
+    });
   });
   await assert.rejects(endpoint.verifyEndpoint(azure, f.runner), error => /permission denied/.test(error.message) && !error.message.includes('test-only-token'));
   assert.equal(closed, true);

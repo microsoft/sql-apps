@@ -22,130 +22,40 @@ async function optionalFile(path) {
   catch (error) { if (error.code === 'ENOENT') return undefined; throw error; }
 }
 
-function markdownSections(content) {
-  const sections = new Map();
-  let current;
-  for (const line of content.split(/\r?\n/)) {
-    const heading = /^##\s+(.+?)\s*$/.exec(line);
-    if (heading) {
-      current = heading[1];
-      sections.set(current, []);
-    } else if (current) sections.get(current).push(line);
-  }
-  return new Map([...sections].map(([name, lines]) => [name, lines.join('\n').trim()]));
-}
-
-function validateDesignIntent(content) {
-  const sections = markdownSections(content);
-  const required = [
-    'Audience', 'Primary recurring task', 'First-read information', 'Composition A', 'Composition B',
-    'Selected composition', 'Typography', 'Palette', 'Layout', 'Responsive behavior', 'Design capability',
-  ];
-  for (const name of required) {
-    if (!sections.get(name)) throw new Error(`Invalid docs/design-intent.md: missing ${name}.`);
-  }
-  for (const name of ['Composition A', 'Composition B']) {
-    const value = sections.get(name);
-    for (const field of ['Hierarchy', 'Density', 'Primary action']) {
-      if (!new RegExp(`^- ${field}:\\s+\\S`, 'mi').test(value)) {
-        throw new Error(`Invalid docs/design-intent.md: ${name} needs ${field}.`);
-      }
-    }
-  }
-  if (sections.get('Composition A').replace(/\s+/g, ' ') === sections.get('Composition B').replace(/\s+/g, ' ')) {
-    throw new Error('Invalid docs/design-intent.md: Composition A and Composition B must be distinct.');
-  }
-  for (const field of ['Choice', 'Why']) {
-    if (!new RegExp(`^- ${field}:\\s+\\S`, 'mi').test(sections.get('Selected composition'))) {
-      throw new Error(`Invalid docs/design-intent.md: Selected composition needs ${field}.`);
-    }
-  }
-  if (!/^- (?:Skill|Manual fallback reason):\s+\S/mi.test(sections.get('Design capability'))) {
-    throw new Error('Invalid docs/design-intent.md: record the design skill or a manual fallback reason.');
-  }
-}
-
 function reviewRows(content) {
   const rows = new Map();
+  let inMatrix = false;
+  let found = false;
   for (const line of content.split(/\r?\n/)) {
-    if (!line.trim().startsWith('|')) continue;
+    if (!line.trim().startsWith('|')) { inMatrix = false; continue; }
     const cells = line.trim().slice(1, -1).split('|').map(value => value.trim());
-    if (cells.length !== 3 || /^(?:State|-+)$/.test(cells[0])) continue;
+    if (cells.length === 3 && cells.join('|').toLowerCase() === 'state|desktop|narrow') {
+      inMatrix = true;
+      found = true;
+      continue;
+    }
+    if (!inMatrix || cells.every(value => /^:?-+:?$/.test(value))) continue;
+    if (cells.length !== 3) throw new Error('Invalid docs/design-review.md: coverage rows need State, Desktop and Narrow cells.');
     const state = cells[0].toLowerCase();
     if (rows.has(state)) throw new Error(`Invalid docs/design-review.md: duplicate ${cells[0]} row.`);
     rows.set(state, cells.slice(1));
   }
-  return rows;
-}
-
-function validateReviewMetadata(content) {
-  const sections = markdownSections(content);
-  const target = sections.get('Review target');
-  if (!target || !/^- Origin:\s+\S/mi.test(target) || !/^- Source\/build:\s+\S/mi.test(target)) {
-    throw new Error('Invalid docs/design-review.md: Review target needs Origin and Source/build.');
-  }
-  if (!sections.get('Findings')) {
-    throw new Error('Invalid docs/design-review.md: missing Findings.');
-  }
-}
-
-const critiqueFields = [
-  'Representative screen', 'First viewport', 'Defining information',
-  'Generic elements', 'Remove or demote', 'Top changes',
-];
-
-function field(section, name) {
-  return new RegExp(`^- ${name.replace(/[/]/g, '\\/')}:[ \\t]+\\S`, 'mi').test(section ?? '');
-}
-
-function designQuality(content) {
-  if (content === undefined) return { status: 'not judged', reason: 'design review missing' };
-  const sections = markdownSections(content);
-  const quality = sections.get('Design quality');
-  if (!quality) return { status: 'not judged', reason: 'no Design quality verdict' };
-  const verdict = /^- Verdict:[ \t]+(.+?)\s*$/mi.exec(quality)?.[1];
-  if (!verdict) throw new Error('Invalid docs/design-review.md: Design quality needs Verdict.');
-  const critique = sections.get('Critique');
-  const missing = critiqueFields.filter(name => !field(critique, name));
-  if (/^accepted$/i.test(verdict)) {
-    if (missing.length) {
-      throw new Error(`Invalid docs/design-review.md: accepted design quality needs Critique ${missing.join(', ')}.`);
-    }
-    if (!field(quality, 'Rationale')) {
-      throw new Error('Invalid docs/design-review.md: accepted design quality needs Rationale.');
-    }
-    return { status: 'accepted' };
-  }
-  const revise = /^revise:\s+(\S.*)$/i.exec(verdict);
-  if (revise) return { status: 'revise', reason: revise[1] };
-  const blocked = /^blocked:\s+(\S.*)$/i.exec(verdict);
-  if (blocked) return { status: 'blocked', reason: blocked[1] };
-  throw new Error(`Invalid docs/design-review.md: unsupported Design quality verdict "${verdict}".`);
+  return found ? rows : undefined;
 }
 
 function plural(count, word) {
   return `${count} ${word}${count === 1 ? '' : 's'}`;
 }
 
-function designReport(coverage, quality, intentPresent) {
-  const coverageLine = coverage.blocked ?
+function designReport(coverage, intentPresent, reviewPresent) {
+  const coverageLine = coverage === undefined ? 'not summarized; no state matrix recorded' : coverage.blocked ?
     `blocked: ${plural(coverage.blocked, 'cell')}${coverage.unreviewed ? `; ${coverage.unreviewed} unreviewed` : ''}` :
     coverage.unreviewed ? `partial: ${plural(coverage.unreviewed, 'unreviewed cell')}` :
       `complete (${plural(coverage.reviewed, 'reviewed cell')})`;
-  const qualityLine = quality.status === 'accepted' ? 'accepted' :
-    `${quality.status}: ${quality.reason}`;
-  const gaps = [];
-  if (!intentPresent) gaps.push('design intent missing');
-  if (coverage.blocked) gaps.push(`${plural(coverage.blocked, 'blocked cell')}`);
-  if (coverage.unreviewed) gaps.push(plural(coverage.unreviewed, 'unreviewed cell'));
-  if (quality.status !== 'accepted') gaps.push(`design quality ${quality.status}`);
-  const acceptance = !gaps.length ? 'accepted' :
-    (coverage.blocked || quality.status === 'blocked') ? `blocked: ${gaps.join('; ')}` :
-      `partial: ${gaps.join('; ')}`;
   return [
     `Rendered coverage: ${coverageLine}.`,
-    `Design quality: ${qualityLine}.`,
-    `Design acceptance: ${acceptance}.`,
+    `Design evidence: intent ${intentPresent ? 'recorded' : 'missing'}; review ${reviewPresent ? 'recorded' : 'missing'} (content not validated).`,
+    'Visual direction approval: not assessed by this check; report user feedback separately from agent assessment.',
   ];
 }
 
@@ -157,6 +67,8 @@ function validateReviewCell(value, state, viewport) {
 }
 
 async function designReviewStatus(root, content) {
+  const rows = content === undefined ? undefined : reviewRows(content);
+  if (!rows) return undefined;
   let required = [...requiredDesignStates];
   const roleConfig = await optionalFile(join(root, 'role-based-data.json'));
   if (roleConfig) {
@@ -165,9 +77,6 @@ async function designReviewStatus(root, content) {
       required.push(`role: ${parsed.requiredRole.trim()}`);
     }
   }
-  if (content === undefined) return { reviewed: 0, blocked: 0, unreviewed: required.length * 2 };
-  validateReviewMetadata(content);
-  const rows = reviewRows(content);
   let reviewed = 0;
   let blocked = 0;
   let unreviewed = 0;
@@ -181,16 +90,6 @@ async function designReviewStatus(root, content) {
     }
   }
   return { reviewed, blocked, unreviewed };
-}
-
-export async function inspectDesignAcceptance(root) {
-  const intent = await optionalFile(join(root, 'docs', 'design-intent.md'));
-  const review = await optionalFile(join(root, 'docs', 'design-review.md'));
-  if (intent !== undefined) validateDesignIntent(intent);
-  const coverage = await designReviewStatus(root, review);
-  const quality = designQuality(review);
-  return { accepted: intent !== undefined && coverage.unreviewed === 0 && coverage.blocked === 0 && quality.status === 'accepted',
-    coverage, quality, review };
 }
 
 async function filesBelow(root, optional = false) {
@@ -353,13 +252,14 @@ export async function checkApplication(root = process.cwd(), model) {
     optionalFile(join(root, 'docs', 'design-review.md')),
     customizedUi(root),
   ]);
-  if (intent !== undefined) validateDesignIntent(intent);
-  if (customized && intent === undefined) {
+  const intentPresent = Boolean(intent?.trim());
+  const reviewPresent = Boolean(review?.trim());
+  if (customized && !intentPresent) {
     console.log('Design warning: customized UI has no docs/design-intent.md.');
   }
   if (customized || intent !== undefined || review !== undefined) {
-    const coverage = await designReviewStatus(root, review);
-    for (const line of designReport(coverage, designQuality(review), intent !== undefined)) console.log(line);
+    const coverage = await designReviewStatus(root, reviewPresent ? review : undefined);
+    for (const line of designReport(coverage, intentPresent, reviewPresent)) console.log(line);
   }
   console.log(`Clean application passed (${config.name}): ${inspected} source/build/schema/test files; no selected examples.`);
 }

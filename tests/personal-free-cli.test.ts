@@ -95,6 +95,10 @@ test('publish status verifies live free settings and fails closed on drift', asy
     main(['invite', '--provider', 'aad', '--user', 'x', '--config', configPath], () => {}, inviteRun),
     /--role is required/,
   );
+  await assert.rejects(
+    main(['invite', '--role', 'owner', '--provider', 'google', '--user', 'x', '--config', configPath], () => {}, inviteRun),
+    /--provider must be aad or github/,
+  );
   assert.equal(invitations.length, 2);
 });
 

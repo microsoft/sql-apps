@@ -16,7 +16,7 @@ Follow **Describe -> Run locally -> Make it yours -> Share optionally**.
 ## Describe
 
 Use the explicitly selected verified archive CLI's `guide` before restore, then `npm run guide`.
-Saved decisions are not readiness or permission. Read only this stage's guide.
+Reuse saved product decisions; they are not readiness or permission. Read only this stage's guide.
 Ask one outcome-focused question about missing users, information or actions at a
 time; summarize exclusions. Never ask beginners to choose frameworks, Azure
 services or topology.

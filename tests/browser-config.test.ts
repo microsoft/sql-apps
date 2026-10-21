@@ -40,3 +40,12 @@ test('Entra browser configuration rejects nonboolean local backend flags', () =>
     assert.throws(() => parseBrowserConfig({ ...config, localBackend }), /Invalid local backend configuration/);
   }
 });
+
+test('Free hosting browser configuration accepts only preconfigured providers', () => {
+  for (const provider of ['aad', 'github']) {
+    assert.deepEqual(parseBrowserConfig({ mode: 'static-web-apps', provider, readinessPath }),
+      { mode: 'static-web-apps', provider, readinessPath });
+  }
+  assert.throws(() => parseBrowserConfig({ mode: 'static-web-apps', provider: 'google', readinessPath }),
+    /Invalid browser authentication/);
+});

@@ -10,9 +10,10 @@ import {
   personalFreeStatePath,
   planPersonalFreeDeployment,
   readPersonalFreeConfig,
+  readProtectedDeploymentState,
   rotatePersonalFreeRuntimeSecret,
 } from './personal-free-deployment.js';
-import { protectedDeploymentStateSchema } from './personal-free-config.js';
+import type { ProtectedDeploymentState } from './personal-free-config.js';
 import { verifyPersonalFreeCostGuard } from './personal-free-cost-guard.js';
 import { projectRoot } from './runtime-roots.js';
 
@@ -26,8 +27,8 @@ function usage(): string {
     '      --environment <dev|test|prod> --sharing <personal|team> --client-ip <public-ipv4>',
     '  sql-apps publish plan [--config <path>]',
     '  sql-apps publish deploy --approve <code> [--config <path>]',
-    '  sql-apps publish invite --role <owner|member> --provider <aad|github|google> --user <email-or-handle> [--config <path>]',
-    '  sql-apps publish invite-owner --provider <aad|github|google> --user <email-or-handle> [--config <path>]',
+    '  sql-apps publish invite --role <owner|member> --provider <aad|github> --user <email-or-handle> [--config <path>]',
+    '  sql-apps publish invite-owner --provider <aad|github> --user <email-or-handle> [--config <path>]',
     '  sql-apps publish rotate-secret --approve <current-deployment-code> [--config <path>]',
     '  sql-apps publish status [--config <path>]',
     '',
@@ -121,13 +122,12 @@ async function invite(args: readonly string[], command: Run, fixedRole?: 'owner'
   const role = fixedRole ?? take(values, '--role');
   if (!['owner', 'member'].includes(role)) throw new Error('--role must be owner or member');
   const provider = take(values, '--provider').toLowerCase();
-  if (!['aad', 'github', 'google'].includes(provider)) throw new Error('--provider must be aad, github, or google');
+  if (!['aad', 'github'].includes(provider)) throw new Error('--provider must be aad or github');
   const user = take(values, '--user');
   const configPath = resolve(take(values, '--config', defaultConfig));
   rejectUnknown(values);
   const config = await readPersonalFreeConfig(configPath);
-  const state = protectedDeploymentStateSchema.parse(JSON.parse(
-    await readFile(personalFreeStatePath(config), 'utf8')));
+  const state = await readProtectedDeploymentState(personalFreeStatePath(config));
   if (!state.staticWebAppName || !state.staticWebAppHostname) throw new Error('Deploy the application before inviting people');
   const invitation = await command('az', [
     'staticwebapp', 'users', 'invite',
@@ -149,14 +149,13 @@ async function status(args: readonly string[], command: Run): Promise<string> {
   const configPath = resolve(take(values, '--config', defaultConfig));
   rejectUnknown(values);
   const config = await readPersonalFreeConfig(configPath);
-  let serializedState: string;
+  let state: ProtectedDeploymentState;
   try {
-    serializedState = await readFile(personalFreeStatePath(config), 'utf8');
+    state = await readProtectedDeploymentState(personalFreeStatePath(config));
   } catch (error) {
     if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return 'Stage: not started';
     throw error;
   }
-  const state = protectedDeploymentStateSchema.parse(JSON.parse(serializedState));
   const report = await verifyPersonalFreeCostGuard(config, state, command);
   return [
     `Profile: ${config.profile}`,

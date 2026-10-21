@@ -294,6 +294,11 @@ export async function initLocal(container: string, run: Run, authorized: RoleBas
     try { state = await readLocal(container); }
     catch (error) {
       if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error;
+      const existing = await adminQuery(container,
+        `SET NOCOUNT ON; SELECT CASE WHEN DB_ID(N'${database}') IS NOT NULL OR SUSER_ID(N'${login}') IS NOT NULL THEN 1 ELSE 0 END;`, run);
+      if (existing.trim() !== '0') {
+        throw new Error('Cannot verify new SQL objects: objects may exist without recorded credentials; restore the credential receipt instead of resetting data or passwords');
+      }
       state = { container, password: `SqlApps1!${randomBytes(32).toString('hex')}` };
       await saveJson(stateFile, state);
     }

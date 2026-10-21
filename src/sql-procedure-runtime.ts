@@ -1,6 +1,7 @@
 import sql from 'mssql';
 import { z } from 'zod';
 import { appRoles, type AppRole } from './swa-principal.js';
+import { createSqlPool, observeSqlPool, sqlErrorNumber, SqlPoolError } from './sql-pool.js';
 
 export type ProcedureParameterType = 'nvarchar' | 'uniqueidentifier' | 'bit' | 'int' | 'datetime2';
 export interface ProcedureDefinition {
@@ -56,11 +57,6 @@ const transientErrors = new Set([
 ]);
 const delays = [5_000, 10_000, 20_000, 40_000, 60_000] as const;
 
-function errorNumber(error: unknown): number | undefined {
-  if (typeof error !== 'object' || error === null || !('number' in error)) return undefined;
-  return typeof error.number === 'number' ? error.number : undefined;
-}
-
 function inputType(type: ProcedureParameterType):
   ReturnType<typeof sql.NVarChar> | typeof sql.UniqueIdentifier | typeof sql.Bit | typeof sql.Int | typeof sql.DateTime2 {
   if (type === 'nvarchar') return sql.NVarChar(sql.MAX);
@@ -71,8 +67,10 @@ function inputType(type: ProcedureParameterType):
 }
 
 export function sqlProcedureConnection(pool: sql.ConnectionPool): SqlRuntimeConnection {
+  const check = observeSqlPool(pool);
   return {
     async execute(subject, role, procedure, values, definition) {
+      check();
       const transaction = new sql.Transaction(pool);
       let contextSet = false;
       let cleanupError: unknown;
@@ -122,7 +120,14 @@ export function sqlProcedureConnection(pool: sql.ConnectionPool): SqlRuntimeConn
 
 const mssqlDriver: SqlRuntimeDriver = {
   async connect(config) {
-    return sqlProcedureConnection(await new sql.ConnectionPool(config).connect());
+    const pool = createSqlPool(config);
+    try {
+      await pool.connect();
+      return sqlProcedureConnection(pool);
+    } catch (error) {
+      await pool.close();
+      throw error;
+    }
   },
 };
 
@@ -170,7 +175,7 @@ export function createProcedureRuntime(
         return await connection;
       } catch (error) {
         connection = undefined;
-        if (!transientErrors.has(errorNumber(error) ?? -1) || attempt >= delays.length) throw error;
+        if (!transientErrors.has(sqlErrorNumber(error) ?? -1) || attempt >= delays.length) throw error;
         await sleep(delays[attempt]!);
       }
     }
@@ -186,7 +191,7 @@ export function createProcedureRuntime(
       try {
         return await (await connect()).execute(subject, role, procedure, values, definition);
       } catch (error) {
-        if (error instanceof SqlConnectionDiscardedError) connection = undefined;
+        if (error instanceof SqlConnectionDiscardedError || error instanceof SqlPoolError) connection = undefined;
         throw error;
       }
   };

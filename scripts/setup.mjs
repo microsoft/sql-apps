@@ -146,7 +146,7 @@ export async function planSetup(value, options = {}, injected = {}) {
   const stages = [];
   const add = (id, status, nextAction, extra = {}) => stages.push({ id, status, nextAction, ...extra });
   const result = { version: 1, home, profile: options.profile ?? null, stages, bootstrap: source.bootstrap === true,
-    prerequisitesReady: false, gatewayReachable: false, running: false, workflowVerified: false,
+    prerequisitesReady: false, gatewayReachable: false, running: false, workflowVerification: 'not-assessed',
     scope: 'Local setup planning/live probes; not installation approval, production authentication or browser/SQL acceptance.' };
   const finish = () => ({ ...result, next: stages.find(stage => stage.status !== 'done') });
   add('checkout', source.ready ? 'done' : 'blocked', source.ready ? 'Intended checkout verified.' : source.nextAction);
@@ -246,7 +246,6 @@ export async function planSetup(value, options = {}, injected = {}) {
         { consent: permission, code: live.code });
     }
   }
-  add('acceptance', 'blocked', 'Verify an actual browser action and SQL save/reload, then one useful change. Record exact evidence through guide; a launch URL is not workflow acceptance.');
   return finish();
 }
 
@@ -317,7 +316,7 @@ export async function runSetup(home, options, injected = {}) {
       continue;
     }
     if (report.gatewayReachable && !report.running) return report;
-    if (report.next.status !== 'next') return report;
+    if (report.next?.status !== 'next') return report;
     const stage = report.next;
     if (previous === stage.id) return { ...report, next: { ...stage, status: 'blocked',
       nextAction: 'The completed command did not establish readiness. Inspect its output before retrying; no automatic repeat was performed.' } };
@@ -374,7 +373,7 @@ export function renderSetup(report, options = {}) {
   const lines = report.stages.map(stage => stage.status === 'done' ? `Done: ${stage.id}` :
     `${stage.status === 'blocked' ? 'Blocked' : 'Next'}: ${describe(stage)}`);
   if (report.approval) lines.push(...renderApproval(report.approval, options));
-  if (report.launchUrl) lines.push(`Running: ${report.launchUrl}; browser/SQL workflow verification is still required.`);
+  if (report.launchUrl) lines.push(`Running: ${report.launchUrl}; setup does not assess browser/SQL workflow acceptance. Report current evidence separately through sql-apps-validation.`);
   if (report.sqlRoutes?.recommended && report.sqlRoutes.recommended !== 'container') {
     const route = report.sqlRoutes.routes.find(item => item.provider === report.sqlRoutes.recommended);
     lines.push(`SQL alternative (not selected or approved): ${route.provider}. ${route.nextAction}`);
@@ -427,7 +426,7 @@ export async function main(args = process.argv.slice(2), home) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main().catch(error => {
-    if (process.argv.includes('--json')) console.log(JSON.stringify({ version: 1, running: false, workflowVerified: false,
+    if (process.argv.includes('--json')) console.log(JSON.stringify({ version: 1, running: false, workflowVerification: 'not-assessed',
       error: { code: 'SETUP_FAILED', nextAction: 'Review setup arguments, checkout manifests and permissions. No successful setup is claimed.' } }));
     else console.error(error instanceof Error ? error.message : 'Setup failed; inspect the selected checkout.');
     process.exitCode = 1;

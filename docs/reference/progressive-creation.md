@@ -54,7 +54,9 @@ External browser opening requires its own explicit user request.
 - SQL data requires an actual configured least-privilege query/save/reload.
 - Data access requires authorized procedure execution, not DAB liveness.
 - Browser acceptance requires the primary user journey and visible error handling.
-- Design acceptance requires rendered desktop and narrow review.
+- Usability review requires rendered desktop and narrow evidence.
+- User visual-direction approval requires attributed explicit feedback, not an
+  agent's own verdict or a passing checker.
 
 Build success, a process listener, an HTTP health response or historical notes
 do not establish these results. Follow [design acceptance](design-acceptance.md)

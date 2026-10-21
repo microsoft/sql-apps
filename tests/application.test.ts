@@ -111,62 +111,70 @@ const designReview = `# Design Review
 
 const coverageOnlyReview = designReview.split('\n## Critique')[0] + '\n';
 
-test('design gate warns for customized UI and validates intent and review artifacts', async t => {
+test('design evidence reports coverage without treating agent assessments as approval', async t => {
   const root = await designFixture(t);
   const missing = await run(process.execPath, [checker, root]);
   assert.match(missing, /Design warning: customized UI has no docs[\\/]design-intent\.md/);
-  assert.match(missing, /Rendered coverage: partial: 22 unreviewed cells/);
-  assert.match(missing, /Design acceptance: partial: design intent missing; 22 unreviewed cells/);
-
-  await writeFile(join(root, 'docs', 'design-intent.md'), designIntent.replace(/## Composition B[\s\S]*?## Selected composition/, '## Selected composition'));
-  await assert.rejects(run(process.execPath, [checker, root]), /Composition B/);
+  assert.match(missing, /Rendered coverage: not summarized; no state matrix recorded/);
+  assert.match(missing, /Visual direction approval: not assessed by this check/);
 
   await writeFile(join(root, 'docs', 'design-intent.md'), designIntent);
   await writeFile(join(root, 'docs', 'design-review.md'), designReview.replace('| empty | observed | observed |', '| empty | observed | |'));
   const partial = await run(process.execPath, [checker, root]);
   assert.match(partial, /Rendered coverage: partial: 1 unreviewed cell\b/);
-  assert.match(partial, /Design quality: accepted\./);
-  assert.match(partial, /Design acceptance: partial: 1 unreviewed cell\b/);
+  assert.match(partial, /Design evidence: intent recorded; review recorded \(content not validated\)/);
+  assert.doesNotMatch(partial, /Design (?:quality|acceptance): accepted/);
 
   await writeFile(join(root, 'docs', 'design-review.md'),
     designReview.replace('| error | observed | observed |', '| error | blocked: API unavailable | observed |'));
   const blocked = await run(process.execPath, [checker, root]);
   assert.match(blocked, /Rendered coverage: blocked: 1 cell\b/);
-  assert.match(blocked, /Design acceptance: blocked: 1 blocked cell\b/);
 
   await writeFile(join(root, 'docs', 'design-review.md'), coverageOnlyReview);
   const coverageOnly = await run(process.execPath, [checker, root]);
   assert.match(coverageOnly, /Rendered coverage: complete \(22 reviewed cells\)/);
-  assert.match(coverageOnly, /Design quality: not judged: no Design quality verdict/);
-  assert.match(coverageOnly, /Design acceptance: partial: design quality not judged/);
-  assert.doesNotMatch(coverageOnly, /Design acceptance: accepted/, 'Coverage alone must not accept the design');
-
-  await writeFile(join(root, 'docs', 'design-review.md'),
-    designReview.replace('- Verdict: accepted', '- Verdict: revise: summary tiles still dominate the first viewport'));
-  const revise = await run(process.execPath, [checker, root]);
-  assert.match(revise, /Design quality: revise: summary tiles still dominate/);
-  assert.match(revise, /Design acceptance: partial: design quality revise/);
-
-  await writeFile(join(root, 'docs', 'design-review.md'), designReview.replace(/^- Generic elements:.*$/m, ''));
-  await assert.rejects(run(process.execPath, [checker, root]), /accepted design quality needs Critique Generic elements/);
-
-  await writeFile(join(root, 'docs', 'design-review.md'), designReview.replace(/^- Rationale:.*$/m, ''));
-  await assert.rejects(run(process.execPath, [checker, root]), /needs Rationale/);
-
-  await writeFile(join(root, 'docs', 'design-review.md'), designReview.replace('- Verdict: accepted', '- Verdict: looks good'));
-  await assert.rejects(run(process.execPath, [checker, root]), /unsupported Design quality verdict/);
+  assert.match(coverageOnly, /Visual direction approval: not assessed by this check/);
 
   await writeFile(join(root, 'docs', 'design-review.md'), designReview);
-  const accepted = await run(process.execPath, [checker, root]);
-  assert.match(accepted, /Rendered coverage: complete \(22 reviewed cells\)/);
-  assert.match(accepted, /Design quality: accepted\./);
-  assert.match(accepted, /Design acceptance: accepted\./);
-  assert.doesNotMatch(accepted, /Design warning/);
+  const recorded = await run(process.execPath, [checker, root]);
+  assert.match(recorded, /Rendered coverage: complete \(22 reviewed cells\)/);
+  assert.match(recorded, /Visual direction approval: not assessed by this check/);
+  assert.doesNotMatch(recorded, /Design warning|Design acceptance: accepted/);
 
+  await writeFile(join(root, 'docs', 'design-review.md'), designReview.replace('Top changes:', 'Top changes, first pass:'));
+  assert.equal(await run(process.execPath, [checker, root]), recorded, 'equivalent critique wording cannot change the result');
+});
+
+test('design notes allow concise prose without exact headings or a mandatory matrix', async t => {
+  const root = await designFixture(t);
   await writeFile(join(root, 'docs', 'design-intent.md'),
-    designIntent.replace('- Skill: sql-apps-design', '- Manual fallback reason: The original host lacked a design skill.'));
-  const legacy = await run(process.execPath, [checker, root]);
-  assert.match(legacy, /Design acceptance: accepted\./);
+    'Use a workshop ledger rather than dashboard tiles: tabular figures, numbered pay slips, ink rules and a compact exceptions queue.');
+  await writeFile(join(root, 'docs', 'design-review.md'),
+    'At http://127.0.0.1:30000, build abc123: desktop and narrow pay-run screens rendered. ' +
+    'Agent assessment: readable, but too generic; replace summary tiles with pay slips. User visual approval pending.\n\n' +
+    '| Finding | Author | Action |\n| --- | --- | --- |\n| Spacing | Agent | Tighten |\n');
+  const output = await run(process.execPath, [checker, root]);
+  assert.match(output, /Rendered coverage: not summarized; no state matrix recorded/);
+  assert.match(output, /Design evidence: intent recorded; review recorded/);
+  assert.doesNotMatch(output, /accepted|Design warning/);
+
+  await writeFile(join(root, 'docs', 'design-intent.md'), '  \n');
+  await writeFile(join(root, 'docs', 'design-review.md'), '');
+  const empty = await run(process.execPath, [checker, root]);
+  assert.match(empty, /Design evidence: intent missing; review missing/);
+});
+
+test('optional coverage matrices reject contradictory or invented status claims', async t => {
+  const root = await designFixture(t);
+  await writeFile(join(root, 'docs', 'design-review.md'),
+    designReview.replace('| empty | observed | observed |', '| empty | looks great | observed |'));
+  await assert.rejects(run(process.execPath, [checker, root]), /unsupported status "looks great"/);
+  await writeFile(join(root, 'docs', 'design-review.md'),
+    designReview.replace('| empty | observed | observed |', '| empty | observed | observed |\n| empty | observed | observed |'));
+  await assert.rejects(run(process.execPath, [checker, root]), /duplicate empty row/);
+  await writeFile(join(root, 'docs', 'design-review.md'),
+    designReview.replace('| empty | observed | observed |', '| empty | observed |'));
+  await assert.rejects(run(process.execPath, [checker, root]), /coverage rows need State, Desktop and Narrow cells/);
 });
 
 test('clean application validation rejects leftovers in each actual delivery surface', async t => {

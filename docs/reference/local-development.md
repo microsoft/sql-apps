@@ -224,6 +224,11 @@ npm run local -- data
 
 Gitignored `.sql-apps` holds per-container SQL credentials and generated local DAB configuration. Preserve credentials alongside their persistent volumes and protect them as secrets. Lost/mismatched credentials fail explicitly; the CLI does not silently reset an existing login. Bootstrap secrets remain in Docker configuration, not repository files. Do not check in state files or share Docker inspections.
 
+When the local credential receipt is missing, `init` verifies that neither its
+database nor its login exists before saving new credentials or publishing any
+schema. Existing objects or an unverifiable response stop initialization;
+restore the original receipt rather than generating a replacement password.
+
 Ownership labels prevent accidental replacement/removal of unrelated containers. Isolated lifecycle checks also verify workspace labels, expected image/provenance shape and loopback published ports before modifying containers; SQL volumes and networks have workspace ownership labels. An unlabeled or mismatched container occupying a project name produces an actionable error rather than being deleted.
 
 ## What is and is not verified

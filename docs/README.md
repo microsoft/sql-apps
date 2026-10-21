@@ -21,7 +21,7 @@ To try something already implemented, use the [Todo reference app](../examples/t
 - [Remember local permissions](reference/local-consent.md): one setup approval covering restore, build, workspace, startup and SQL terms, reusable grants and revocation.
 - [Manage projects](reference/projects.md): create independent application repositories under the user-level SQL Apps project root.
 - [Authentication and application access](reference/authentication.md): account states, local preview, real Entra opt-in, access permissions and current/future hosting boundaries.
-- [Design acceptance](reference/design-acceptance.md): design intent, the render-critique-improve loop, rendered coverage versus design quality, and final verdicts.
+- [Design review and visual approval](reference/design-acceptance.md): visual direction, early rendered critique, flexible evidence notes, and separate functional, usability and user approval judgments.
 - [Application read performance](reference/read-performance.md): bounded reads, redundant requests, safe cache proposals and comparable user-action measurements.
 - [Role-based-data profile](reference/role-based-data.md): SQL/DAB/browser startup, application-role authorization and private SQL Azure deployment.
 - [SQL Apps plugin](reference/plugins.md): assistant support, installation, explicit project selection and native loader verification.

@@ -125,6 +125,12 @@ test('selected build gate rejects profile, source, namespace and route mismatche
     await assert.rejects(buildSelectedApplication(home, name, 'public-demo'), /selection|ENOENT/);
   }
   const built = await buildSelectedApplication(home, 'inventory', 'local-simulation');
+  for (const path of ['Dockerfile', '.dockerignore', 'dab/Dockerfile']) {
+    await assert.rejects(readFile(join(built.directory, path)), { code: 'ENOENT' });
+    assert.equal(built.manifest.files.some(file => file.path === path), false);
+  }
+  assert.ok(built.manifest.files.some(file => file.path === 'server/start.mjs'));
+  assert.ok(built.manifest.files.some(file => file.path === 'public/index.html'));
   await assert.rejects(checkSelectedApplication(home, built.directory, 'public-demo'), /profile/);
   await writeFile(join(home, 'examples/inventory/web/app.ts'), 'document.body.textContent="Changed source";');
   await assert.rejects(checkSelectedApplication(home, built.directory, 'local-simulation'), /source/);

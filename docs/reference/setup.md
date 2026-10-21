@@ -387,7 +387,7 @@ and, for Entra, tenant ID and API client ID; see
 ownership/authentication blocker, never permission to silently adopt or replace
 the gateway. An unready match remains a nonzero launch blocker; recovery is
 recognized by the next probe without restarting the gateway.
-`workflowVerified` still remains false.
+Setup does not assess domain acceptance.
 
 New startup runs the stages start-sql -> init -> data -> serve and requires the
 configured readiness procedure before listening; it publishes a launch URL only
@@ -409,6 +409,11 @@ save/reload, relevant authorization and one useful change. Save only agreed
 decisions and exact safe evidence through `guide`; checkpoints are historical,
 not live acceptance or permission.
 
-The report deliberately keeps `workflowVerified: false`: setup does not know
-your domain acceptance action. Local simulated identities are not production
-Entra sign-in. Sharing remains a separately approved optional journey.
+The report uses `workflowVerification: "not-assessed"`: setup does not know
+your domain acceptance action and does not read external browser/design evidence.
+Once its own stages are done, there is no next setup stage, rather than a
+permanently blocked acceptance stage. This neither rejects evidence collected
+elsewhere nor claims it passed. Use the validation report for functional
+acceptance, agent usability review and attributed user visual-direction feedback.
+Local simulated identities are not production Entra sign-in. Sharing remains a
+separately approved optional journey.

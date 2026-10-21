@@ -10,11 +10,14 @@ import {
   initPersonalFreeConfig,
   planPersonalFreeDeployment,
   readPersonalFreeConfig,
+  readProtectedDeploymentState,
   saveProtectedDeploymentState,
   verifyPersonalFreeReadiness,
   verifyPersonalFreeInfrastructure,
 } from '../src/personal-free-deployment.js';
 import type { Run } from '../src/process.js';
+import { run } from '../src/process.js';
+import { readProtectedJson } from '../src/sql-endpoint.js';
 
 const subscriptionId = '11111111-1111-4111-8111-111111111111';
 const tenantId = '22222222-2222-4222-8222-222222222222';
@@ -157,7 +160,12 @@ test('protected deployment state contains strong secrets and is written privatel
   assert.notEqual(state.sqlAdministratorPassword, state.runtimePassword);
   const path = join(directory, 'state.json');
   await saveProtectedDeploymentState(path, state);
-  assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), state);
+  if (process.platform === 'win32') {
+    const serialized = await readFile(path, 'utf8');
+    assert.equal(serialized.includes(state.runtimePassword), false);
+    assert.equal(serialized.includes(state.sqlAdministratorPassword), false);
+  }
+  assert.deepEqual(await readProtectedJson(path, run), state);
   if (process.platform !== 'win32') assert.equal((await stat(path)).mode & 0o777, 0o600);
 });
 
@@ -171,6 +179,20 @@ test('a newly approved build preserves protected credentials for the existing de
   assert.equal(revised.stage, 'new');
   assert.equal(revised.sqlAdministratorPassword, state.sqlAdministratorPassword);
   assert.equal(revised.runtimePassword, state.runtimePassword);
+});
+
+test('reading legacy deployment state protects it without replacing its credentials', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'sql-apps-legacy-state-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const path = join(directory, 'state.json');
+  const state = createProtectedDeploymentState('abcdef123456');
+  await writeFile(path, JSON.stringify(state));
+  const messages: string[] = [];
+  t.mock.method(console, 'error', (message: string) => { messages.push(message); });
+  assert.deepEqual(await readProtectedDeploymentState(path), state);
+  assert.deepEqual(await readProtectedJson(path, run), state);
+  assert.match(messages.join('\n'), /Protecting legacy plaintext/);
+  assert.equal(messages.join('\n').includes(state.runtimePassword), false);
 });
 
 test('infrastructure stage is returned only after the live cost guard passes', async () => {

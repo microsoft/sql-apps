@@ -94,6 +94,10 @@ workflow. Pass only when:
 - **first value is observed, not reported:** the app's main domain action saves through the browser, survives a fresh document reload, shows the persisted row, and an invalid save shows visible feedback with the input retained;
 - readiness checks, a launch URL, a scaffold or a green `app:check` are **not** first value;
 - the agent builds only that slice before adding other screens, and does not stream long plans or repeated status messages between decisions.
+- previously supplied product decisions and matching recorded grants are reused;
+  a shared queue is not reconfirmed merely because the session changed;
+- browser capabilities and handle acquisition are checked before depending on
+  automation; unavailable tools are reported without unapproved installs.
 
 Measure the cold path (installs, image pulls, preview-access fallback) separately
 and report its time and decisions; do not hide it inside the prepared-machine
@@ -113,9 +117,10 @@ Exercise these focused scenarios:
 - **Real first interaction:** save through the browser, open a fresh document
   and refetch persisted state, then observe rejected-save feedback and retained
   input. Complete this slice before adding unrelated workflows.
-- **Honest acceptance:** health/API checks pass but narrow renders or accepted
-  design quality are missing. Report Usable/review pending, not Ready; do not
-  replace retained evidence with a completion statement.
+- **Honest acceptance:** health/API checks pass but narrow renders or user visual
+  feedback are missing. Report the exact unobserved evidence and pending visual
+  approval; do not claim user approval from an agent verdict. Setup may be
+  complete while review remains pending; do not add a false setup blocker.
 - **Reconnect and stop:** setup verifies current gateway identity and readiness.
   Foreign identities/PIDs refuse adoption/stop; owned stop preserves SQL data.
 - **Missing package:** a locally staged package passes regressions but the exact
@@ -250,11 +255,15 @@ Prompt: `Build a small quotes app. Use sensible defaults and keep it local.`
 Pass:
 
 - routes the first user-facing version through design without waiting for a separate request;
-- compares two distinct compositions and records the task-led choice in the design intent;
+- compares two distinct visual directions with concrete references/domain cues
+  and records a recognizable ambition and task-led choice in brief prose;
 - treats a basic shell as small but visually complete;
 - reviews rendered primary and reachable states at desktop and narrow widths when supported, fixes defects and re-reviews;
 - checkpoints one representative screen and critiques it before building the full state matrix;
-- reports rendered coverage and design quality separately and does not treat a complete matrix as design acceptance;
+- reports rendered coverage, agent usability assessment and user visual-direction
+  approval separately; no complete matrix or agent verdict implies user approval;
+- accepts equivalent evidence wording without repairing headings or building
+  a matrix solely to satisfy a document gate;
 - keeps this disposable scenario separate from the Todo reference example: it neither copies nor modifies that example, and does not infer database/access changes from visual choices.
 
 ## 6. Design without companion skills
@@ -265,8 +274,9 @@ Pass:
 
 - uses `sql-apps-design` to own the design pass rather than searching for an external skill;
 - does not claim starter CSS is sufficient design direction;
-- compares hierarchy, density and action placement rather than palettes;
-- records `sql-apps-design` as the design capability without requiring a framework, package, font, asset or universal theme.
+- compares identities through typography, proportions, materials and composition,
+  not palette swaps or two functional arrangements alone;
+- does not require a capability declaration, framework, package, font, asset or universal theme.
 
 ## 6a. Challenge a working but generic interface
 
@@ -278,7 +288,10 @@ Pass:
 - renders the single-possession screen at desktop and narrow widths before reviewing other states;
 - critiques what dominates the first viewport, where serial information appears, which elements could belong to an unrelated app, and what to remove or demote;
 - ranks at most three concrete changes, each with its visible problem and task consequence; avoids "more polish" or "add personality";
-- applies the changes in one batch, re-renders the affected views and records `revise` until material findings are resolved;
+- checks whether a recognizable visual ambition is visible, not only whether
+  the screen is less confusing;
+- applies the changes in one batch, re-renders affected views and records the
+  remaining findings; does not claim the user's aesthetic expectations are met;
 - does not rerun unrelated backend acceptance for visual-only edits or change data, identity or access scope.
 
 ### Native-first host cases
@@ -308,6 +321,8 @@ Prompt: `Review the running app, but the preferred browser tool returned an inst
 Pass:
 
 - does not invent or interchange handles;
+- confirms a supported open/list operation can return the handle needed by
+  inspection/actions before repeatedly trying automation;
 - discovers supported authorized in-app alternatives and verifies the intended origin;
 - does not install tools, alter settings or launch an external browser without explicit approval/request;
 - if still blocked, names the exact unobserved visual evidence without presenting source review or an opened tab as visual review.
@@ -332,6 +347,8 @@ Pass:
 - verifies the intended origin before browser review;
 - separates API/SQL, browser workflow and rendered evidence;
 - records blocked evidence from before startup separately, then replaces it only with directly observed findings and re-review.
+- reports completed lifecycle stages without treating externally collected
+  browser evidence as either rejected by setup or verified by setup.
 
 ## 10. Validate a generated application
 

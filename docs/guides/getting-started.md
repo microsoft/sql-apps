@@ -157,7 +157,9 @@ administrator changes, recovery, destructive cleanup and cloud work remain separ
 Use the returned launch URL only after intended ownership/readiness verification.
 Health and compilation do not prove a working app: save a record, reload a new
 browser document, and verify a visible invalid-save error. Render and review the
-desktop and narrow layouts. Keep unobserved acceptance explicitly blocked.
+desktop and narrow layouts. Name unobserved functional evidence and unresolved
+usability findings; report user visual-direction approval separately as pending
+unless explicit feedback supports it. Setup does not judge these results.
 
 See [Run locally](run-locally.md), [remembered permissions](../reference/local-consent.md)
 and [setup](../reference/setup.md) for lifecycle and data-preserving recovery.

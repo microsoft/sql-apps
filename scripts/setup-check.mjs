@@ -2,12 +2,11 @@ import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readFile, access, realpath, lstat, mkdir, writeFile } from 'node:fs/promises';
 import { totalmem, hostname, release } from 'node:os';
-import { createServer } from 'node:net';
 import { dirname, join, relative, resolve, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 import { randomUUID, createHash } from 'node:crypto';
-import { runtimeFor, describeWorkspace } from '../src/workspace.mjs';
+import { runtimeFor, describeWorkspace, portState } from '../src/workspace.mjs';
 import { readSqlSources, roleBasedDabProblem, roleBasedProcedureProblem, roleBasedProfileProblem } from '../src/role-based-rules.mjs';
 import { readProjectManifest } from '../src/project-contract.mjs';
 import { projectHome, toolingHome } from '../src/tooling-context.mjs';
@@ -32,21 +31,6 @@ export async function runProbe(command, args, root) {
     throw new Error('NPM_UNAVAILABLE');
   }
   return (await execute(command, args, options)).stdout;
-}
-
-async function portState(port) {
-  return new Promise(done => {
-    const server = createServer();
-    const timer = setTimeout(() => { server.close(); done('unknown'); }, 2000);
-    server.once('error', error => {
-      clearTimeout(timer);
-      done(error.code === 'EADDRINUSE' ? 'occupied' : 'unknown');
-    });
-    server.listen({ host: '127.0.0.1', port, exclusive: true }, () => {
-      clearTimeout(timer);
-      server.close(() => done('free'));
-    });
-  });
 }
 
 export function parseArguments(args) {

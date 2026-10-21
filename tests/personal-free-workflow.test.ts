@@ -1,6 +1,6 @@
 import { after, test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import sql from 'mssql';
@@ -56,6 +56,7 @@ async function fixture(t: TestContext) {
     query: async (_statement: string) => {},
     publish: async (_path: string) => {},
     infrastructure: async (_path: string) => {},
+    parameters: async (_path: string) => {},
     ready: true,
   };
   const run: Run = async (command, args) => {
@@ -76,6 +77,7 @@ async function fixture(t: TestContext) {
       if (args[0] === 'provider') return 'Registered';
       if (args[0] === 'group') return '';
       if (args[0] === 'deployment') {
+        await hooks.parameters(value('--parameters').slice(1));
         await hooks.infrastructure(value('--template-file'));
         return JSON.stringify(Object.fromEntries(Object.entries(outputs).map(([key, entry]) => [key, { value: entry }])));
       }
@@ -172,7 +174,7 @@ test('firewall cleanup failure reports a recovery command and never reports read
   };
   await assert.rejects(deployment.deployPersonalFree(config, f.approval, run),
     /Could not remove temporary SQL firewall rule sql-apps-deploy-[a-f0-9]+;.*az sql server firewall-rule delete/);
-  assert.notEqual(JSON.parse(await readFile(f.statePath, 'utf8')).stage, 'ready');
+  assert.notEqual((await deployment.readProtectedDeploymentState(f.statePath)).stage, 'ready');
 });
 
 test('cloud planning requires explicit operator SQL access and binds it to approval', () => {
@@ -182,6 +184,34 @@ test('cloud planning requires explicit operator SQL access and binds it to appro
   assert.match(first.summary, /203\.0\.113\.10\/32/);
   assert.notEqual(first.approval,
     deployment.planPersonalFreeDeployment({ ...config, deploymentClientIp: '203.0.113.11' }, 'source').approval);
+});
+
+test('temporary deployment parameters are protected before Azure can read their passwords', async t => {
+  const f = await fixture(t);
+  let parameters: string | undefined;
+  f.hooks.parameters = async path => {
+    parameters = path;
+    assert.equal(JSON.parse(await readFile(path, 'utf8')).parameters.runtimePassword.value, f.saved.runtimePassword);
+    if (process.platform === 'win32') {
+      const access = JSON.parse(await execute('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+        '$ErrorActionPreference="Stop";$path=[Console]::In.ReadToEnd();$acl=[IO.Directory]::GetAccessControl($path);' +
+        '@{protected=$acl.AreAccessRulesProtected;users=@($acl.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])|ForEach-Object {$_.IdentityReference.Value});' +
+        'current=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value}|ConvertTo-Json -Compress'],
+      { input: dirname(path) }));
+      assert.equal(access.protected, true);
+      assert.deepEqual(access.users, [access.current]);
+    } else {
+      assert.equal((await stat(dirname(path))).mode & 0o777, 0o700);
+      assert.equal((await stat(path)).mode & 0o777, 0o600);
+    }
+  };
+  await deployment.deployPersonalFree(config, f.approval, f.run);
+  assert.ok(parameters);
+  await assert.rejects(readFile(parameters), { code: 'ENOENT' });
+  await assert.rejects(stat(dirname(parameters)), { code: 'ENOENT' });
+  f.hooks.parameters = async path => { parameters = path; throw new Error('synthetic infrastructure failure'); };
+  await assert.rejects(deployment.deployPersonalFree(config, f.approval, f.run), /synthetic infrastructure failure/);
+  await assert.rejects(stat(dirname(parameters)), { code: 'ENOENT' });
 });
 
 test('deployment launches the installed SWA JavaScript entry with Node on every platform', async t => {
@@ -206,7 +236,7 @@ test('rotation durably saves its pending password before SQL and resumes it afte
     throw new Error('synthetic disconnect after ALTER USER');
   };
   await assert.rejects(deployment.rotatePersonalFreeRuntimeSecret(config, f.approval, f.run), /synthetic disconnect/);
-  const pending = JSON.parse(await readFile(f.statePath, 'utf8'));
+  const pending = await deployment.readProtectedDeploymentState(f.statePath);
   assert.equal(pending.runtimePassword, password);
   assert.notEqual(pending.runtimePassword, f.saved.runtimePassword);
   assert.notEqual(pending.stage, 'ready');
@@ -225,6 +255,6 @@ test('rotation cannot mark an application ready when the final readiness check f
   const f = await fixture(t);
   f.hooks.ready = false;
   await assert.rejects(deployment.rotatePersonalFreeRuntimeSecret(config, f.approval, f.run), /readiness/i);
-  assert.notEqual(JSON.parse(await readFile(f.statePath, 'utf8')).stage, 'ready');
+  assert.notEqual((await deployment.readProtectedDeploymentState(f.statePath)).stage, 'ready');
   assert.equal(f.rules.size, 0);
 });

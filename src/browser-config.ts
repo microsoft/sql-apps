@@ -4,7 +4,7 @@ export const authRedirectPath = '/auth/redirect.html';
 export type BrowserConfig =
   | { mode: 'entra'; tenantId: string; clientId: string; scope: string; localBackend?: boolean; readinessPath: string }
   | { mode: 'local'; readinessPath: string }
-  | { mode: 'static-web-apps'; provider: 'aad' | 'github' | 'google'; readinessPath: string };
+  | { mode: 'static-web-apps'; provider: 'aad' | 'github'; readinessPath: string };
 
 export function parseBrowserConfig(value: unknown): BrowserConfig {
   if (!value || typeof value !== 'object') throw new Error('Invalid browser configuration');
@@ -14,8 +14,8 @@ export function parseBrowserConfig(value: unknown): BrowserConfig {
   }
   if ('mode' in value && value.mode === 'local') return { mode: 'local', readinessPath };
   if ('mode' in value && value.mode === 'static-web-apps' && 'provider' in value &&
-      ['aad', 'github', 'google'].includes(String(value.provider))) {
-    return { mode: 'static-web-apps', provider: value.provider as 'aad' | 'github' | 'google', readinessPath };
+      (value.provider === 'aad' || value.provider === 'github')) {
+    return { mode: 'static-web-apps', provider: value.provider, readinessPath };
   }
   if ('mode' in value && value.mode === 'entra' && 'tenantId' in value && typeof value.tenantId === 'string' && value.tenantId &&
       'clientId' in value && typeof value.clientId === 'string' && value.clientId &&

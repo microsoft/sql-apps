@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { buildPersonalFreeArtifact, type PersonalFreeBuildManifest } from '../src/personal-free-build.js';
 import { parseBrowserConfig } from '../src/browser-config.js';
-import type { Run } from '../src/process.js';
+import { run as execute, type Run } from '../src/process.js';
 
 const compile: Run = async (command, args) => {
   if (command === 'dotnet' && args[0] === 'build') {
@@ -64,7 +64,7 @@ test('personal-free build emits only static and managed Functions artifacts', as
     'static/app.js',
     'static/staticwebapp.config.json',
     'static/auth-config.json',
-    'api/dist/index.mjs',
+    'api/dist/index.cjs',
     'api/host.json',
     'api/package.json',
     'deployment/database.dacpac',
@@ -80,9 +80,37 @@ test('personal-free build emits only static and managed Functions artifacts', as
   });
   const serialized = await readFile(join(destination, 'personal-free-build.json'), 'utf8');
   assert.doesNotMatch(serialized, /password|token|connection/i);
-  const entry = await readFile(join(destination, 'api', 'dist', 'index.mjs'), 'utf8');
+  const entry = await readFile(join(destination, 'api', 'dist', 'index.cjs'), 'utf8');
   assert.doesNotMatch(entry, /test-only-not-a-real-password/);
   assert.match(entry, /parsePersonalFreeBody/);
+  const apiPackage = JSON.parse(await readFile(join(destination, 'api', 'package.json'), 'utf8'));
+  await execute(process.execPath, [join(destination, 'api', apiPackage.main)], {
+    env: {
+      NODE_PATH: '',
+      AZURE_SQL_SERVER: 'startup.database.windows.net',
+      AZURE_SQL_DATABASE: 'app',
+      AZURE_SQL_USER: 'sql_apps_runtime',
+      AZURE_SQL_PASSWORD: 'startup-test-only-not-a-real-password',
+    },
+    timeoutMs: 30_000,
+  });
+});
+
+test('personal-free build rejects Google authentication before compiling or publishing output', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'sql-apps-free-provider-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(join(root, 'public'));
+  for (const name of ['index.html', 'style.css', 'app.js', 'staticwebapp.config.json']) {
+    await writeFile(join(root, 'public', name), '{}');
+  }
+  await writeFile(join(root, 'personal-free-api.json'), JSON.stringify({
+    version: 1, authenticationProvider: 'google',
+    routes: [{ method: 'GET', path: '/api/AppReady', procedure: { name: 'AppReady', parameters: {} } }],
+  }));
+  await assert.rejects(buildPersonalFreeArtifact(root, join(root, 'artifact'), async () => {
+    assert.fail('Invalid authentication must not invoke a compiler');
+  }), /authenticationProvider/);
+  await assert.rejects(readFile(join(root, 'artifact', 'personal-free-build.json')), { code: 'ENOENT' });
 });
 
 test('personal-free build publishes every application asset under public', async t => {
@@ -167,8 +195,8 @@ test('personal-free build requires member access to readiness when members can c
   await assert.rejects(build(root, join(root, 'artifact')), /unique/);
   await writeFile(join(root, 'personal-free-api.json'), api(['owner', 'member']));
   await build(root, join(root, 'artifact'));
-  const entry = await readFile(join(root, 'artifact', 'api', 'dist', 'index.mjs'), 'utf8');
-  assert.match(entry, /"roles":\["owner","member"\]/);
+  const snapshot = JSON.parse(await readFile(join(root, 'artifact', 'deployment', 'api.json'), 'utf8'));
+  assert.deepEqual(snapshot.routes[0].roles, ['owner', 'member']);
 });
 
 test('personal-free approval fingerprint includes the compiled SQL package', async t => {
@@ -212,7 +240,7 @@ test('personal-free browser readiness skips parameterized and nested routes', as
   await build(root, join(root, 'artifact'));
   const config = parseBrowserConfig(JSON.parse(await readFile(join(root, 'artifact', 'static', 'auth-config.json'), 'utf8')));
   assert.equal(config.readinessPath, '/api/AppReady');
-  const entry = await readFile(join(root, 'artifact', 'api', 'dist', 'index.mjs'), 'utf8');
+  const entry = await readFile(join(root, 'artifact', 'api', 'dist', 'index.cjs'), 'utf8');
   assert.match(entry, /readinessProcedure: "AppReady"/);
 
   for (const route of routes.slice(0, 2)) {

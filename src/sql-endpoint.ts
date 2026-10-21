@@ -1,7 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { lstat, readFile } from 'node:fs/promises';
 import { join, sep } from 'node:path';
-import sql from 'mssql';
 import { z } from 'zod';
 import { validateSqlTarget, sqlTargetFingerprint, type SqlTarget } from './sql-target.mjs';
 import { saveJson, withStateLock } from './state-files.js';
@@ -10,6 +9,7 @@ import { roleBasedProcedureGrants, type RoleBasedProfile } from './role-based-pr
 import { projectPath, toolingAsset } from './runtime-roots.js';
 import type { Run } from './process.js';
 import { ensureLocalSqlPackage } from './local.js';
+import { createSqlPool, observeSqlPool, sqlErrorNumber } from './sql-pool.js';
 
 export type EndpointTarget = Exclude<SqlTarget, { provider: 'container' }>;
 const identifier = z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,127}$/);
@@ -99,7 +99,7 @@ async function queryOnce(target: EndpointTarget, statement: string, run: Run, st
       ['account', 'get-access-token', '--subscription', target.subscriptionId, '--tenant', target.tenantId,
         '--resource', 'https://database.windows.net/', '-o', 'json'], { sensitiveOutput: true }))).accessToken;
   }
-  const pool = new sql.ConnectionPool({
+  const pool = createSqlPool({
     server: target.server, port: target.provider === 'express' ? target.port : 1433, database: target.database,
     options: { encrypt: true, trustServerCertificate: target.provider === 'express' },
     ...(state ? { user: state.login, password: state.password } :
@@ -108,6 +108,7 @@ async function queryOnce(target: EndpointTarget, statement: string, run: Run, st
   });
   try {
     await pool.connect();
+    observeSqlPool(pool)();
     const messages: Record<string, unknown>[] = [];
     const request = pool.request();
     request.on('info', info => messages.push({ message: info.message }));
@@ -117,7 +118,7 @@ async function queryOnce(target: EndpointTarget, statement: string, run: Run, st
     let message = error instanceof Error ? error.message : 'SQL endpoint operation failed.';
     for (const secret of [state?.password, token, ...redact]) if (secret) message = message.replaceAll(secret, '[REDACTED]');
     const safe = new Error(`SQL endpoint operation failed: ${message}`);
-    if (error instanceof Error && 'number' in error && error.number === 40613) Object.assign(safe, { number: 40613 });
+    if (sqlErrorNumber(error) === 40613) Object.assign(safe, { number: 40613 });
     throw safe;
   } finally { await pool.close(); }
 }
