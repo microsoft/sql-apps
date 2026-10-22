@@ -6,7 +6,7 @@ Choose your host below. Packaging and verification are different: consult the [v
 
 ## Before you install
 
-The marketplace is `sql-apps-skills`, and the plugin is `sql-apps`. The source repository is [microsoft/sql-apps](https://github.com/microsoft/sql-apps). Remote examples below install from this repository. If you previously installed SQL Apps, refresh the marketplace and update the plugin to get this implementation.
+The marketplace is `sql-apps-skills`, and the plugin is `sql-apps`. The source repository is [microsoft/sql-apps](https://github.com/microsoft/sql-apps). The version in this checkout is the **0.2.0 release candidate**, not evidence that 0.2.0 has been published. Remote examples below install what is actually published in that repository. Existing 0.1.0 installations do not become 0.2.0 when a checkout changes: refresh the marketplace, update the plugin, and verify the installed bytes.
 
 Local examples use `C:\git\sql-apps-v3`; replace that with your downloaded checkout. Installation/registration changes host configuration, so review its prompts. Registration alone does not install a plugin.
 
@@ -27,7 +27,15 @@ For a local marketplace, replace the first command with:
 copilot plugin marketplace add C:\git\sql-apps-v3
 ```
 
-Start a fresh session and check `/plugin list`. VS Code versions with marketplace chat commands use `/plugin marketplace add microsoft/sql-apps` followed by `/plugin install sql-apps@sql-apps-skills`. See the [VS Code plugin guide](https://code.visualstudio.com/docs/agent-customization/agent-plugins).
+After an authorized release is published, update an existing CLI installation with:
+
+```powershell
+copilot plugin marketplace update sql-apps-skills
+copilot plugin update sql-apps@sql-apps-skills
+copilot plugin list --json
+```
+
+Start a fresh session and check `/plugin list`, then [verify the actual installed root](#verify-the-actual-installed-root). VS Code versions with marketplace chat commands use `/plugin marketplace add microsoft/sql-apps` followed by `/plugin install sql-apps@sql-apps-skills`; use that host's marketplace refresh and plugin update actions for an existing installation. CLI and VS Code installations/caches are separate: updating one does not prove the other changed. See the [VS Code plugin guide](https://code.visualstudio.com/docs/agent-customization/agent-plugins).
 
 ### Local VS Code development
 
@@ -48,6 +56,8 @@ For session-only CLI discovery without marketplace registration:
 ```powershell
 copilot --plugin-dir C:\git\sql-apps-v3 plugin list --json
 ```
+
+These are development loaders, not copied-install verification. Some CLI versions also register a local marketplace plugin as `source: live`, with `installedFrom` pointing to the checkout; this still does not test an independently packaged installation.
 
 ## Claude Code
 
@@ -109,11 +119,46 @@ Install companions separately using their supported host setup. SQL Apps does no
 | Capability | Setup |
 | --- | --- |
 | SQL expertise and local engine | [Microsoft SQL plugins](https://github.com/microsoft/microsoft-sql#choose-a-plugin): `microsoft-sql` for general coding hosts, or `microsoft-sql-vscode` for the MSSQL extension |
+| Application data APIs (**mandatory**) | Discover installed Microsoft SQL DAB guidance (`dab-rest-and-graphql` or `azuresql-db-dab`) or the MSSQL extension's DAB tool (for example, `mssql_dab`). The VS Code SQL bundle intentionally omits overlapping DAB skills because the extension supplies tools; verify that the tool is actually available |
 | Container guidance with the VS Code SQL bundle | Add `microsoft-azuresqldb-container` when needed; it is already included in the broad `microsoft-sql` bundle |
 | Azure work | [Azure Skills](https://github.com/microsoft/azure-skills), following your host's setup and authentication guidance |
 | Build and verification | Node.js/npm supported by the app tooling, specialist-documented SQL container prerequisites, and host browser/SQL tools |
 
-Do not install overlapping SQL bundles unnecessarily. The assistant checks actual capabilities and reports missing prerequisites rather than substituting mocked persistence. Local-only builds do not enter cloud onboarding or require an Azure subscription. Requested cloud work still requires the specialist's prerequisites and approvals.
+For a general coding host, the Microsoft SQL marketplace's broad bundle includes DAB guidance. For example, in Copilot CLI:
+
+```powershell
+copilot plugin marketplace add microsoft/microsoft-sql
+copilot plugin install microsoft-sql@microsoft-sql
+```
+
+Use the [Microsoft SQL host-specific installation instructions](https://github.com/microsoft/microsoft-sql#installation) for other hosts. In VS Code, enable the Microsoft MSSQL extension's DAB capability and verify host tool discovery, rather than installing overlapping broad SQL bundles just to get the same tool. Skill/tool names above are discovery examples, not a guarantee of installation. Follow the installed specialist to check/install the DAB runtime and its prerequisites; SQL Apps does not auto-install them.
+
+If no Microsoft SQL DAB skill/tool is available, stop application data-API work with a specific prerequisite blocker and installation guidance. **Do not silently substitute direct Express-to-SQL CRUD for DAB.** Express is conditional for authentication, orchestration, or domain work, not a replacement data API; SQL invariants still belong in SQL. The assistant also checks real engine capabilities rather than substituting mocked persistence.
+
+The default `poc` outcome requires zero Azure spend. Local-only builds do not enter cloud onboarding or require an Azure subscription. A requested free Azure topology must be checked end-to-end using current specialist guidance; a missing free capability is a blocker, not permission for a paid fallback. Requested cloud work still requires the specialist's prerequisites and approvals. Installing the plugin proves none of those runtime outcomes.
+
+## Verify the actual installed root
+
+Use Node.js 22 or later and the [release verifier](../scripts/verify-release.mjs) from the approved release checkout. Find the root the host **actually loaded**, containing `plugin.json` and `skills`, using its plugin diagnostics/listing or the loaded skill's path. Do not supply the repository, `--plugin-dir`, Gemini's development link, or merely the marketplace registration path.
+
+For VS Code, enumerate cache candidates without modifying them:
+
+```powershell
+Get-ChildItem "$env:APPDATA\Code\agentPlugins" -Directory -Filter '*sql-apps*' |
+  ForEach-Object { Get-ChildItem $_.FullName -Directory } |
+  Select-Object -ExpandProperty FullName
+```
+
+There may be several hash-named copies. Match the one used by the current host session; the newest-looking directory alone is not proof of the active install. With that actual path:
+
+```powershell
+$installedRoot = Read-Host 'Actual installed SQL Apps package root'
+node C:\git\sql-apps-v3\scripts\verify-release.mjs --source-root C:\git\sql-apps-v3 --installed-root "$installedRoot"
+```
+
+Success reports `PASS sql-apps 0.2.0`, the compared roots, skill file count, and a SHA-256 payload fingerprint. The verifier checks every manifest/catalog, release identity/version, and all shipped skill/reference/template bytes, including missing or extra files. It rejects the source itself and linked skill payloads. A stale version, same-version edited guidance, missing file, or wrong root exits nonzero with the failing paths.
+
+After install/update, restart or open a fresh session, confirm the reported plugin version and loaded path, and rerun this command on that path. Then explicitly invoke SQL Apps and check actual Microsoft SQL DAB discovery before app work. A verified unpacked package or `source: live` listing does not prove the host loaded a copied install, and byte verification does not prove app execution. See the [release checks](./reference/releasing.md#package-and-installed-copy-verification) for packaging and isolated testing.
 
 ## Project instructions and troubleshooting
 

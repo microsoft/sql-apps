@@ -18,14 +18,22 @@ The repository is both a marketplace and a plugin. All catalog sources resolve t
 | [Gemini manifest](../../gemini-extension.json) | Extension metadata and conventional skill discovery |
 | [Routing skill](../../skills/sql-apps/SKILL.md) | Shared workflow and bundled references/templates |
 
-There are no executable hooks, MCP servers, automatic companion dependencies, or build step. There is no duplicate host-specific application implementation.
+There are no executable hooks, MCP servers, automatic companion dependencies, or build step. There is no duplicate host-specific application implementation. The release verifier is a maintainer-run Node.js check, not a plugin runtime.
+
+## Release identity
+
+This checkout is the **0.2.0 release candidate**. That identifies source metadata, not a published release or an updated user installation. The marketplace identity remains `sql-apps-skills`, the plugin/extension identity remains `sql-apps`, and the install coordinate remains `sql-apps@sql-apps-skills`.
+
+`plugin.json` is the canonical version. Keep the Claude, Codex, Cursor, and Gemini manifests and the shared/Cursor catalog versions aligned with it. The Codex catalog in `.agents/plugins/marketplace.json` intentionally reads the plugin version rather than duplicating it.
+
+Published release versions are **immutable**: never change shipped guidance or templates under an already published version, replace a versioned package in place, or retag a release. Any shipped payload change requires a new version in all versioned metadata. Freeze the reviewed source and package bytes together; record the source revision and verifier's skill-payload fingerprint. The fingerprint covers the skill payload, not a signed archive or a whole-repository digest.
 
 ## Verification status
 
 | Host | Packaging | Native validation / loader |
 | --- | --- | --- |
-| Copilot CLI | Root manifest + shared catalog | Isolated registration, browse, and installation passed with one skill |
-| VS Code | Root manifest + shared catalog | Installation/UI loading not yet exercised |
+| Copilot CLI | Root manifest + shared catalog | 0.2.0 isolated local marketplace registration/install/list passed with one skill on CLI 1.0.102, but it reports `source: live`: no cached package was copied |
+| VS Code | Root manifest + shared catalog | Existing cached 0.1.0 package inspected read-only; verifier correctly rejects its stale versions and changed skill bytes. Fresh 0.2.0 UI loading not exercised |
 | Claude Code | Native manifest + shared catalog | Manifest/catalog validation passed; interactive loading not exercised |
 | OpenAI Codex | Compatibility manifest + Codex catalog | Static checks only; CLI unavailable in the validation environment |
 | Gemini CLI | Extension manifest + shared skills | Static checks only; CLI unavailable in the validation environment |
@@ -38,20 +46,56 @@ No host has passed end-to-end application-generation or Azure deployment evaluat
 Run packaging tests with Node.js 22 or later:
 
 ```powershell
-node --test tests\plugin.test.mjs
+node --test tests\plugin.test.mjs tests\verify-release.test.mjs tests\workflow.test.mjs
 copilot --plugin-dir C:\git\sql-apps-v3 plugin list --json
 claude plugin validate C:\git\sql-apps-v3
 claude plugin validate C:\git\sql-apps-v3\.claude-plugin\plugin.json
 ```
 
-Replace the checkout path as needed. Tests cover manifest/version consistency, catalogs, shared skill paths, documentation links, host instruction destinations, design/alignment guidance, the service template, and the absence of runtime components.
+Replace the checkout path as needed. Tests cover manifest/version consistency, catalogs, shared skill paths, documentation links, host instruction destinations, design/alignment guidance, the service template, the absence of runtime components, and verifier positive/negative cases. `--plugin-dir` checks development discovery only.
+
+## Package and installed-copy verification
+
+Use the [portable verifier](../../scripts/verify-release.mjs) against an **explicitly supplied independent root**. It defaults the source to the checkout containing the script, not the current working directory. It reads both roots without modifying either, compares all manifest/catalog metadata, validates release names/versions, and compares the exact file set and bytes under `skills`, including bundled references and templates.
+
+```powershell
+$packageRoot = Read-Host 'Independent unpacked SQL Apps release package root'
+node scripts\verify-release.mjs --source-root C:\git\sql-apps-v3 --installed-root "$packageRoot"
+$installedRoot = Read-Host 'Actual host-installed SQL Apps root'
+node scripts\verify-release.mjs --source-root C:\git\sql-apps-v3 --installed-root "$installedRoot"
+```
+
+Each success prints the version, number of skill files, compared paths, and a SHA-256 skill-payload fingerprint. Exit codes: `0` match, `1` missing/stale/mismatched package, `2` invalid command usage. Same-version content drift, missing or extra files, inconsistent compatibility metadata, malformed JSON, and linked skill payloads fail. Comparison is byte-exact, including line endings: package the reviewed bytes rather than ignoring normalization differences.
+
+Do not substitute a repository root, marketplace catalog, `--plugin-dir`, or development link for the actual installed root. An unpacked-package pass establishes package fidelity only. An installed-root pass establishes that copy's fidelity, not which copy a running host activated. After install/update, start a **fresh session**, inspect the loaded skill/plugin path and version, and verify that exact root again. See [installed-path discovery](../installation.md#verify-the-actual-installed-root). A version-only plugin list is not payload verification.
+
+For isolated Copilot checks, use a new configuration directory inside your checkout, never the live user settings or VS Code cache:
+
+```powershell
+$savedHome = $env:COPILOT_HOME
+$savedAutoUpdate = $env:COPILOT_AUTO_UPDATE
+try {
+  $env:COPILOT_HOME = Join-Path (Get-Location).Path '.release-check-copilot-0.2.0'
+  $env:COPILOT_AUTO_UPDATE = 'false'
+  copilot plugin marketplace add C:\git\sql-apps-v3
+  copilot plugin install sql-apps@sql-apps-skills
+  copilot plugin list --json
+} finally {
+  $env:COPILOT_HOME = $savedHome
+  $env:COPILOT_AUTO_UPDATE = $savedAutoUpdate
+}
+```
+
+Use a previously nonexistent directory; retain diagnostics only as needed, then remove that isolated directory. CLI 1.0.102 reports local marketplace installs as `source: live` / `installedFrom: <checkout>` and explicitly says nothing was copied. This is useful discovery evidence, **not installed-package verification**; pointing the verifier at that checkout correctly fails. A published immutable artifact or a host's copied-install route is still needed to test real install/update propagation. Do not edit live caches to make a failed check pass.
+
+### Runtime acceptance remains separate
 
 Before claiming end-to-end support for a host, test it with the required specialists:
 
 1. Generate a reservation app with a real UI-to-SQL save/reload and documented restart.
 2. In a new conversation, change an invariant without losing policy or existing behavior.
-3. Exercise missing SQL prerequisites and an out-of-profile request; expect an explicit blocker.
-4. Complete local-only delivery without cloud onboarding or resource creation.
+3. Exercise missing SQL and DAB prerequisites and an out-of-profile request; expect an explicit blocker. Application data APIs require an actually installed Microsoft SQL DAB skill/tool; no silent Express-to-SQL CRUD substitution. Express is conditional for auth/orchestration/domain work.
+4. Complete the default `poc` delivery with zero Azure spend. Complete local-only delivery without cloud onboarding or resource creation. Where a free Azure topology is requested, check its entire app/data/auth/hosting path end-to-end; unavailable free capabilities must block, never trigger a paid fallback.
 5. In an authorized environment, follow one Azure deployment workflow and verify the deployed primary workflow.
 6. Check workspace builds, real paths, `dist/index.html`, themes, keyboard behavior, and `rayfin/rayfin.yml` with `mssql`. Confirm no unintended Rayfin SDK/runtime installation or workflow handoff.
 
@@ -59,13 +103,14 @@ Record actual commands/results and host/plugin versions. A static test or instal
 
 ## Publish a release
 
-1. Review license, notices, payload, and validation results.
-2. Keep all versioned manifests and catalog entries aligned. Codex's catalog reads the plugin version rather than duplicating it.
-3. Publish reviewed commits to [microsoft/sql-apps](https://github.com/microsoft/sql-apps). Tag the reviewed version when preparing a versioned release.
-4. Keep installation examples pointed at this repository. For a pinned release, check the host's pinning syntax.
-5. Verify each advertised installation route. Public marketplace listing may require separate submission, review, or account permissions.
+1. Review license, notices, payload, release identity, and validation results; do not reuse an existing release version for changed bytes.
+2. Run both test files above. Prepare an independent package from the reviewed candidate and run the verifier against its unpacked root. Record the exact source revision, version, commands/results, and payload fingerprint.
+3. With maintainer authorization, publish reviewed commits to [microsoft/sql-apps](https://github.com/microsoft/sql-apps) and create the matching immutable version tag/release. A local 0.2.0 manifest change alone does not publish anything. Do not claim app/cloud acceptance based on a package check.
+4. Keep installation examples pointed at this repository. For a pinned release, check the host's actual pinning syntax rather than guessing a tag parameter.
+5. Test initial installation **and** marketplace refresh/plugin update from the previously released version, using isolated host configuration where supported. Locate the actual copied package, run the verifier, start a fresh session, confirm its loaded path/version, and rerun the verifier. Record host/plugin versions and distinguish copied installs from live development sources.
+6. Verify each advertised installation route before broadening its status. Public marketplace listing may require separate submission, review, or account permissions. Keep unexercised hosts/runtime scenarios explicit.
 
-The previous SQL Apps implementation used the same marketplace name. Existing installations may need a marketplace refresh and plugin update.
+The previous SQL Apps implementation used the same marketplace name. Existing installations need a marketplace refresh and plugin update after publication; a fresh session must still be checked. Actual publication is blocked until an authorized maintainer publishes the reviewed candidate and release identity. Real remote install/update propagation and runtime app/cloud acceptance remain separate unverified gates; no commit, push, tag, or publication is implied by these instructions.
 
 ## Maintenance boundary
 

@@ -4,14 +4,16 @@ SQL Apps follows compatible project and design conventions to make future migrat
 
 ## Conventions for new apps
 
-- Use npm workspaces: `packages/frontend` for React/Vite, `packages/data` for server-only SQL repositories and migrations, `packages/shared` for browser-safe contracts, and `packages/server` for Express. Keep one application deployment.
+- Use npm workspaces: `packages/frontend` for React/Vite, `packages/data` for SQL migrations/procedures and DAB configuration, `packages/shared` for browser-safe contracts, and `packages/server` only for necessary custom authentication, orchestration, or domain code. Do not add direct-SQL CRUD repositories to fill a package.
 - Follow the bundled app-design guidance for Tailwind tokens, accessible components, and consistent UI states.
-- Keep frontend API calls behind a small app-owned client using relative, same-origin URLs. Keep database access server-side so UI and persistence can change independently.
+- Keep frontend DAB API calls behind a small app-owned client, preferring relative same-origin URLs with verified proxy routing. Keep SQL access server-side and preserve DAB permissions and SQL invariants through any custom-server hop.
 - Copy the bundled service template to `rayfin/rayfin.yml`, retaining `services.data.dialect: mssql`.
-- Keep configured paths and build commands accurate. The frontend builds to `dist/index.html`; data has its own working build command.
+- Keep configured paths and build commands accurate. The frontend builds to `dist/index.html`; data has its own working configuration validation/build command. A DAB configuration is not a Node server build or a running Rayfin data service.
 - Enable optional services only for implemented requirements. Do not add Rayfin SDKs, service emulation, or a generic provider abstraction for hypothetical compatibility.
 
 Preserve existing project layouts unless restructuring is explicitly in scope.
+
+These conventions do not prescribe a paid host, a mandatory Express server, or a single-process deployment. DAB remains the application data API, and the brief's PoC/zero-spend constraints survive any specialist handoff or future migration. Verify the complete free topology rather than assuming the service template proves hosting compatibility.
 
 ## Compatibility boundary
 

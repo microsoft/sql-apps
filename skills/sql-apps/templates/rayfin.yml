@@ -1,6 +1,8 @@
 # SQL Apps migration intent, based on a proposed Rayfin service shape.
 # Copy to rayfin/rayfin.yml in the generated application.
 # Not executable configuration or a claim of released Rayfin mssql support.
+# Keep DAB as the real application data API; this is not its runtime config.
+# Carry app-brief.md intent/costPreference through any future migration.
 services:
   auth:
     enabled: false

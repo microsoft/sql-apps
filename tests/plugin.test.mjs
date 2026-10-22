@@ -29,6 +29,7 @@ test('manifest uses only supported Agent Plugins 1.0 fields', () => {
   assert.match(manifest.name, /^(?!.*(?:--|\.\.))[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/);
   assert.ok(manifest.name.length <= 64);
   assert.match(manifest.version, /^\d+\.\d+\.\d+$/);
+  assert.equal(manifest.version, '0.2.0', 'Keep the release candidate explicit');
   assert.equal(typeof manifest.description, 'string');
   assert.ok(manifest.description.length > 0);
   assert.equal(manifest.license, 'MIT');
@@ -125,6 +126,26 @@ test('Gemini extension uses native skill discovery without global context or cod
   assert.ok(!existsSync(path.join(root, 'GEMINI.md')), 'Do not make plugin guidance always-on');
 });
 
+test('release and installation guidance verify payloads and require discovered DAB', () => {
+  const installation = read(path.join('docs', 'installation.md'));
+  const releasing = read(path.join('docs', 'reference', 'releasing.md'));
+  assert.match(installation, /0\.2\.0 release candidate/);
+  assert.match(installation, /microsoft-sql@microsoft-sql/);
+  assert.match(installation, /mandatory/);
+  assert.match(installation, /dab-rest-and-graphql/);
+  assert.match(installation, /mssql_dab/);
+  assert.match(installation, /Do not silently substitute direct Express-to-SQL CRUD for DAB/);
+  for (const document of [installation, releasing]) {
+    assert.match(document, /--installed-root/);
+    assert.match(document, /actual installed|actual installed root|actually loaded/);
+    assert.match(document, /fresh session/);
+    assert.match(document, /source: live/);
+  }
+  assert.match(releasing, /immutable/);
+  assert.match(releasing, /byte-exact/);
+  assert.ok(existsSync(path.join(root, 'scripts', 'verify-release.mjs')));
+});
+
 test('shared guidance persists policy for each active host without five copies', () => {
   const skill = read(skillPath);
   const constitution = read(path.join('skills', 'sql-apps', 'references', 'constitution.md'));
@@ -168,8 +189,9 @@ test('constitution contains one portable durable project-policy block', () => {
   assert.equal((block[1].match(/sql-apps:constitution:start/g) ?? []).length, 1);
   assert.equal((block[1].match(/sql-apps:constitution:end/g) ?? []).length, 1);
   for (const required of [
-    'TypeScript', 'React/Vite', 'Express', 'Azure SQL Database', 'mssql',
-    'Azure App Service', 'Local-only', 'app-brief.md', 'host permissions',
+    'TypeScript', 'React/Vite', 'Express', 'Azure SQL Database', 'mssql', 'DAB',
+    'intent: poc', 'costPreference: zero-azure-spend', 'AutoPause',
+    'Local-only', 'app-brief.md', 'host permissions',
   ]) {
     assert.ok(block[1].includes(required), `Missing durable policy: ${required}`);
   }
@@ -183,11 +205,12 @@ test('brief stays about intent and observable acceptance', () => {
   for (const heading of [
     '## Outcome and users', '## Essential workflows and checks',
     '## Data and access rules', '## First delivery', '## Technical boundary',
+    '## Complete topology and cost boundary', '## Architecture and cost acceptance',
     '## Design and migration intent',
   ]) {
     assert.ok(brief.includes(heading), `Missing brief heading: ${heading}`);
   }
-  assert.ok(brief.split(/\r?\n/).length < 50);
+  assert.ok(brief.split(/\r?\n/).length < 90);
   assert.match(brief, /Do not store secrets/);
 });
 
