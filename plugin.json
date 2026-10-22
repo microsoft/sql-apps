@@ -1,0 +1,15 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "sql-apps",
+  "version": "0.1.0",
+  "description": "An opinionated TypeScript and Azure SQL application router for existing coding assistants and specialist plugins.",
+  "license": "MIT",
+  "keywords": [
+    "azure-sql",
+    "typescript",
+    "react",
+    "express",
+    "app-service",
+    "skills"
+  ]
+}

@@ -1,14 +1,12 @@
 {
   "name": "sql-apps-skills",
-  "interface": {
-    "displayName": "SQL Apps Skills"
-  },
+  "interface": { "displayName": "SQL Apps Skills" },
   "plugins": [
     {
       "name": "sql-apps",
       "source": {
         "source": "local",
-        "path": "./plugins/sql-apps"
+        "path": "./"
       },
       "policy": {
         "installation": "AVAILABLE",

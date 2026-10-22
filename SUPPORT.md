@@ -1,11 +1,18 @@
 # Support
 
-SQL Apps is maintained by the Microsoft SQL team (mssql). Use this repository's support channels for the project.
+SQL Apps is an early-preview assistant plugin. This repository provides no
+service-level agreement or Microsoft support commitment. Azure product support
+remains governed by your Azure agreement.
 
-Use the repository's issues for bugs and questions. Include the affected version, command, expected/actual result, and redacted logs. Never post access tokens, connection secrets, or private user data.
+For setup and known validation limits, start with the [README](./README.md).
+Use [repository issues](https://github.com/microsoft/sql-apps/issues) for non-security
+bugs and questions. Include the plugin version, assistant/host version, relevant
+companion plugin versions, steps to reproduce, expected and actual behavior,
+and redacted diagnostic output.
 
-No service-level agreement or Microsoft support commitment is provided by this repository. Product-level Azure support remains governed by your Azure agreement.
+Never post access tokens, connection secrets, or private user data. Report
+vulnerabilities privately as described in [SECURITY.md](./SECURITY.md).
 
-Start with the [documentation index](docs/README.md) for setup and app-building guides. For deployment prerequisites and limitations, see the [personal-free deployment reference](docs/reference/personal-free-deployment.md).
-
-Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+Microsoft SQL and Azure Skills are separate dependencies. Use their own support
+and reporting channels for issues isolated to those plugins; SQL Apps does not
+extend their support policies.

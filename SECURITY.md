@@ -14,4 +14,7 @@ please review the latest guidance for Microsoft repositories at
 
 <!-- END MICROSOFT SECURITY.MD BLOCK -->
 
-The bundled personal-project profile requires live identity, authorization, persistence, and recovery validation before use with real data. See the [personal-free deployment reference](docs/reference/personal-free-deployment.md).
+SQL Apps is an instruction-based plugin, not a security boundary. Review generated
+applications and validate identity, authorization, persistence, migrations, and
+recovery before using real data. Do not include credentials or private data in
+public reports.

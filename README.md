@@ -2,208 +2,115 @@
 
 <img src="content/icons/sql-apps.png" alt="SQL Apps icon: a blue database with a purple application ribbon" width="160">
 
-**Build locally. Make it yours. Share when ready.**
+**Your idea. Your assistant. Your SQL app.**
 
-SQL Apps is a local-first foundation for building SQL-backed web applications
-with the AI assistant of your choice. Start with an idea rather than a framework
-choice, then let the AI assistant implement the screens, data and workflows.
+Build SQL-backed web applications with the coding assistant you already use. Describe your idea, shape the important rules, and build a working application you own. Start locally. Deploy to Azure when you're ready.
 
-## What you get
+SQL Apps is a lightweight assistant plugin, not another application platform. It brings an opinionated TypeScript stack and connects your assistant with existing Microsoft SQL and Azure expertise. No SQL Apps account, hosted service, or application runtime.
 
-- **An application foundation:** TypeScript, a SQL database and a local runtime
-  with sign-in and role-based access.
-- **Local development:** use the Azure SQL Database container or SQL Express on
-  Windows. Get the idea working before choosing cloud hosting.
-- **Your own project:** each application lives in an independent Git repository,
-  separate from the SQL Apps tooling.
-- **A guided workflow:** provider-neutral guides and an optional
-  [assistant plugin](docs/reference/plugins.md) with packaging for Claude Code,
-  GitHub Copilot, Codex, Cursor and Gemini CLI, plus
-  [Azure Skills integration](#optional-azure-deployment-plugins) for Azure work.
-- **Free-tier-first planning:** explore hosting for POCs and quick ideas with
-  eligibility, quotas and cost trade-offs reviewed before deployment.
+[Get started](#get-started) · [Install for your assistant](./docs/installation.md) · [Reference](#learn-more)
 
-The foundation is not a finished domain app. You and your assistant build and
-test the behavior your application needs. File storage and background jobs are
-outside SQL Apps; add them separately with maintained Azure skills if needed.
+> **Preview · 0.1.0** — Packaging is available for five assistant families. Application-generation and deployment validation is still in progress; see [verification status](./docs/reference/releasing.md#verification-status).
 
 ## What will you build?
 
-Track equipment loans, manage inventory, collect registrations or give a small
-team a shared review workflow. These are ideas, not prebuilt templates.
+Track shared equipment, manage inventory, collect event registrations, or give your team a better approval workflow.
 
-To try an already implemented example, use the separate
-[Todo reference app](examples/todo/README.md). New projects do not include its
-screens or sample data.
+> "Build an equipment reservation app. Staff manage equipment, members reserve it, and overlapping reservations aren't allowed."
+
+These are your applications, not prebuilt demo templates. Your assistant builds the screens, data rules, and workflows around your requirements.
+
+## What you get
+
+- **A stack chosen for you.** TypeScript, React, Express, and Azure SQL Database—less setup debate, more time building.
+- **A considered interface.** Shared design conventions for accessible, responsive screens with light and dark themes.
+- **Real SQL workflows.** Guidance to verify saves, reloads, validation, and access rules against a real database—not just an empty scaffold.
+- **An independent project.** Source, migrations, tests, configuration, and run instructions that remain yours without the plugin.
+- **A path to Azure.** Optional deployment with reviewed resources, access settings, and costs.
 
 ## Get started
 
-**Start with [Get started](docs/guides/getting-started.md)** to verify a release
-archive, install its CLI in a dedicated directory and create an independent
-project. No foundation clone, global install or assistant plugin is required.
+### 1. Install for your assistant
 
-This branch prepares the **initial 0.1.0 release candidate**, not a published
-runtime. Maintainers can exercise the archive flow with a locally built candidate.
-Earlier demos have no compatibility or migration guarantee.
-
-After explicitly approving installation of your verified archive:
-
-```powershell
-npm install --prefix "C:\SqlAppsTools\0.1.0" --no-save --package-lock=false --ignore-scripts "C:\Downloads\microsoft-sql-apps-0.1.0.tgz"
-$cli = "C:\SqlAppsTools\0.1.0\node_modules\@microsoft\sql-apps\bin\sql-apps.mjs"
-node $cli projects create-plan "Equipment Checkout" --archive "C:\Downloads\microsoft-sql-apps-0.1.0.tgz"
-node $cli projects create "Equipment Checkout" --archive "C:\Downloads\microsoft-sql-apps-0.1.0.tgz" --approval <printed-id>
-```
-
-Review the destination, Git repository and archive checksum before creation.
-Creation binds the reviewed archive immediately and starts no helper or browser.
-The guide continues with a restore-only bootstrap approval, then a fresh local
-setup plan through the app's exact installed tooling.
-
-Open the generated application in your editor, give your assistant access to
-that project and ask:
-
-> Help me build an equipment checkout app with SQL Apps. Start by asking who will use it and what it should do. Help me run it locally, then make one useful change. Do not deploy it yet.
-
-Replace equipment checkout with your idea. The journey is
-**Describe -> Run locally -> Make it yours -> Share optionally**.
-
-A useful first result is a real workflow: save a record to SQL, reload and see
-it again, and get a clear message when a save is invalid. A readiness check or
-launch URL alone does not prove your app works.
-
-## Install assistant guidance
-
-The plugin packages seven SQL Apps skills and a launcher to guide project setup,
-local development, application changes and validation. Installing it does **not**
-install the application runtime or database, select a foundation checkout, grant
-setup permissions or deploy resources. Follow [Get started](docs/guides/getting-started.md)
-for those separate steps.
-
-Claude Code and GitHub Copilot native loaders are tested in CI. Codex, Cursor and
-Gemini packaging is included, but their SQL Apps loaders have not been verified
-here. Other assistants can use the provider-neutral guides.
-
-### Claude Code
-
-Run in Bash or PowerShell 7:
-
-```sh
-claude plugin marketplace add microsoft/sql-apps && claude plugin install sql-apps@sql-apps-skills
-```
-
-### GitHub Copilot
-
-Run in Bash or PowerShell 7:
-
-```sh
-copilot plugin marketplace add microsoft/sql-apps && copilot plugin install sql-apps@sql-apps-skills
-```
-
-### Codex
-
-Register the repository marketplace:
-
-```sh
-codex plugin marketplace add microsoft/sql-apps
-```
-
-Then restart the desktop app, open its Plugins directory, select **SQL Apps
-Skills** and install **sql-apps**. Registration alone does not install the plugin.
-See [Codex marketplace setup](https://developers.openai.com/plugins/build/plugins#add-a-marketplace-from-the-cli).
-
-### Cursor
-
-The bundle uses the portable Agent Plugins format. Cursor's documented
-team-marketplace route requires a Teams or Enterprise plan: open **Dashboard ->
-Plugins & MCPs -> Team Marketplaces -> Add Marketplace -> Import from Repo** and
-use `https://github.com/microsoft/sql-apps`. Review the imported plugin, then find
-it in **Customize**. This SQL Apps import path has not been verified here.
-See [Cursor team marketplaces](https://cursor.com/docs/plugins#add-a-team-marketplace).
-
-### Gemini CLI
-
-Install from the canonical plugin directory in an existing foundation checkout;
-replace the example path with your checkout:
-
-```powershell
-gemini extensions install "C:\git\sql-apps\plugins\sql-apps"
-```
-
-The extension manifest lives in that subdirectory, not the repository root.
-See [Gemini extension installation](https://geminicli.com/docs/extensions/reference/#install-an-extension).
-
-After installing, start a fresh assistant session. See the
-[plugin reference](docs/reference/plugins.md) for loader verification, foundation
-selection, updates and troubleshooting.
-
-## Optional Azure deployment plugins
-
-SQL Apps guides the application workflow; the official
-[Azure Skills plugin](https://github.com/microsoft/azure-skills#azure-skills-plugin)
-owns Azure onboarding, infrastructure preparation, validation, deployment and
-diagnostics. Use it for requested Azure capabilities during development too,
-such as storage, messaging, AI and telemetry, without adding them to the SQL Apps
-runtime. The [workflow routing table](docs/reference/plugins.md#azure-workflow-routing)
-defines the handoffs. These are companion plugins, not bundled dependencies or
-prerequisites for local-only development:
-
-| Plugin | Role |
+| Assistant | Setup |
 | --- | --- |
-| `microsoft-sql@microsoft-sql` | Azure SQL provisioning, identity, schema, Data API Builder and database diagnostics |
-| `azure@azure-skills` | Azure onboarding, preparation, validation, deployment and production diagnostics |
-| `azure-cost@azure-skills` | Account-aware estimates, cost analysis, optimization and governance |
+| GitHub Copilot / VS Code | [Plugin marketplace or local setup](./docs/installation.md#github-copilot-and-vs-code) |
+| Claude Code | [Plugin marketplace](./docs/installation.md#claude-code) |
+| OpenAI Codex | [Codex marketplace](./docs/installation.md#openai-codex) |
+| Gemini CLI | [Gemini extension](./docs/installation.md#gemini-cli) |
+| Cursor | [Team marketplace](./docs/installation.md#cursor) |
 
-For **VS Code**, follow the upstream
-[Azure MCP extension setup](https://github.com/microsoft/azure-skills#vs-code),
-which supplies the Azure skills companion and MCP integration. Host installation
-and skill availability are separate from installing the SQL Apps plugin.
+The marketplace install coordinate is **`sql-apps@sql-apps-skills`**. Use the [installation guide](./docs/installation.md) for the appropriate host; Gemini uses an extension instead.
 
-In GitHub Copilot CLI or the Copilot App, run:
+### 2. Connect the specialists
 
-```text
-/plugin marketplace add microsoft/microsoft-sql
-/plugin install microsoft-sql@microsoft-sql
-/plugin marketplace add microsoft/azure-skills
-/plugin install azure@azure-skills
-/plugin install azure-cost@azure-skills
-```
+Install the [Microsoft SQL guidance](https://github.com/microsoft/microsoft-sql#choose-a-plugin) appropriate to your host and check the local database prerequisites. Add [Azure Skills](https://github.com/microsoft/azure-skills) when you need Azure capabilities.
 
-Start a fresh session and use `/plugin list` to verify the plugins are enabled.
-SQL Apps does not install or update companions automatically. Cloud work still
-requires a reviewed plan and explicit approval; free allowances do not guarantee
-a zero bill. See [companion plugin details](docs/reference/plugins.md#install-companion-plugins-for-cloud-work)
-and [sharing your app](docs/guides/sharing.md), including the existing bundled
-`personal-free` fallback.
+SQL Apps does not install these companions or the database automatically. See [prerequisites](./docs/installation.md#prerequisites) for bundle choices and tooling. Local-only development does not require cloud onboarding.
+
+### 3. Describe your app
+
+Open the directory where you want the application—not the plugin directory—and ask:
+
+> Use SQL Apps to build an equipment reservation application. Staff manage equipment; members reserve it; overlapping reservations must be rejected. Ask about important missing rules, then build and verify one complete workflow. Finish locally; do not deploy yet.
+
+Your assistant clarifies the consequential rules, confirms a short brief, and builds across the interface, server, and SQL database.
+
+**A useful first result:** save a reservation, reload it from SQL, and reject a conflicting reservation. The assistant should tell you what it checked and what remains blocked.
+
+### 4. Make it yours. Share when ready.
+
+Continue with a change:
+
+> Add staff approval before a reservation is confirmed. Preserve the overlap rule and rerun the affected checks.
+
+When you're ready for Azure:
+
+> Help me deploy this app. Show me the proposed resources, access settings, and estimated costs before making cloud changes.
+
+Deployment is optional and requires its own approvals. Cloud charges may apply.
+
+## Built on a familiar stack
+
+| Layer | Default |
+| --- | --- |
+| Interface | React, Vite, TypeScript |
+| Design | Tailwind CSS v4, Radix primitives, Lucide icons |
+| Application | Node.js and Express |
+| Data | Azure SQL Database, with server-side `mssql` access |
+| Azure hosting | App Service and Azure SQL Database |
+
+Start with one application and one database. Add storage, identity, telemetry, or secret management only when needed. See the [stack and service profile](./skills/sql-apps/references/constitution.md) for the full boundary.
+
+## Your app stays yours
+
+SQL Apps leaves ordinary project files, a concise application brief, and project instructions your assistant can use in a new conversation. The generated application does not depend on SQL Apps to run.
+
+We also align package boundaries and design conventions with [Rayfin](https://github.com/microsoft/rayfin), including a `rayfin.yml` configuration using `dialect: mssql`. This prepares for future migration without adopting Rayfin's runtime or claiming released SQL compatibility. See [Rayfin alignment](./skills/sql-apps/references/rayfin-alignment.md).
 
 ## Learn more
 
-| I want to... | Start here |
+| I want to... | Read |
 | --- | --- |
-| Turn an idea into an app | [Build your app](docs/guides/build-your-app.md) |
-| Start, stop or resume locally | [Run locally](docs/guides/run-locally.md) |
-| Install or verify assistant support | [SQL Apps plugin](docs/reference/plugins.md) |
-| Share with other people | [Sharing your app](docs/guides/sharing.md) |
-| Understand costs and free-tier limits | [Costs and growth](docs/guides/costs.md) |
-| Find commands, configuration or contributor docs | [Documentation index](docs/README.md) |
+| Install or troubleshoot assistant discovery | [Installation and prerequisites](./docs/installation.md) |
+| Understand the supported stack | [Project constitution](./skills/sql-apps/references/constitution.md) |
+| Understand the UI conventions | [App design](./skills/sql-apps/references/app-design.md) |
+| Plan for a future Rayfin migration | [Rayfin alignment](./skills/sql-apps/references/rayfin-alignment.md) |
+| Inspect the service configuration | [rayfin.yml template](./skills/sql-apps/templates/rayfin.yml) |
+| Validate or distribute the plugin | [Packaging, verification, and releases](./docs/reference/releasing.md) |
+| Report a problem or find support limits | [Support](./SUPPORT.md) |
 
 ## Important limits
 
-- **Local first, not access-free.** The preferred SQL container is in private
-  preview; other database routes are available. Tools and AI providers have
-  their own access, licensing and pricing conditions. See [setup requirements](docs/guides/getting-started.md).
-- **Sharing is optional, and charges may apply.** You are responsible for your
-  Azure bill. Free allowances and cost guards are not a guarantee of no charges;
-  budgets alert rather than stop spending. See [costs and safeguards](docs/guides/costs.md).
-- **App Service, then containers, then SWA.** Assess compatible App Service Free
-  first, then Container Apps with explicit acceptance of possible charges.
-  Keep DAB on ACA with managed identity; SWA is only a fallback when the complete
-  required setup fits Free. See [cloud planning](docs/reference/free-first.md).
-- **Your assistant acts with real permissions.** Review plans and approvals,
-  keep backups and do not bypass permissions. See [setup safety](docs/guides/getting-started.md#2-select-the-cli-and-optional-assistant-guidance).
-- **Not production-ready as-is.** A working local app is not production
-  certification. The personal cloud option has availability and networking
-  trade-offs; review them before storing real or regulated data. See [sharing limits](docs/guides/sharing.md).
+SQL Apps is preview guidance, not a security sandbox or production certification. Review generated code, access controls, migrations, and recovery before using real or regulated data. Tools, AI providers, the local SQL container, and Azure services have their own availability, licensing, and pricing conditions.
+
+Review plans and permissions, keep backups, and never commit credentials. You are responsible for Azure charges; free allowances do not guarantee a zero bill, and budget alerts do not stop spending. No service-level agreement or Microsoft support commitment is provided; Azure support remains governed by your Azure agreement. See [Support](./SUPPORT.md).
+
+## Security and community
+
+**Do not report vulnerabilities in public issues.** Follow [Security](./SECURITY.md) for private reporting. Never include secrets or private user data in public reports.
+
+This project follows the [Microsoft Open Source Code of Conduct](./CODE_OF_CONDUCT.md).
 
 ## Trademarks
 
@@ -214,6 +121,5 @@ Any use of third-party trademarks or logos is subject to those third parties' po
 
 ## License
 
-[MIT](LICENSE). SQL Apps is provided "as is," without warranty of any kind.
-
-For contributions and help, see [Contributing](CONTRIBUTING.md), [Support](SUPPORT.md) and [Security](SECURITY.md).
+Licensed under the [MIT License](./LICENSE).
+SQL Apps is provided "as is," without warranty of any kind, subject to the full terms and liability limitations in the license.

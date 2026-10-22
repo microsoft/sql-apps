@@ -1,0 +1,32 @@
+# SQL Apps migration intent, based on a proposed Rayfin service shape.
+# Copy to rayfin/rayfin.yml in the generated application.
+# Not executable configuration or a claim of released Rayfin mssql support.
+services:
+  auth:
+    enabled: false
+    password:
+      enabled: false
+    allowedRedirectUris: []
+    fabric:
+      enabled: false
+  data:
+    enabled: true
+    dialect: mssql
+    path: packages/data
+    buildCommand: npm run build
+  realtime:
+    enabled: false
+    backplane: none
+  storage:
+    enabled: false
+  functions:
+    enabled: false
+    durable:
+      enabled: false
+  staticHosting:
+    enabled: true
+    path: packages/frontend
+    folder: dist
+    buildCommand: npm run build
+    indexDocument: index.html
+    assetAccess: public
