@@ -6,7 +6,7 @@ Choose your host below. Packaging and verification are different: consult the [v
 
 ## Before you install
 
-The marketplace is `sql-apps-skills`, and the plugin is `sql-apps`. The source repository is [microsoft/sql-apps](https://github.com/microsoft/sql-apps). The version in this checkout is the **0.3.0 release candidate**, not evidence that 0.3.0 has been published. Remote examples below install what is actually published in that repository. Existing 0.1.0 or 0.2.0 installations do not become 0.3.0 when a checkout changes: refresh the marketplace, update the plugin, and verify the installed bytes.
+The marketplace is `sql-apps-skills`, and the plugin is `sql-apps`. The source repository is [microsoft/sql-apps](https://github.com/microsoft/sql-apps). The version in this checkout is the **0.2.1 patch release candidate**, not evidence that 0.2.1 has been published. Remote examples below install what is actually published in that repository. Existing 0.1.0 or 0.2.0 installations do not become 0.2.1 when a checkout changes: refresh the marketplace, update the plugin, and verify the installed bytes.
 
 Local examples use `C:\git\sql-apps-v3`; replace that with your downloaded checkout. Installation/registration changes host configuration, so review its prompts. Registration alone does not install a plugin.
 
@@ -135,7 +135,67 @@ Use the [Microsoft SQL host-specific installation instructions](https://github.c
 
 If no Microsoft SQL DAB skill/tool is available, stop application data-API work with a specific prerequisite blocker and installation guidance. **Do not silently substitute direct Express-to-SQL CRUD for DAB.** Express is conditional for authentication, orchestration, or domain work, not a replacement data API; SQL invariants still belong in SQL. The assistant also checks real engine capabilities rather than substituting mocked persistence.
 
-The default `poc` outcome requires zero Azure spend. Local-only builds do not enter cloud onboarding or require an Azure subscription. A requested free Azure topology must be checked end-to-end using current specialist guidance; a missing free capability is a blocker, not permission for a paid fallback. Requested cloud work still requires the specialist's prerequisites and approvals. Installing the plugin proves none of those runtime outcomes.
+The default `poc` outcome is free-first, not a guarantee of zero Azure spend. Local-only has no Azure CLI or subscription requirement and does not enter cloud onboarding. A requested free Azure topology must be checked end-to-end using current specialist guidance; a missing free capability is not permission for a paid fallback. Requested cloud work still requires the specialist's prerequisites and approvals. Installing the plugin proves none of those runtime outcomes.
+
+## Quick setup when a capability is missing
+
+First identify the actual coding host and discover the skills/tools it loaded. Choose the SQL option matching that host; install Azure Skills and Azure CLI only when Azure work is requested. These companions are separate from SQL Apps.
+
+### Microsoft SQL and DAB
+
+- **General coding hosts:** install the broad [`microsoft-sql@microsoft-sql` plugin](https://github.com/microsoft/microsoft-sql#installation) using that host's official setup. For Copilot CLI, run:
+
+  ```text
+  copilot plugin marketplace add microsoft/microsoft-sql
+  copilot plugin install microsoft-sql@microsoft-sql
+  ```
+
+- **VS Code:** install/enable the [Microsoft SQL Server (MSSQL) extension](https://marketplace.visualstudio.com/items?itemName=ms-mssql.mssql), enable its DAB capability, then verify its DAB tool is actually discovered. The `microsoft-sql-vscode` plugin is tailored to that extension and normally should not be installed alongside the overlapping broad SQL plugin.
+- **Other hosts:** follow the current [Microsoft SQL host-specific instructions](https://github.com/microsoft/microsoft-sql#installation); do not copy commands from a different host.
+
+Refresh or restart the host and verify DAB guidance/tool discovery before app data-API work. Follow the specialist's instructions for the local SQL engine and DAB runtime. If DAB is still unavailable, explain the precise prerequisite and pause that work; do not replace it with direct Express-to-SQL CRUD or mocked persistence.
+
+### Azure Skills
+
+Azure Skills are needed for Azure planning/deployment workflows, not for local-only app work. Choose the host's supported setup from the [official Azure Skills installation guide](https://github.com/microsoft/azure-skills#install-in-60-seconds). For example:
+
+- **VS Code:** install the [Azure MCP extension](https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-azure-mcp-server), which installs its companion skills extension. Git CLI is required for that skills extension.
+- **Copilot CLI:** add the marketplace, then install the plugin:
+
+  ```text
+  /plugin marketplace add microsoft/azure-skills
+  /plugin install azure@azure-skills
+  ```
+
+- **Other hosts:** use the official guide's host-specific instructions. The guide lists Node.js 18+ and Azure CLI authentication for Azure workflows; Azure Developer CLI is only needed when the selected workflow uses `azd`.
+
+After setup, start a fresh session and confirm the skills/tools are available. An installed plugin alone does not authenticate the user, validate a deployment, or authorize cloud changes.
+
+### Azure CLI on Windows
+
+For local Azure workflows that need `az`, install it from an elevated or standard PowerShell terminal, subject to your organization's device policy:
+
+```powershell
+winget install --exact --id Microsoft.AzureCLI
+```
+
+Close and reopen the terminal, then verify:
+
+```powershell
+az version
+```
+
+See Microsoft's [Azure CLI Windows installation guide](https://learn.microsoft.com/cli/azure/install-azure-cli-windows) for MSI and other installation methods. If local installation is unavailable, [Azure Cloud Shell](https://portal.azure.com/#cloudshell/) provides Azure CLI in a browser after the user signs in. A local assistant cannot assume it can operate that browser shell; the user can run approved commands there and share non-sensitive output.
+
+`az login` is an interactive user-controlled sign-in, not an install step. Run it only when the user has chosen an Azure task and the required authentication method; let the user complete the browser/device flow. Never ask for, read, store, or echo credentials, tokens, or secrets. Use `az account show` to confirm the signed-in context and have the user select the intended subscription where applicable. Do not install `azd` unless the chosen deployment path requires it.
+
+### For an assistant: discover, offer, and proceed with approval
+
+Copy this request into the coding assistant:
+
+> Use SQL Apps. First inspect this host's available skills/tools and tell me what is missing. Distinguish local work from Azure work: local-only work needs no Azure CLI, Azure sign-in, or subscription. For each missing prerequisite, name the exact host-specific install/enable action and its effect. Do not install, enable, authenticate, or change host/system configuration until I approve that specific action. After approval, perform only the approved setup, then restart/refresh and verify actual capability discovery. Let me complete any interactive sign-in; never request or handle secrets. If DAB remains unavailable, state the blocker and next setup step—do not substitute Express CRUD or mocked persistence. Before any Azure write, present one concise review of target resources, cost posture, security/access changes, and uncertainties, and wait for explicit approval. Do not silently choose a paid fallback.
+
+An approval to install or enable a plugin/extension does not approve Azure sign-in, subscription changes, resource creation, spend, access changes, or destructive actions. If a tool or setup step fails, report the observed result and offer one bounded alternative from the official host guidance rather than repeating discovery indefinitely.
 
 ## Verify the actual installed root
 
@@ -156,7 +216,7 @@ $installedRoot = Read-Host 'Actual installed SQL Apps package root'
 node C:\git\sql-apps-v3\scripts\verify-release.mjs --source-root C:\git\sql-apps-v3 --installed-root "$installedRoot"
 ```
 
-Success reports `PASS sql-apps 0.3.0`, the compared roots, skill file count, and a SHA-256 payload fingerprint. The verifier checks every manifest/catalog, release identity/version, and all shipped skill/reference/template bytes, including missing or extra files. It rejects the source itself and linked skill payloads. A stale version, same-version edited guidance, missing file, or wrong root exits nonzero with the failing paths.
+Success reports `PASS sql-apps 0.2.1`, the compared roots, skill file count, and a SHA-256 payload fingerprint. The verifier checks every manifest/catalog, release identity/version, and all shipped skill/reference/template bytes, including missing or extra files. It rejects the source itself and linked skill payloads. A stale version, same-version edited guidance, missing file, or wrong root exits nonzero with the failing paths.
 
 After install/update, restart or open a fresh session, confirm the reported plugin version and loaded path, and rerun this command on that path. Then explicitly invoke SQL Apps and check actual Microsoft SQL DAB discovery before app work. A verified unpacked package or `source: live` listing does not prove the host loaded a copied install, and byte verification does not prove app execution. See the [release checks](./reference/releasing.md#package-and-installed-copy-verification) for packaging and isolated testing.
 

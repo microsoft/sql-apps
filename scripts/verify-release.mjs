@@ -48,7 +48,7 @@ export function verifyRelease({ sourceRoot = checkout, installedRoot } = {}) {
   const installed = readMetadata(installedRoot, 'installed');
   const version = source.get('plugin.json')?.version;
   if (typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version)) {
-    errors.push('source plugin.json: expected a release version such as 0.3.0');
+    errors.push('source plugin.json: expected a release version such as 0.2.1');
   }
   function checkName(data, expected, label) {
     if (data?.name !== expected) errors.push(`${label}: name ${data?.name}; expected ${expected}`);

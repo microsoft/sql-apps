@@ -187,7 +187,7 @@ Do not build an evidence subsystem to enforce this checklist. Keep commands and 
 
 ## 9. First release and deletion test
 
-Package for **Copilot/VS Code, Claude Code, OpenAI Codex, Gemini CLI, and Cursor**, using one canonical skill and the React/DAB/Azure SQL PoC profile. Publish changed payloads under distinguishable, immutable versions; verify actual installed manifests and skill bytes, not just the source checkout or a development link. The 0.3.0 minor-release candidate is not itself a published release. Prove the end-to-end proposal in Copilot in VS Code first; packaging another host does not certify its loader or application workflow.
+Package for **Copilot/VS Code, Claude Code, OpenAI Codex, Gemini CLI, and Cursor**, using one canonical skill and the React/DAB/Azure SQL PoC profile. Publish changed payloads under distinguishable, immutable versions; verify actual installed manifests and skill bytes, not just the source checkout or a development link. The 0.2.1 patch-release candidate is not itself a published release. Prove the end-to-end proposal in Copilot in VS Code first; packaging another host does not certify its loader or application workflow.
 
 Implement only the package above. Evaluate:
 

@@ -3,13 +3,13 @@
   "owner": { "name": "Microsoft", "url": "https://www.microsoft.com" },
   "metadata": {
     "description": "Opinionated TypeScript application development on Azure SQL Database.",
-    "version": "0.3.0"
+    "version": "0.2.1"
   },
   "plugins": [
     {
       "name": "sql-apps",
       "description": "Build TypeScript and Azure SQL applications with one routing skill and existing specialist plugins.",
-      "version": "0.3.0",
+      "version": "0.2.1",
       "source": "./"
     }
   ]

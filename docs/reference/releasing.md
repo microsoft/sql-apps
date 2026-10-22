@@ -22,7 +22,7 @@ There are no executable hooks, MCP servers, automatic companion dependencies, or
 
 ## Release identity
 
-This checkout is the **0.3.0 minor release candidate**. That identifies source metadata, not a published release or an updated user installation. The marketplace identity remains `sql-apps-skills`, the plugin/extension identity remains `sql-apps`, and the install coordinate remains `sql-apps@sql-apps-skills`.
+This checkout is the **0.2.1 patch release candidate**. That identifies source metadata, not a published release or an updated user installation. The marketplace identity remains `sql-apps-skills`, the plugin/extension identity remains `sql-apps`, and the install coordinate remains `sql-apps@sql-apps-skills`.
 
 `plugin.json` is the canonical version. Keep the Claude, Codex, Cursor, and Gemini manifests and the shared/Cursor catalog versions aligned with it. The Codex catalog in `.agents/plugins/marketplace.json` intentionally reads the plugin version rather than duplicating it.
 
@@ -32,8 +32,8 @@ Published release versions are **immutable**: never change shipped guidance or t
 
 | Host | Packaging | Native validation / loader |
 | --- | --- | --- |
-| Copilot CLI | Root manifest + shared catalog | 0.2.0 isolated local marketplace registration/install/list passed with one skill on CLI 1.0.102, but it reports `source: live`: no cached package was copied; 0.3.0 loading not exercised |
-| VS Code | Root manifest + shared catalog | Existing cached 0.1.0 package inspected read-only; verifier correctly rejects its stale versions and changed skill bytes. Fresh 0.3.0 UI loading not exercised |
+| Copilot CLI | Root manifest + shared catalog | 0.2.0 isolated local marketplace registration/install/list passed with one skill on CLI 1.0.102, but it reports `source: live`: no cached package was copied; 0.2.1 loading not exercised |
+| VS Code | Root manifest + shared catalog | Existing cached 0.1.0 package inspected read-only; verifier correctly rejects its stale versions and changed skill bytes. Fresh 0.2.1 UI loading not exercised |
 | Claude Code | Native manifest + shared catalog | Manifest/catalog validation passed; interactive loading not exercised |
 | OpenAI Codex | Compatibility manifest + Codex catalog | Static checks only; CLI unavailable in the validation environment |
 | Gemini CLI | Extension manifest + shared skills | Static checks only; CLI unavailable in the validation environment |
@@ -75,7 +75,7 @@ For isolated Copilot checks, use a new configuration directory inside your check
 $savedHome = $env:COPILOT_HOME
 $savedAutoUpdate = $env:COPILOT_AUTO_UPDATE
 try {
-  $env:COPILOT_HOME = Join-Path (Get-Location).Path '.release-check-copilot-0.3.0'
+  $env:COPILOT_HOME = Join-Path (Get-Location).Path '.release-check-copilot-0.2.1'
   $env:COPILOT_AUTO_UPDATE = 'false'
   copilot plugin marketplace add C:\git\sql-apps-v3
   copilot plugin install sql-apps@sql-apps-skills
@@ -130,7 +130,7 @@ For an approved deployment, read back actual resource tags and names through the
 
 1. Review license, notices, payload, release identity, and validation results; do not reuse an existing release version for changed bytes.
 2. Run all three test files above. Prepare an independent package from the reviewed candidate and run the verifier against its unpacked root. Record the exact source revision, version, commands/results, and payload fingerprint.
-3. With maintainer authorization, publish reviewed commits to [microsoft/sql-apps](https://github.com/microsoft/sql-apps) and create the matching immutable version tag/release. A local 0.3.0 manifest change alone does not publish anything. Do not claim app/cloud acceptance based on a package check.
+3. With maintainer authorization, publish reviewed commits to [microsoft/sql-apps](https://github.com/microsoft/sql-apps) and create the matching immutable version tag/release. A local 0.2.1 manifest change alone does not publish anything. Do not claim app/cloud acceptance based on a package check.
 4. Keep installation examples pointed at this repository. For a pinned release, check the host's actual pinning syntax rather than guessing a tag parameter.
 5. Test initial installation **and** marketplace refresh/plugin update from the previously released version, using isolated host configuration where supported. Locate the actual copied package, run the verifier, start a fresh session, confirm its loaded path/version, and rerun the verifier. Record host/plugin versions and distinguish copied installs from live development sources.
 6. Verify each advertised installation route before broadening its status. Public marketplace listing may require separate submission, review, or account permissions. Keep unexercised hosts/runtime scenarios explicit.

@@ -12,7 +12,7 @@ Configure the existing assistant; do not start an orchestration runtime.
 1. Read the [constitution](./references/constitution.md) before planning or changing an app.
 2. Confirm the intended application directory. The installed plugin directory is guidance, never the destination for a generated application. Inspect an existing project before creating files or scaffolding.
 3. Read existing project instructions, the app brief, source, and relevant specialist artifacts. Preserve unrelated work. An existing incompatible stack is not permission to rewrite it: explain the conflict and obtain a scoped decision.
-4. Identify the actual installed skills and tools, including Data API builder (DAB) guidance and runtime prerequisites. Use host discovery; do not assume availability from a remembered name. If a required capability is missing, report the prerequisite and the installation guidance in this plugin's README. Do not install it silently, substitute another database, or replace DAB with direct Express-to-SQL APIs.
+4. Identify the actual installed skills and tools, including Data API builder (DAB) guidance and runtime prerequisites. Use host discovery; do not assume availability from a remembered name. If a capability is missing, follow [quick setup guidance](../../docs/installation.md#quick-setup-when-a-capability-is-missing): offer the host-specific install/enable steps and obtain approval before changing host or system configuration. Local-only work needs no Azure CLI, sign-in, or subscription. Never handle credentials; do not substitute another database or replace DAB with direct Express-to-SQL APIs.
 
 ## New application
 

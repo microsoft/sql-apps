@@ -29,7 +29,7 @@ test('manifest uses only supported Agent Plugins 1.0 fields', () => {
   assert.match(manifest.name, /^(?!.*(?:--|\.\.))[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/);
   assert.ok(manifest.name.length <= 64);
   assert.match(manifest.version, /^\d+\.\d+\.\d+$/);
-  assert.equal(manifest.version, '0.3.0', 'Keep the minor release version explicit');
+  assert.equal(manifest.version, '0.2.1', 'Keep the patch release version explicit');
   assert.equal(typeof manifest.description, 'string');
   assert.ok(manifest.description.length > 0);
   assert.equal(manifest.license, 'MIT');
@@ -129,7 +129,7 @@ test('Gemini extension uses native skill discovery without global context or cod
 test('release and installation guidance verify payloads and require discovered DAB', () => {
   const installation = read(path.join('docs', 'installation.md'));
   const releasing = read(path.join('docs', 'reference', 'releasing.md'));
-  assert.match(installation, /0\.3\.0 release candidate/);
+  assert.match(installation, /0\.2\.1 patch release candidate/);
   assert.match(installation, /microsoft-sql@microsoft-sql/);
   assert.match(installation, /mandatory/);
   assert.match(installation, /dab-rest-and-graphql/);
@@ -144,6 +144,31 @@ test('release and installation guidance verify payloads and require discovered D
   assert.match(releasing, /immutable/);
   assert.match(releasing, /byte-exact/);
   assert.ok(existsSync(path.join(root, 'scripts', 'verify-release.mjs')));
+});
+
+test('missing SQL, Azure Skills, or Azure CLI has actionable setup guidance', () => {
+  const installation = read(path.join('docs', 'installation.md'));
+  const skill = read(skillPath);
+  const readme = read('README.md');
+  for (const requirement of [
+    'Quick setup when a capability is missing',
+    'microsoft-sql@microsoft-sql',
+    'microsoft-sql-vscode',
+    'Azure MCP extension',
+    'winget install --exact --id Microsoft.AzureCLI',
+    'Azure Cloud Shell',
+    'az version',
+    'az login',
+    'Use SQL Apps. First inspect this host',
+  ]) {
+    assert.ok(installation.includes(requirement), `Missing setup guidance: ${requirement}`);
+  }
+  assert.match(installation, /Local-only has no Azure CLI or subscription requirement/);
+  assert.match(installation, /Do not install, enable, authenticate, or change host\/system configuration until I approve/);
+  assert.match(installation, /Never ask for, read, store, or echo credentials/);
+  assert.match(installation, /Before any Azure write,.*wait for explicit approval/);
+  assert.ok(skill.includes('../../docs/installation.md#quick-setup-when-a-capability-is-missing'));
+  assert.ok(readme.includes('./docs/installation.md#quick-setup-when-a-capability-is-missing'));
 });
 
 test('shared guidance persists policy for each active host without five copies', () => {

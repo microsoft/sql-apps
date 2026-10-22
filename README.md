@@ -10,7 +10,7 @@ SQL Apps is a lightweight assistant plugin, not another application platform. It
 
 [Get started](#get-started) · [Install for your assistant](./docs/installation.md) · [Reference](#learn-more)
 
-> **Preview · 0.3.0 release candidate** — Free-first, deployment-shaped DAB-based PoC guidance. Packaging is available for five assistant families. Application-generation and deployment validation is still in progress; see [verification status](./docs/reference/releasing.md#verification-status). Check the installed package version and payload, not just this checkout.
+> **Preview · 0.2.1 release candidate** — Free-first, deployment-shaped DAB-based PoC guidance. Packaging is available for five assistant families. Application-generation and deployment validation is still in progress; see [verification status](./docs/reference/releasing.md#verification-status). Check the installed package version and payload, not just this checkout.
 
 ## What will you build?
 
@@ -45,9 +45,9 @@ The marketplace install coordinate is **`sql-apps@sql-apps-skills`**. Use the [i
 
 ### 2. Connect the specialists
 
-Install the [Microsoft SQL guidance](https://github.com/microsoft/microsoft-sql#choose-a-plugin) appropriate to your host, including DAB guidance, and check the local database and DAB runtime prerequisites. Add [Azure Skills](https://github.com/microsoft/azure-skills) when you need Azure capabilities.
+Install the [Microsoft SQL guidance](https://github.com/microsoft/microsoft-sql#choose-a-plugin) appropriate to your host, including DAB guidance, and check the local database and DAB runtime prerequisites. Add [Azure Skills](https://github.com/microsoft/azure-skills) when you need Azure capabilities. If a companion or Azure CLI is missing, follow [quick setup when a capability is missing](./docs/installation.md#quick-setup-when-a-capability-is-missing) for host-specific, approval-gated steps.
 
-SQL Apps does not install these companions or the database automatically. See [prerequisites](./docs/installation.md#prerequisites) for bundle choices and tooling. Local-only development does not require cloud onboarding.
+SQL Apps does not install these companions or the database automatically. See [prerequisites](./docs/installation.md#prerequisites) for bundle choices and tooling. Local-only development does not require Azure CLI, Azure sign-in, or a subscription.
 
 ### 3. Describe your app
 
