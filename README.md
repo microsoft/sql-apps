@@ -2,7 +2,7 @@
 
 <img src="content/icons/sql-apps.png" alt="SQL Apps icon: a blue database with a purple application ribbon" width="160">
 
-**Your idea. Your assistant. Your SQL.**
+**Your idea. Your assistant. Your app.**
 
 Build SQL-backed web applications with the coding assistant you already use. Describe your idea, shape the important rules, and build a working application you own. Start locally. Deploy to Azure when you're ready.
 
