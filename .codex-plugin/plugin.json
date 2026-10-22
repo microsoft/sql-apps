@@ -1,6 +1,6 @@
 {
   "name": "sql-apps",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "An opinionated TypeScript and Azure SQL application router for existing coding assistants and specialist plugins.",
   "author": { "name": "Microsoft" },
   "license": "MIT",

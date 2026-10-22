@@ -38,7 +38,7 @@ Azure SQL Database and TypeScript are the defining choices. The remaining defaul
 | Area | First-release policy |
 | --- | --- |
 | Language | TypeScript for application code; T-SQL for database work |
-| Intent and cost | `intent: poc` and `costPreference: zero-azure-spend`; explicit production requirements change intent, not spend approval |
+| Intent and cost | `intent: poc` and `costPreference: free-first`; explicit `zero-azure-spend` remains strict; production intent is not spend approval |
 | UI | React with Vite |
 | Design and testing | Rayfin-informed Tailwind v4 tokens, Radix primitives, Lucide icons, `clsx`/`tailwind-merge`; Vitest/React Testing Library |
 | Application data APIs | DAB with validated identity and role/ownership permissions; no automatic Express-to-SQL CRUD |
@@ -46,20 +46,25 @@ Azure SQL Database and TypeScript are the defining choices. The remaining defaul
 | Database rules | SQL constraints and transaction-safe procedures exposed through DAB enforce transactional/concurrent invariants without bypass write paths |
 | Relational data | Azure SQL Database; no silent SQLite, PostgreSQL, Cosmos DB, or Fabric substitution |
 | Local database | Route to Microsoft SQL's Azure SQL Database container guidance; check availability and prerequisites before promising a local run |
-| Cloud hosting | Verify a complete qualifying free topology first; no default paid hosting/database SKU |
+| Cloud hosting | Complete free-first topology/cost review; no automatic paid SKU |
 | Optional services | Azure Blob Storage for files, Microsoft Entra ID for sign-in, Application Insights for telemetry, Key Vault when secret storage is needed |
 | Structure | npm workspaces for frontend, data (SQL/DAB configuration), shared contracts, and a custom server only when needed; one application and one database |
 | Migration intent | `rayfin/rayfin.yml` with `services.data.dialect: mssql`; not executed by SQL Apps or proof of released Rayfin support |
 | Delivery | A working local app is sufficient; cloud deployment is optional |
+| Deployment attribution | Sole `sqlapps-version` tag using the adopted guidance version; final `sqlapps` suffix on new resource names by default, with customer overrides |
 | Ownership | Normal source, migrations, configuration, tests, and run instructions; no SQL Apps runtime dependency |
 
 The service list is a support boundary, not a provisioning checklist. Do not create storage, identity registrations, telemetry resources, or a vault unless the app needs them.
+
+Deployment attribution is metadata only: the brief records `sqlapps-version` from the actual SQL Apps plugin manifest when its guidance is adopted, plus the final `sqlapps` suffix naming pattern and approved exceptions. Environment and stable uniqueness tokens come before the suffix. Preserve these choices on resume; a newer installed plugin must not automatically relabel old infrastructure. Merge the sole attribution tag onto each new tag-capable resource and new group, since group tags are not inherited. Preserve customer tags and existing/shared resources; do not rename or replace resources for attribution. The signal indicates resource footprint, not active usage or unique applications; it adds no runtime telemetry, data access, or Microsoft reporting access. The [deployment attribution contract](./skills/sql-apps/references/deployment-attribution.md) owns naming constraints, overrides, and verification.
 
 Do not silently introduce another framework, ORM, data API platform, or database. Specialists may assess alternative hosting for the required DAB app, disclosing support boundaries and verifying the complete topology. Messaging, AI services, AKS, or another application stack exceed the initial profile. An explicitly accepted exception is not a newly supported profile.
 
 These are instruction-level policies, not a security sandbox. Host permissions and actual tests remain authoritative. Browser code must never receive database credentials; authorization must hold at DAB, including direct requests, and SQL must enforce transactional invariants.
 
-Assess hosting, DAB, SQL, authentication, build/publication, and supporting resources together. Distinguish free SKUs and quota-stopped offers from metered allowances, trials, and credits. Qualifying zero-spend SQL requires `useFreeLimit: true` and `freeLimitExhaustionBehavior: AutoPause`, not just idle auto-pause. Azure SQL Basic is paid. If any required component is incompatible or unverified, stop cloud work and preserve the local app; present paid alternatives separately for explicit approval. The [constitution](./skills/sql-apps/references/constitution.md) owns the detailed gate.
+Assess hosting, DAB, SQL, authentication, build/publication, and supporting resources together. Distinguish free SKUs and quota-stopped offers from metered allowances, trials, and credits; never promise guaranteed free operation. Qualifying zero-spend SQL requires `useFreeLimit: true` and `freeLimitExhaustionBehavior: AutoPause`, not just idle auto-pause. Azure SQL Basic is paid. Stop unapproved cloud writes, not safe investigation: classify confirmed incompatibility, missing evidence and recoverable tooling failure, then provide bounded recovery and a next safe action/precise approval. Preserve component-specific accepted decisions, such as B1 hosting with SQL still free. The [constitution](./skills/sql-apps/references/constitution.md) owns cost policy.
+
+Local completion is deployment-ready: pinned DAB, portable configuration, supported authentication, reproducible UI/custom-server/DAB/SQL packaging, and documented hosting recipe/evidence status. Evaluate precompiled runtime artifacts, not TypeScript labels, when assessing F1. The [deployment guidance](./skills/sql-apps/references/deployment.md) defines one concise review, bounded recovery, scoped approvals and recipe promotion. No exercised core recipe is yet bundled; do not represent documentation or static tests as successful deployment evidence.
 
 ## 4. Compose what already exists
 
@@ -141,13 +146,13 @@ The router has one job: **given the request, project, constitution, and installe
 | New SQL Apps application | Clarify consequential gaps, confirm a short brief and profile, then let the assistant implement using the applicable SQL guidance |
 | DAB APIs/authorization, SQL design, connections, migrations, or local database | Relevant Microsoft SQL skill/tool |
 | Ordinary UI/server implementation or app change | Assistant's normal coding workflow; consult SQL/Azure specialists only for the affected work |
-| Deploy an accepted application | Appropriate Azure workflow carrying PoC/zero-spend constraints; complete free-topology assessment before resource selection or provisioning |
+| Deploy an accepted application | Appropriate Azure workflow carrying current costs and accepted decisions; one complete topology/cost/security review and bounded resolution of uncertainties |
 | SQL or Azure failure | Owning diagnostic skill, supplied with the actual error and relevant context |
 | Resume or change an app | Read the brief, project instructions, current code, and specialist-owned artifacts; inspect reality rather than trusting old task status |
 | Missing capability | Report the exact prerequisite and supported installation path; do not invent success or install silently |
 | Out-of-profile requirement | Explain the conflict and propose an explicit exception or another product |
 
-A handoff is a short task description: project location, desired result, current `intent` and `costPreference` values, DAB/SQL requirements, approved topology/cost boundary, and acceptance checks. Carry those values explicitly to every specialist, not just as a brief link. Use the host's tools directly unless a bounded task genuinely benefits from a separate agent.
+A handoff is a short task description: project location, desired result, current `intent` and `costPreference` values, DAB/SQL requirements, approved topology/cost boundary, and acceptance checks. Carry those values explicitly to every specialist, not just as a brief link. Every Azure handoff also carries recorded `sqlapps-version`, the final `sqlapps` suffix naming pattern, and approved overrides/exceptions. Use the host's tools directly unless a bounded task genuinely benefits from a separate agent.
 
 Borrow the [Mission Control](https://github.blog/ai-and-ml/github-copilot/how-to-orchestrate-agents-using-mission-control/) discipline: scoped tasks, sufficient context, visible progress, and review. Do not build another Mission Control. Parallelism is optional and appropriate only for independent work; a schema/API/UI dependency chain is not automatically three parallel agents.
 
@@ -156,11 +161,11 @@ Borrow the [Mission Control](https://github.blog/ai-and-ml/github-copilot/how-to
 > "Build a shared-equipment reservation app."
 
 1. Confirm the project location. Resolve only material ambiguities: who can reserve, who can see reservations, and whether overlaps are allowed.
-2. Confirm the short app brief with `intent: poc`, `costPreference: zero-azure-spend`, and the SQL Apps profile. Do not ask the user to select defaults already chosen by the constitution.
+2. Confirm the short app brief with `intent: poc`, `costPreference: free-first`, and the SQL Apps profile; strict zero spend is explicit and existing choices are preserved.
 3. Check the relevant host tools, SQL/DAB guidance, and runtime/local-engine prerequisites. Surface a blocker before building around an unavailable dependency.
 4. Implement one real workflow across React, DAB, and SQL; add custom server behavior only where necessary. Reuse upstream guidance without copying it into SQL Apps.
 5. Run the checks below and leave usable source plus exact run instructions. If cloud delivery was not requested, stop here.
-6. If deployment is requested, retain PoC intent and the cost boundary through the selected Azure workflow. Verify a complete free topology first; stop with a specific blocker if it cannot qualify, leaving the local app usable. Offer paid choices separately for explicit approval. Retain upstream gates and verify actual deployed behavior and resource settings.
+6. If deployment is requested, retain PoC intent, component constraints and accepted decisions through the selected Azure workflow. Present one concise review, investigate evidence gaps with bounded recovery and request precise approvals for writes/spend/access changes. Local engineering checks stay within implementation approval and host permissions. Verify actual deployed behavior and settings; a plan or successful local tests are not cloud success.
 
 For later changes, update the brief where intent changes, implement across affected layers, and rerun relevant checks. No SQL Apps execution record is required. Upstream workflows may keep their own artifacts; SQL Apps should not duplicate them.
 
@@ -174,6 +179,7 @@ Use the generated project's existing test/build tooling and the host's browser/S
 - Inspect the essential UI at desktop and narrow widths, including error/empty states.
 - Confirm the documented start/restart path works. Distinguish "verified runnable" from "currently running."
 - If deployed, repeat architecture/authorization/invariant checks at the deployed origin and read actual SKUs, SQL free-limit flags, and supporting meter/overage settings against the approved cost posture. An estimate or IaC declaration is not evidence of actual settings.
+- Read back actual tags/names for each in-scope resource against the brief's recorded attribution version, naming pattern, and approved exceptions. Report mismatches separately from approved overrides/unsupported cases; no renamed resources, overwritten customer tags, or added telemetry to force a pass. Local-only delivery needs no Azure attribution checks.
 
 Report what ran, what passed, and what is blocked. A scaffold, successful deployment command, screenshot, or specialist's success message alone is not proof that the application works.
 
@@ -181,7 +187,7 @@ Do not build an evidence subsystem to enforce this checklist. Keep commands and 
 
 ## 9. First release and deletion test
 
-Package for **Copilot/VS Code, Claude Code, OpenAI Codex, Gemini CLI, and Cursor**, using one canonical skill and the React/DAB/Azure SQL PoC profile. Publish changed payloads under distinguishable, immutable versions; verify actual installed manifests and skill bytes, not just the source checkout or a development link. The 0.2.0 candidate is not itself a published release. Prove the end-to-end proposal in Copilot in VS Code first; packaging another host does not certify its loader or application workflow.
+Package for **Copilot/VS Code, Claude Code, OpenAI Codex, Gemini CLI, and Cursor**, using one canonical skill and the React/DAB/Azure SQL PoC profile. Publish changed payloads under distinguishable, immutable versions; verify actual installed manifests and skill bytes, not just the source checkout or a development link. The 0.3.0 minor-release candidate is not itself a published release. Prove the end-to-end proposal in Copilot in VS Code first; packaging another host does not certify its loader or application workflow.
 
 Implement only the package above. Evaluate:
 
@@ -189,7 +195,7 @@ Implement only the package above. Evaluate:
 2. A new conversation adds a rule without losing the constitution or existing behavior.
 3. Missing SQL prerequisites and out-of-profile requests produce explicit blockers, not substitute architectures.
 4. Local-only delivery does not enter cloud onboarding or provision resources.
-5. An authorized Azure deployment follows one upstream workflow, preserves the approved cost posture, and passes architecture/cost acceptance. An incompatible free topology stops cloud work without an automatic paid upgrade.
+5. An authorized Azure deployment follows one upstream workflow, preserves scoped approvals and passes deployed architecture/cost acceptance. Evidence gaps get a bounded resolution path; unapproved writes stop without automatic upgrades. Strict zero-spend choices remain strict.
 
 Before implementing any additional SQL Apps component, ask:
 

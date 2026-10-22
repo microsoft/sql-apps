@@ -17,13 +17,13 @@
 ## First delivery
 
 - intent: poc
-- costPreference: zero-azure-spend
+- costPreference: free-first
 - Includes: <small but complete useful scope>
 - Excludes: <deferred features>
 - Assumptions: <consequential assumptions explicitly confirmed or delegated>
 - Delivery: <local; Azure only if requested, subject to its own approvals>
 
-PoC and zero Azure spend are the defaults. Only explicit production availability, scale, or compliance requirements change intent; "deploy" does not. A production requirement does not authorize charges. Change costPreference only after explicit approval of a separately presented paid option. Carry the current values and architecture/cost acceptance checks explicitly into every specialist handoff.
+PoC/free-first are the defaults, not a guarantee of free operation or permission to spend. Explicit costPreference: zero-azure-spend is strict; preserve existing choices. Only explicit production availability, scale, or compliance requirements change intent; "deploy" does not. Carry current values, scoped accepted decisions and acceptance checks into every specialist handoff. Routine non-destructive local checks are within implementation approval/host permissions; cloud writes, spend/access changes and destructive actions need explicit approval.
 
 ## Technical boundary
 
@@ -32,6 +32,15 @@ SQL Apps profile: TypeScript, React/Vite, DAB application data APIs, Azure SQL D
 - Application request path: <UI/API client -> DAB -> SQL; any necessary custom-server hop and its purpose>
 - DAB authorization: <identity validation, role/ownership rules, direct-endpoint and proxy trust boundaries>
 - SQL invariants: <constraints/procedures, transaction/concurrency behavior, restricted write paths>
+- Local deployment-ready delivery: <pinned DAB/runtime; portable configuration; supported authentication; reproducible packaging/startup/routing/restart for UI, custom server, DAB and SQL migrations/permissions; cloud recipe revision and evidence gaps>
+
+## Deployment attribution
+
+- sqlapps-version: <verified SQL Apps guidance version adopted for generated infrastructure; preserve on resume>
+- Resource naming: <final sqlapps suffix and approved naming pattern for new resources; environment/stable uniqueness tokens before the suffix>
+- Exceptions: <none, or approved naming/tagging exceptions and existing/shared resource boundaries>
+
+Resolve the version from the actual SQL Apps plugin manifest, not the app/DAB version. Preserve customer tags and existing names; group tags are not inherited. Metadata only: no runtime telemetry, data access, or added monitoring resources. Local-only delivery needs no Azure attribution checks.
 
 ## Complete topology and cost boundary
 
@@ -46,11 +55,12 @@ Before cloud work, assess the required topology together; no preselected paid SK
 | Build/publication | <build and artifact/publication path> | <limits and behavior> |
 | Supporting resources | <required resources, or explicitly none> | <logs, storage, secrets, network/egress, backups, domains> |
 
-- Approved topology / plan: <local-only by default; link an approved cloud plan when requested>
-- Incompatibilities: <specific component/feature that fails free eligibility or compatibility; unknown eligibility blocks cloud work>
+- Approved topology / plan: <local-only by default; one concise cloud review of target/resources, costs, security changes and uncertainty when requested>
+- Accepted decisions: <component-specific approval scope/limits; B1 hosting approval must preserve SQL-free requirements>
+- Findings and next action: <confirmed incompatibility / missing evidence / recoverable tooling failure; bounded investigation, next safe engineering action and precise approval needed>
 - Paid alternatives: <separate options and complete costs only if needed; no implicit authorization>
 
-Trials, credits, consumption grants, and budget alerts do not guarantee zero spend. Idle SQL auto-pause alone is not monthly free-limit AutoPause. If the complete topology cannot meet the cost boundary, stop cloud work and preserve the local DAB app; do not upgrade or weaken the architecture automatically.
+Trials, credits, consumption grants, and budget alerts do not guarantee zero spend. Idle SQL auto-pause alone is not monthly free-limit AutoPause. Stop unapproved cloud writes, not safe engineering or authorized read-only investigation; preserve the local DAB app. Present paid alternatives separately for explicit user approval; do not upgrade or weaken the architecture automatically.
 
 ## Architecture and cost acceptance
 
@@ -58,7 +68,7 @@ Trials, credits, consumption grants, and budget alerts do not guarantee zero spe
 - Authorization: <denied direct DAB operations, allowed positive controls, unauthenticated/forged-role checks>
 - SQL rules: <invariant-breaking and concurrent requests rejected atomically, no bypass or partial writes>
 - Local usability: <documented start/restart for UI, DAB, SQL, and any necessary custom server>
-- If deployed: <repeat at deployed origin; read back actual SKUs, SQL free-limit flags, supporting meters and overage settings against the approved topology>
+- If deployed: <repeat at deployed origin; read back actual SKUs, SQL free-limit flags, supporting meters and overage settings against the approved topology; verify actual resource tags and names against the recorded attribution choices and exceptions>
 
 ## Design and migration intent
 

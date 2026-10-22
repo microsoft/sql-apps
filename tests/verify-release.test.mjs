@@ -42,12 +42,12 @@ function cli(args) {
 test('an independent package copy matches source metadata and every skill byte', (t) => {
   const roots = fixture(t);
   const result = verifyRelease(roots);
-  assert.equal(result.version, '0.2.0');
-  assert.ok(result.skillFiles >= 6);
+  assert.equal(result.version, '0.3.0');
+  assert.equal(result.skillFiles, 8);
   assert.match(result.payloadDigest, /^[a-f0-9]{64}$/);
   const command = cli(['--source-root', roots.sourceRoot, '--installed-root', roots.installedRoot]);
   assert.equal(command.status, 0, command.stderr);
-  assert.match(command.stdout, /PASS sql-apps 0\.2\.0/);
+  assert.match(command.stdout, /PASS sql-apps 0\.3\.0/);
   assert.ok(command.stdout.includes(result.payloadDigest));
 });
 
@@ -64,7 +64,7 @@ test('a stale installed version fails clearly', (t) => {
   editJSON(roots.installedRoot, 'plugin.json', (data) => { data.version = '0.1.0'; });
   const command = cli(['--source-root', roots.sourceRoot, '--installed-root', roots.installedRoot]);
   assert.equal(command.status, 1);
-  assert.match(command.stderr, /installed plugin\.json: version 0\.1\.0; expected 0\.2\.0/);
+  assert.match(command.stderr, /installed plugin\.json: version 0\.1\.0; expected 0\.3\.0/);
 });
 
 test('same-version changed skill bytes fail, including newline-only drift', (t) => {

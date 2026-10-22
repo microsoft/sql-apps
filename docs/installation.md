@@ -6,7 +6,7 @@ Choose your host below. Packaging and verification are different: consult the [v
 
 ## Before you install
 
-The marketplace is `sql-apps-skills`, and the plugin is `sql-apps`. The source repository is [microsoft/sql-apps](https://github.com/microsoft/sql-apps). The version in this checkout is the **0.2.0 release candidate**, not evidence that 0.2.0 has been published. Remote examples below install what is actually published in that repository. Existing 0.1.0 installations do not become 0.2.0 when a checkout changes: refresh the marketplace, update the plugin, and verify the installed bytes.
+The marketplace is `sql-apps-skills`, and the plugin is `sql-apps`. The source repository is [microsoft/sql-apps](https://github.com/microsoft/sql-apps). The version in this checkout is the **0.3.0 release candidate**, not evidence that 0.3.0 has been published. Remote examples below install what is actually published in that repository. Existing 0.1.0 or 0.2.0 installations do not become 0.3.0 when a checkout changes: refresh the marketplace, update the plugin, and verify the installed bytes.
 
 Local examples use `C:\git\sql-apps-v3`; replace that with your downloaded checkout. Installation/registration changes host configuration, so review its prompts. Registration alone does not install a plugin.
 
@@ -156,7 +156,7 @@ $installedRoot = Read-Host 'Actual installed SQL Apps package root'
 node C:\git\sql-apps-v3\scripts\verify-release.mjs --source-root C:\git\sql-apps-v3 --installed-root "$installedRoot"
 ```
 
-Success reports `PASS sql-apps 0.2.0`, the compared roots, skill file count, and a SHA-256 payload fingerprint. The verifier checks every manifest/catalog, release identity/version, and all shipped skill/reference/template bytes, including missing or extra files. It rejects the source itself and linked skill payloads. A stale version, same-version edited guidance, missing file, or wrong root exits nonzero with the failing paths.
+Success reports `PASS sql-apps 0.3.0`, the compared roots, skill file count, and a SHA-256 payload fingerprint. The verifier checks every manifest/catalog, release identity/version, and all shipped skill/reference/template bytes, including missing or extra files. It rejects the source itself and linked skill payloads. A stale version, same-version edited guidance, missing file, or wrong root exits nonzero with the failing paths.
 
 After install/update, restart or open a fresh session, confirm the reported plugin version and loaded path, and rerun this command on that path. Then explicitly invoke SQL Apps and check actual Microsoft SQL DAB discovery before app work. A verified unpacked package or `source: live` listing does not prove the host loaded a copied install, and byte verification does not prove app execution. See the [release checks](./reference/releasing.md#package-and-installed-copy-verification) for packaging and isolated testing.
 
