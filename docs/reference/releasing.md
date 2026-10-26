@@ -94,12 +94,41 @@ Before claiming end-to-end support for a host, test it with the required special
 
 1. Generate a reservation app with a real UI-to-SQL save/reload and documented restart.
 2. In a new conversation, change an invariant without losing policy or existing behavior.
-3. Exercise missing SQL and DAB prerequisites and an out-of-profile request; expect an explicit blocker. Application data APIs require an actually installed Microsoft SQL DAB skill/tool; no silent Express-to-SQL CRUD substitution. Express is conditional for auth/orchestration/domain work.
+3. Exercise missing SQL/DAB prerequisites and an out-of-profile request. Missing runtime capability should produce a useful setup path and allow safe UI/schema/scaffolding work; database persistence stays incomplete until real SQL/DAB is available. No mock persistence or direct Express-to-SQL substitution.
 4. Complete default `poc` / `free-first` local delivery with reproducible deployment-shaped artifacts, without cloud onboarding or resource creation. Explicit strict-zero choices remain strict. In a requested cloud review, distinguish confirmed incompatibility, missing evidence and recoverable tool failure; exercise bounded fallback and preserve scoped approvals rather than silently upgrading.
 5. In an authorized environment, follow one Azure deployment workflow and verify the deployed primary workflow, including the attribution acceptance below.
 6. Check workspace builds, real paths, `dist/index.html`, themes, keyboard behavior, and `rayfin/rayfin.yml` with `mssql`. Confirm no unintended Rayfin SDK/runtime installation or workflow handoff.
 
 Record actual commands/results and host/plugin versions. A static test or installed skill does not count as a passed application scenario.
+
+#### Reservation-app prompt and acceptance checks
+
+Use the [README's reservation scenario](../../README.md#2-build-your-first-workflow) as a realistic user request, not a maintained demo codebase or a scripted acceptance checklist. Run it in a new disposable workspace outside the plugin repository. Confirm [prerequisites](../installation.md#prerequisites) and the loaded plugin version/path first. Do not reuse credentials or modify another running demo.
+
+**User prompt**
+
+> Use SQL Apps to build an equipment reservation app. Staff manage equipment; members reserve it; overlapping reservations must be rejected. Ask about important missing rules, then build and verify one complete workflow locally.
+
+**Acceptance checks (separate from the prompt)**
+
+- Record host/plugin versions, prerequisites, prompt, actual commands, observed results, and unresolved checks. Compare with the same user prompt without SQL Apps and equivalent specialist setup before claiming the plugin adds value.
+- When real SQL/DAB is available, check UI save/reload, allowed and denied direct DAB requests, SQL rejection of overlapping concurrent reservations, reproducible packaging, restart, and persistence.
+- If SQL/DAB is unavailable, allow useful UI/schema/scaffolding work. Record persistence and end-to-end acceptance as incomplete, give the user supported setup steps, and do not substitute mock data or direct SQL.
+- Do not provision Azure resources, initiate cloud authentication, or disrupt existing services for this local evaluation. Report missing prerequisites and checks that were not run.
+
+**2. Change a rule in a fresh conversation**
+
+Open a new conversation in the generated application's workspace, then use:
+
+> Use SQL Apps to continue this reservation app. Read its project instructions and existing implementation first. Add a maximum of three active future reservations per member. Clarify what "active" and "future" mean, then update the app and its run instructions without changing existing behavior. Keep this work local.
+
+For this change, separately check the agreed rule below, at the limit, and for concurrent requests competing for the last available reservation. Confirm the durable policy and existing authorization remain intact; report unrun checks rather than claiming they passed.
+
+**3. Review deployment of the same app**
+
+> Use SQL Apps and the installed Azure/SQL specialists to review deployment of this existing app, not scaffold a replacement. Inspect its production artifacts and the recorded architecture, cost choices and exceptions. Present one concise review covering subscription, region, isolated resource scope, complete topology, pinned runtimes, identity and access changes, routing, process lifecycle, estimated costs, cleanup scope and remaining uncertainties. Distinguish confirmed incompatibility, missing evidence and recoverable tool failure; give each an actionable next step. Preserve explicit strict-zero choices and any already approved component-specific exceptions. Do not provision, enable paid services, change access or clean up resources until the exact actions are explicitly approved. After approval, verify the deployed workflow, direct DAB authorization, SQL overlap and member-limit concurrency rules, restart and actual resource settings under the deployment and attribution acceptance below. Record failures and unrun checks honestly.
+
+Retain sanitized run evidence with the actual source/package and runtime versions, commands, observed outcomes and unresolved checks. Do not commit credentials, tokens or customer data. Completing this prompt sequence does not replace the other runtime acceptance cases above, prove every supported host, or promote a deployment recipe without the evidence below.
 
 ### Deployment experience and recipe acceptance (unverified)
 
