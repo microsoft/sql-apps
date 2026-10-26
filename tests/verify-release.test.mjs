@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { cpSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -43,7 +43,7 @@ test('an independent package copy matches source metadata and every skill byte',
   const roots = fixture(t);
   const result = verifyRelease(roots);
   assert.equal(result.version, '0.2.1');
-  assert.equal(result.skillFiles, 8);
+  assert.equal(result.skillFiles, 9);
   assert.match(result.payloadDigest, /^[a-f0-9]{64}$/);
   const command = cli(['--source-root', roots.sourceRoot, '--installed-root', roots.installedRoot]);
   assert.equal(command.status, 0, command.stderr);
@@ -74,11 +74,36 @@ test('same-version changed skill bytes fail, including newline-only drift', (t) 
   assert.throws(() => verifyRelease(roots), /payload bytes differ: skills\/sql-apps\/SKILL\.md/);
 });
 
+test('every relative link required by the installed skill exists in the copied payload', (t) => {
+  const { installedRoot } = fixture(t);
+  const skillPath = path.join(installedRoot, 'skills', 'sql-apps', 'SKILL.md');
+  const skill = readFileSync(skillPath, 'utf8');
+  for (const match of skill.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
+    const target = match[1];
+    if (/^(https:\/\/|mailto:)/.test(target) || target.startsWith('#')) continue;
+    assert.ok(
+      existsSync(path.resolve(path.dirname(skillPath), target.split('#')[0])),
+      `Missing bundled skill dependency: ${target}`,
+    );
+  }
+});
+
 test('missing references, extra files, and missing skill directories fail', async (t) => {
   await t.test('missing reference', (t) => {
     const roots = fixture(t);
     rmSync(path.join(roots.installedRoot, 'skills', 'sql-apps', 'references', 'constitution.md'));
     assert.throws(() => verifyRelease(roots), /missing payload file: skills\/sql-apps\/references\/constitution\.md/);
+  });
+  await t.test('missing prerequisite guidance', (t) => {
+    const roots = fixture(t);
+    rmSync(path.join(roots.installedRoot, 'skills', 'sql-apps', 'references', 'prerequisites.md'));
+    assert.throws(() => verifyRelease(roots), /missing payload file: skills\/sql-apps\/references\/prerequisites\.md/);
+  });
+  await t.test('stale prerequisite guidance', (t) => {
+    const roots = fixture(t);
+    const file = path.join(roots.installedRoot, 'skills', 'sql-apps', 'references', 'prerequisites.md');
+    writeFileSync(file, 'Outdated prerequisite instructions.');
+    assert.throws(() => verifyRelease(roots), /payload bytes differ: skills\/sql-apps\/references\/prerequisites\.md/);
   });
   await t.test('extra payload', (t) => {
     const roots = fixture(t);

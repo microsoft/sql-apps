@@ -51,7 +51,7 @@ test('skill is discoverable with valid, narrowly scoped metadata', () => {
   assert.match(description, /Use when/);
   assert.match(description, /user requests SQL Apps/);
   assert.match(description, /SQL Apps profile/);
-  assert.ok(skill.split(/\r?\n/).length < 200, 'Keep the router small');
+  assert.ok(skill.split(/\s+/).length < 2200, 'Keep the router within a reading budget');
   assert.equal(readdirSync(path.join(root, 'skills')).length, 1);
 });
 
@@ -128,13 +128,14 @@ test('Gemini extension uses native skill discovery without global context or cod
 
 test('release and installation guidance verify payloads and require discovered DAB', () => {
   const installation = read(path.join('docs', 'installation.md'));
+  const prerequisites = read(path.join('skills', 'sql-apps', 'references', 'prerequisites.md'));
   const releasing = read(path.join('docs', 'reference', 'releasing.md'));
   assert.match(installation, /0\.2\.1 patch release candidate/);
-  assert.match(installation, /microsoft-sql@microsoft-sql/);
-  assert.match(installation, /mandatory/);
+  assert.match(prerequisites, /microsoft-sql@microsoft-sql/);
+  assert.match(installation, /required for a complete database-backed workflow/);
   assert.match(installation, /dab-rest-and-graphql/);
   assert.match(installation, /mssql_dab/);
-  assert.match(installation, /Do not silently substitute direct Express-to-SQL CRUD for DAB/);
+  assert.match(prerequisites, /Do not substitute mock persistence/);
   for (const document of [installation, releasing]) {
     assert.match(document, /--installed-root/);
     assert.match(document, /actual installed|actual installed root|actually loaded/);
@@ -148,10 +149,11 @@ test('release and installation guidance verify payloads and require discovered D
 
 test('missing SQL, Azure Skills, or Azure CLI has actionable setup guidance', () => {
   const installation = read(path.join('docs', 'installation.md'));
+  const prerequisites = read(path.join('skills', 'sql-apps', 'references', 'prerequisites.md'));
   const skill = read(skillPath);
   const readme = read('README.md');
+  assert.match(installation, /Quick setup when a capability is missing/);
   for (const requirement of [
-    'Quick setup when a capability is missing',
     'microsoft-sql@microsoft-sql',
     'microsoft-sql-vscode',
     'Azure MCP extension',
@@ -159,15 +161,22 @@ test('missing SQL, Azure Skills, or Azure CLI has actionable setup guidance', ()
     'Azure Cloud Shell',
     'az version',
     'az login',
-    'Use SQL Apps. First inspect this host',
   ]) {
-    assert.ok(installation.includes(requirement), `Missing setup guidance: ${requirement}`);
+    assert.ok(prerequisites.includes(requirement), `Missing setup guidance: ${requirement}`);
   }
+  assert.ok(installation.includes('../skills/sql-apps/references/prerequisites.md'));
+  assert.match(prerequisites, /Private Preview/);
+  assert.ok(prerequisites.includes('https://aka.ms/sqldbcontainerpreview-signup'));
+  assert.ok(prerequisites.includes('https://microsoft.github.io/azure-sql-database-container/getting-started.html'));
+  assert.match(prerequisites, /does not grant registry access/i);
+  assert.match(prerequisites, /user must complete any interactive registry login/i);
+  assert.match(prerequisites, /Do not enroll, accept terms, or authenticate without explicit approval/);
+  assert.match(prerequisites, /continue useful UI, schema, and scaffolding/);
+  assert.match(prerequisites, /persistence and end-to-end checks stay incomplete/);
+  assert.match(prerequisites, /Do not substitute mock persistence/);
+  assert.ok(prerequisites.includes("Use SQL Apps. Inspect this host's available skills/tools"));
   assert.match(installation, /Local-only has no Azure CLI or subscription requirement/);
-  assert.match(installation, /Do not install, enable, authenticate, or change host\/system configuration until I approve/);
-  assert.match(installation, /Never ask for, read, store, or echo credentials/);
-  assert.match(installation, /Before any Azure write,.*wait for explicit approval/);
-  assert.ok(skill.includes('../../docs/installation.md#quick-setup-when-a-capability-is-missing'));
+  assert.ok(skill.includes('./references/prerequisites.md'));
   assert.ok(readme.includes('./docs/installation.md#quick-setup-when-a-capability-is-missing'));
 });
 
@@ -185,7 +194,7 @@ test('shared guidance persists policy for each active host without five copies',
   for (const host of ['GitHub Copilot', 'Claude Code', 'OpenAI Codex', 'Gemini CLI', 'Cursor']) {
     assert.ok(readme.includes(host), `Missing installation guidance: ${host}`);
   }
-  assert.match(read(path.join('docs', 'reference', 'releasing.md')), /No host has passed end-to-end/);
+  assert.match(read(path.join('docs', 'reference', 'releasing.md')), /Verification status/);
 });
 
 test('every bundled Markdown link resolves inside the plugin', () => {
@@ -207,6 +216,26 @@ test('every bundled Markdown link resolves inside the plugin', () => {
   }
 });
 
+test('skill links resolve within an independent installed payload', () => {
+  const skillFiles = filesIn('skills');
+  for (const document of skillFiles.filter((file) => file.endsWith('.md'))) {
+    const text = read(document);
+    for (const match of text.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
+      const target = match[1];
+      if (/^(https:\/\/|mailto:)/.test(target) || target.startsWith('#')) continue;
+      const resolved = path.resolve(root, path.dirname(document), target.split('#')[0]);
+      const packageRelative = path.relative(root, resolved);
+      const skillRelative = path.relative(path.resolve(root, 'skills'), resolved);
+      const isBundledReference = !skillRelative.startsWith('..') && !path.isAbsolute(skillRelative);
+      const isPluginManifest = resolved === path.resolve(root, 'plugin.json');
+      assert.ok(isBundledReference || isPluginManifest, `${document}: escaping package dependency: ${target}`);
+      assert.ok(!resolved.startsWith(path.resolve(root, 'docs')), `${document}: skill depends on unbundled docs: ${target}`);
+      assert.ok(!packageRelative.startsWith('..') && !path.isAbsolute(packageRelative), `${document}: escaping package root: ${target}`);
+      assert.ok(existsSync(resolved), `${document}: missing in package: ${target}`);
+    }
+  }
+});
+
 test('constitution contains one portable durable project-policy block', () => {
   const constitution = read(path.join('skills', 'sql-apps', 'references', 'constitution.md'));
   const block = constitution.match(/```markdown\r?\n([\s\S]+?)\r?\n```/);
@@ -214,29 +243,28 @@ test('constitution contains one portable durable project-policy block', () => {
   assert.equal((block[1].match(/sql-apps:constitution:start/g) ?? []).length, 1);
   assert.equal((block[1].match(/sql-apps:constitution:end/g) ?? []).length, 1);
   for (const required of [
-    'TypeScript', 'React/Vite', 'Express', 'Azure SQL Database', 'mssql', 'DAB',
-    'intent: poc', 'costPreference: free-first', 'zero-azure-spend', 'AutoPause',
-    'Local-only', 'app-brief.md', 'host permissions',
+    'TypeScript', 'React/Vite', 'Express', 'Azure SQL through DAB', 'mssql', 'DAB',
+    'intent: poc', 'costPreference: free-first', 'zero-azure-spend',
+    'Local work', 'app-brief.md', 'host permissions',
   ]) {
     assert.ok(block[1].includes(required), `Missing durable policy: ${required}`);
   }
   assert.doesNotMatch(block[1], /C:\\|PLUGIN_ROOT|node_modules/);
   assert.match(read(skillPath), /preserving|Preserve/);
   assert.match(read(skillPath), /rather than appending duplicates/);
+  assert.ok(block[1].split(/\s+/).length < 300, 'Keep always-on policy concise');
 });
 
-test('brief stays about intent and observable acceptance', () => {
+test('brief captures app decisions without duplicating deployment policy', () => {
   const brief = read(path.join('skills', 'sql-apps', 'templates', 'app-brief.md'));
   for (const heading of [
-    '## Outcome and users', '## Essential workflows and checks',
-    '## Data and access rules', '## First delivery', '## Technical boundary',
-    '## Complete topology and cost boundary', '## Architecture and cost acceptance',
-    '## Design and migration intent',
+    '## Outcome and users', '## Workflows, data, and access',
+    '## Scope and decisions', '## Technical notes', '## Delivery and open checks',
   ]) {
     assert.ok(brief.includes(heading), `Missing brief heading: ${heading}`);
   }
-  assert.ok(brief.split(/\r?\n/).length < 90);
-  assert.match(brief, /Do not store secrets/);
+  assert.ok(brief.split(/\s+/).length < 400, 'Keep the template concise');
+  assert.match(brief, /Do not store credentials/);
 });
 
 test('router wires Rayfin-aligned design and migration metadata into generated apps', () => {
@@ -262,9 +290,7 @@ test('router wires Rayfin-aligned design and migration metadata into generated a
   const constitution = read(path.join('skills', 'sql-apps', 'references', 'constitution.md'));
   const block = constitution.match(/```markdown\r?\n([\s\S]+?)\r?\n```/)[1];
   assert.ok(block.includes('rayfin/rayfin.yml'));
-  assert.ok(block.includes('presence alone does not transfer workflow ownership'));
-  assert.ok(block.includes('services.data.dialect: mssql'));
-  assert.ok(block.includes('not proof of released Rayfin SQL support'));
+  assert.ok(block.includes('mssql` dialect as migration intent only'));
 });
 
 test('design guidance adopts UI conventions without Rayfin runtime coupling', () => {
@@ -281,7 +307,7 @@ test('design guidance adopts UI conventions without Rayfin runtime coupling', ()
 
 test('Rayfin reference stays focused on alignment rather than platform implementation', () => {
   const alignment = read(path.join('skills', 'sql-apps', 'references', 'rayfin-alignment.md'));
-  assert.ok(alignment.split(/\r?\n/).length <= 30);
+  assert.ok(alignment.split(/\s+/).length < 350);
   assert.match(alignment, /Leave migration and runtime implementation to Rayfin/);
   assert.doesNotMatch(alignment, /custom-aca|operation poller|schema job|2026-10-01-preview/);
 });
@@ -324,7 +350,7 @@ test('future service YAML preserves the proposed mssql shape and safe capability
 
 test('payload has no executable runtime, hooks, MCP config, or vendored specialists', () => {
   const payload = filesIn('skills');
-  assert.equal(payload.length, 8);
+  assert.equal(payload.length, 9);
   assert.ok(payload.includes(path.join('skills', 'sql-apps', 'references', 'deployment.md')));
   assert.ok(payload.includes(path.join('skills', 'sql-apps', 'references', 'deployment-attribution.md')));
   assert.ok(payload.every((file) => file.endsWith('.md') || file.endsWith('.yml')));
