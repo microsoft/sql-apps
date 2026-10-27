@@ -10,7 +10,7 @@ SQL Apps is not an application runtime, scaffolding framework, cloud control pla
 
 This document replaces the previous specification. It defines a proposed first-release boundary, not implemented capabilities or permission to provision resources.
 
-Implementation has started: the root plugin manifest, routing skill, constitution, brief template, README, license, and packaging tests now exist. Packaging tests and native Copilot CLI discovery have passed; VS Code installation, application-generation scenarios, and Azure deployment remain unverified or not performed. The plugin source is maintained at [microsoft/sql-apps](https://github.com/microsoft/sql-apps). See the [README](./README.md) for setup and release checks.
+Implementation has started: the root plugin manifest, routing skill, constitution, brief template, README, license, and packaging tests now exist. Packaging tests, native Copilot CLI discovery, and one supervised VS Code candidate's local application checkpoints have passed. Copied installation/update, broader application-generation scenarios, and Azure deployment remain unverified or not performed; the release guide records the scoped evidence and limits. The plugin source is maintained at [microsoft/sql-apps](https://github.com/microsoft/sql-apps). See the [README](./README.md) for setup and release checks.
 
 ## 2. What was wrong with the previous plan
 
@@ -33,7 +33,7 @@ Keep the valuable parts: clarify consequential requirements, build real workflow
 
 ## 3. The constitution
 
-The intentionally narrow profile is TypeScript and React/Vite, DAB over Azure SQL, and SQL-enforced business rules. Custom server code is conditional; Azure provisioning is optional. If local SQL/DAB is missing, users may still build UI, schema, and scaffolding, but persistence remains incomplete.
+The intentionally narrow profile is TypeScript and React/Vite, DAB over Azure SQL, and SQL-enforced business rules. Database targets are the local Azure SQL Database container or Azure SQL Database cloud, never an on-premises fallback; follow the [prerequisite routing](./skills/sql-apps/references/prerequisites.md). Custom server code is conditional; Azure provisioning is optional. If SQL/DAB is missing, users may still build UI, schema, and scaffolding, but persistence remains incomplete.
 
 The [constitution](./skills/sql-apps/references/constitution.md) owns current stack, security, and cost policy. [Deployment guidance](./skills/sql-apps/references/deployment.md) owns cloud review and evidence; [attribution guidance](./skills/sql-apps/references/deployment-attribution.md) owns resource tags and naming. These policies are guardrails, not a provisioning checklist or runtime.
 

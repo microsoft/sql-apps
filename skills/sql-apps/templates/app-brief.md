@@ -19,14 +19,15 @@
 - Includes / excludes: <first useful scope and deferred work>
 - Confirmed decisions and assumptions: <material choices and their source>
 - Accepted exceptions: <specific stack, cost, or security boundaries; none unless approved>
+- Database: <local Azure SQL container or Azure SQL Database cloud; connection topology, runtime/version evidence, and compatibility gaps>
 
 PoC/free-first is a default, not a promise of free use or approval to spend. Preserve explicit `costPreference: zero-azure-spend`. Only explicit production availability, scale, or compliance requirements change intent; "deploy" alone does not.
 
 ## Technical notes
 
-Use TypeScript, React/Vite, Data API builder (DAB), and Azure SQL Database. A custom server is only for necessary authentication, orchestration, or domain behavior. DAB must enforce access, and SQL must enforce transactional business rules without a bypass.
+Use TypeScript, React/Vite, DAB, and Azure SQL Database, either the local container or cloud service. No SQL Server Express or other on-premises fallback. A custom server is only for necessary authentication, orchestration, or domain behavior. DAB must enforce access, and SQL must enforce transactional business rules without a bypass.
 
-Application changes can start while prerequisites are missing. Guide the user to supported SQL/DAB setup; label database integration and end-to-end checks incomplete. Do not use mock persistence, another database, or direct-SQL CRUD as a substitute.
+Application changes can start while prerequisites are missing. Offer preview signup or explicitly selected Azure SQL cloud setup; label integration and end-to-end checks incomplete until verified. Never substitute mocks, another database, or direct-SQL CRUD.
 
 ## Delivery and open checks
 

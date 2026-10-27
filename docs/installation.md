@@ -4,6 +4,16 @@
 
 Choose your host below. Packaging and verification are different: consult the [verification matrix](./reference/releasing.md#verification-status) before relying on a host-specific workflow.
 
+> **Local database notice:** The Azure SQL Database container is in **Private Preview**. You must [sign up for preview access](https://aka.ms/sqldbcontainerpreview-signup) to get the registry credentials needed to pull it. Read the [official getting-started guide](https://microsoft.github.io/azure-sql-database-container/getting-started.html) before setting up local SQL. SQL Apps can still scaffold while access is pending, but database persistence cannot be verified without a real SQL engine and DAB.
+
+SQL Apps targets only the local Azure SQL Database container or Azure SQL Database in the cloud. If preview access is unavailable, offer signup or an explicitly selected cloud path, not an on-premises database fallback.
+
+## Pick the shortest setup path
+
+Let the assistant inspect installed capabilities and reuse project decisions first. Ask one grouped question only for missing routing choices: local or cloud, then the relevant database option. Local is the default when unspecified. If cloud is selected, establish whether an Azure subscription already exists and follow installed Azure guidance; subscription ownership alone never selects cloud or authorizes sign-in, provisioning, or spend. Defer detailed installation and deployment questions until needed.
+
+For local work, use the Azure SQL container. When unavailable, offer preview signup or explicitly selected Azure SQL Database cloud access; if neither is ready, continue useful scaffolding and keep persistence unverified. Setup/configuration changes still need scoped approval. See the [bundled routing guide](../skills/sql-apps/references/prerequisites.md#choose-the-shortest-setup-path).
+
 ## Before you install
 
 The marketplace is `sql-apps-skills`, and the plugin is `sql-apps`. The source repository is [microsoft/sql-apps](https://github.com/microsoft/sql-apps). The version in this checkout is the **0.2.1 patch release candidate**, not evidence that 0.2.1 has been published. Remote examples below install what is actually published in that repository. Existing 0.1.0 or 0.2.0 installations do not become 0.2.1 when a checkout changes: refresh the marketplace, update the plugin, and verify the installed bytes.
@@ -126,7 +136,7 @@ Install companions separately using their supported host setup. SQL Apps does no
 
 For SQL/DAB setup and private-preview local-engine access, use the [bundled prerequisite guide](../skills/sql-apps/references/prerequisites.md). The listed skill/tool names are discovery examples, not a guarantee of installation.
 
-If DAB or a permitted SQL engine is unavailable, give the user its supported setup path. Useful UI, schema, and scaffolding work can continue, but mark persistence and end-to-end checks incomplete. Do not substitute mocked persistence or direct Express-to-SQL CRUD.
+If DAB or the selected Azure SQL target is unavailable, give the user its supported setup path. Useful UI, schema, and scaffolding work can continue, but mark persistence and end-to-end checks incomplete. Do not substitute another database, mocked persistence, or direct Express-to-SQL CRUD.
 
 The default `poc` outcome is free-first, not a guarantee of zero Azure spend. Local-only has no Azure CLI or subscription requirement and does not enter cloud onboarding. A requested free Azure topology must be checked end-to-end using current specialist guidance; a missing free capability is not permission for a paid fallback. Requested cloud work still requires the specialist's prerequisites and approvals. Installing the plugin proves none of those runtime outcomes.
 
@@ -153,7 +163,7 @@ $installedRoot = Read-Host 'Actual installed SQL Apps package root'
 node C:\git\sql-apps-v3\scripts\verify-release.mjs --source-root C:\git\sql-apps-v3 --installed-root "$installedRoot"
 ```
 
-Success reports `PASS sql-apps 0.2.1`, the compared roots, skill file count, and a SHA-256 payload fingerprint. The verifier checks every manifest/catalog, release identity/version, and all shipped skill/reference/template bytes, including missing or extra files. It rejects the source itself and linked skill payloads. A stale version, same-version edited guidance, missing file, or wrong root exits nonzero with the failing paths.
+Success reports `PASS sql-apps 0.2.1`, the compared roots, skill file count, and a SHA-256 payload fingerprint. The verifier checks every manifest/catalog, release identity/version, and all shipped skill/reference/template bytes, including missing or extra files. It rejects the source itself, linked skill payloads, and unexpected host-loaded components such as hooks, MCP configuration, commands, agents, rules, or global context. A stale version, same-version edited guidance, missing file, or wrong root exits nonzero with the failing paths. Shipped skill files use canonical LF newlines through the repository's Git attributes; see the [release checks](./reference/releasing.md#package-and-installed-copy-verification) if an older Windows working copy retains CRLF.
 
 After install/update, restart or open a fresh session, confirm the reported plugin version and loaded path, and rerun this command on that path. Then explicitly invoke SQL Apps and check actual Microsoft SQL DAB discovery before app work. A verified unpacked package or `source: live` listing does not prove the host loaded a copied install, and byte verification does not prove app execution. See the [release checks](./reference/releasing.md#package-and-installed-copy-verification) for packaging and isolated testing.
 

@@ -43,7 +43,7 @@ test('PoC free-first defaults preserve explicit strict-zero choices', () => {
 test('every specialist receives explicit architecture and cost constraints', () => {
   const handoff = skill.match(/\*\*Every specialist handoff\*\*([^\n]+)/)?.[1];
   assert.ok(handoff);
-  for (const requirement of ['intent', 'costPreference', 'DAB', 'SQL invariants', 'topology', 'acceptance']) {
+  for (const requirement of ['intent', 'costPreference', 'Azure SQL target', 'compatibility gaps', 'DAB', 'SQL invariants', 'topology', 'acceptance']) {
     assert.ok(handoff.includes(requirement), `Handoff omits ${requirement}`);
   }
   assert.match(handoff, /link alone is insufficient/);
@@ -56,7 +56,7 @@ test('DAB is mandatory and custom servers are not the default data API', () => {
   assert.match(constitution, /Node\.js\/Express only for necessary authentication, orchestration, or domain behavior/);
   assert.match(skill, /azuresql-db-dab/);
   assert.match(skill, /dab-rest-and-graphql/);
-  assert.match(skill, /continue useful UI, schema, or scaffolding work/);
+  assert.match(skill, /continue useful UI, schema, or scaffolding work/i);
   assert.match(prerequisites, /persistence and end-to-end checks stay incomplete/);
   assert.match(prerequisites, /Do not substitute mock persistence/);
   assert.match(constitution, /transaction-safe stored procedures/);
@@ -65,11 +65,58 @@ test('DAB is mandatory and custom servers are not the default data API', () => {
 });
 
 test('missing SQL/DAB guidance allows scaffold work without false persistence', () => {
-  assert.match(skill, /continue useful UI, schema, or scaffolding work/);
+  assert.match(skill, /continue useful UI, schema, or scaffolding work/i);
   assert.match(prerequisites, /let the user decide/);
   assert.match(prerequisites, /persistence and end-to-end checks stay incomplete/);
   assert.match(prerequisites, /Do not substitute mock persistence/);
   assert.doesNotMatch(skill, /pause all application changes|stop app creation/i);
+});
+
+test('onboarding discovers first, groups missing choices, and keeps cloud opt-in', () => {
+  const boundary = skill.split('## Establish the boundary\n')[1]?.split('\n## ')[0];
+  assert.ok(boundary);
+  assert.match(boundary, /Discover.*before asking setup questions/);
+  assert.match(boundary, /one grouped routing question only for unknown choices/);
+  assert.match(boundary, /Reuse known answers; defer detailed questions until needed/);
+  const routes = prerequisites.split('## Choose the shortest setup path\n')[1]?.split('\n## ')[0];
+  assert.ok(routes);
+  for (const [situation, action] of [
+    ['Working Azure SQL/DAB and a recorded target', /Reuse them; do not repeat onboarding/],
+    ['Target unknown', /Offer local or cloud; default to local/],
+    ['Cloud selected', /subscription exists only if unknown/],
+    ['Azure subscription exists, target undecided', /ownership is not cloud intent or provisioning approval/],
+    ['Local selected, Azure SQL container unavailable', /Private Preview signup.*explicitly selected Azure SQL Database cloud access.*never switch to cloud automatically/],
+    ['Neither Azure SQL target is ready, or DAB is missing', /continue useful UI\/schema\/scaffolding and mark integration incomplete/],
+    ['Existing on-premises database', /outside this profile.*do not reuse it as a fallback.*without explicit scope/],
+  ]) {
+    const row = routes.split('\n').find((line) => line.startsWith(`| ${situation} |`));
+    assert.ok(row, `Missing routing case: ${situation}`);
+    assert.match(row, action, situation);
+  }
+  assert.match(routes, /Host permissions, interactive sign-in, license acceptance, and cloud\/access\/destructive approvals still apply/);
+});
+
+test('database targets stay Azure SQL-only without creating on-premises debt', async () => {
+  for (const [name, text] of Object.entries({ skill, constitution, brief, policy })) {
+    assert.match(text, /local Azure SQL (Database )?container/, name);
+    assert.match(text, /Azure SQL (Database )?cloud/, name);
+    assert.match(text, /(No|Never substitute) SQL Server Express.*on-premises/, name);
+    assert.doesNotMatch(text, /sql-server-express\.md/, name);
+  }
+  assert.match(prerequisites, /SQL Server Express and other on-premises engines are not fallback paths/);
+  assert.match(prerequisites, /Cloud selection is not approval to sign in, create resources, spend, or change access/);
+  assert.match(policy, /Never substitute mocks or another database/);
+  assert.match(policy, /Before moving to cloud.*actual cloud target/);
+  assert.match(brief, /Database: <local Azure SQL container or Azure SQL Database cloud/);
+  const resume = skill.split('## Resume or change\n')[1]?.split('\n## ')[0];
+  assert.match(resume, /Preserve supported Azure SQL target and setup decisions/);
+  assert.match(resume, /older project records an on-premises fallback.*obtain migration scope.*never install or extend/);
+  assert.match(resume, /Before moving from the container to cloud.*actual cloud target/);
+  assert.ok(!existsSync(new URL('skills/sql-apps/references/sql-server-express.md', root)));
+  for (const relative of ['README.md', 'docs/installation.md', 'docs/reference/releasing.md']) {
+    const document = await read(relative);
+    assert.doesNotMatch(document, /sql-server-express\.md|disposable Windows Express|Express selected/);
+  }
 });
 
 test('the cost review covers the entire deployable application', () => {
@@ -203,7 +250,7 @@ test('deployment attribution is metadata only, not active-usage telemetry', asyn
   const attribution = await readAttribution();
   assert.match(attribution, /No runtime events, SDK instrumentation, callbacks, collectors, or new monitoring resources/);
   assert.match(attribution, /Do not query customer data or metrics/);
-  assert.match(attribution, /does not grant Microsoft.*access/);
+  assert.match(attribution, /does not grant Microsoft additional access or send SQL Apps a usage report/);
   assert.match(attribution, /not active application usage/);
   assert.match(attribution, /unique people, unique applications, or deployment-event counts/);
   assert.match(attribution, /Local-only delivery requires no Azure sign-in/);
@@ -257,16 +304,6 @@ test('README links to canonical setup, policy, and verification guidance', () =>
     assert.ok(targets.includes(target), `README: missing reference link ${target}`);
     assert.ok(existsSync(new URL(target.split('#')[0], root)), `Missing reference file: ${target}`);
   }
-});
-
-test('public guidance discloses attribution without promising usage tracking', async () => {
-  const attribution = await readAttribution();
-  assert.ok(attribution.includes('sqlapps-version'));
-  assert.match(attribution, /resource-name suffix is `sqlapps`/);
-  assert.match(attribution, /not active application usage/);
-  assert.match(attribution, /No runtime events, SDK instrumentation, callbacks, collectors, or new monitoring resources/);
-  assert.match(attribution, /Do not query customer data or metrics/);
-  assert.match(attribution, /does not grant Microsoft additional access or send SQL Apps a usage report/);
 });
 
 test('reservation user prompt stays separate from runtime acceptance', async () => {

@@ -33,17 +33,53 @@ Published release versions are **immutable**: never change shipped guidance or t
 | Host | Packaging | Native validation / loader |
 | --- | --- | --- |
 | Copilot CLI | Root manifest + shared catalog | 0.2.0 isolated local marketplace registration/install/list passed with one skill on CLI 1.0.102, but it reports `source: live`: no cached package was copied; 0.2.1 loading not exercised |
-| VS Code | Root manifest + shared catalog | Existing cached 0.1.0 package inspected read-only; verifier correctly rejects its stale versions and changed skill bytes. Fresh 0.2.1 UI loading not exercised |
+| VS Code | Root manifest + shared catalog | Isolated VS Code 1.143.0 loaded the 0.2.1 candidate and exercised one local application workflow; native-loaded skill bytes matched the candidate. Published copied installation/update remains unverified |
 | Claude Code | Native manifest + shared catalog | Manifest/catalog validation passed; interactive loading not exercised |
 | OpenAI Codex | Compatibility manifest + Codex catalog | Static checks only; CLI unavailable in the validation environment |
 | Gemini CLI | Extension manifest + shared skills | Static checks only; CLI unavailable in the validation environment |
 | Cursor | Portable/native manifests + Cursor catalog | Static checks only; host unavailable in the validation environment |
 
-No host has passed end-to-end application-generation or Azure deployment evaluation yet. Package checks do not prove instruction-following, specialist availability, browser access, database behavior, or compatibility with an unreleased Rayfin schema.
+One approved VS Code candidate evaluation passed the scoped local application checks below. This is not broad host certification, an unattended-generation claim, copied installation/update proof, or Azure deployment acceptance. Package checks alone prove none of those runtime behaviors or compatibility with an unreleased Rayfin schema.
+
+### Open runtime acceptance gate
+
+The initial 2026-10-26 preflight lacked a disposable target and execution authorization and performed no application or database changes. A later, separately approved local evaluation completed the application checkpoints before the maintainer ended the remaining evaluation. Its documentation was retained in a separate worktree and had not been incorporated here.
+
+On 2026-10-27, remediation rechecked the evaluated candidate against the current checkout, verified the retained archive hashes and structured results, and incorporated the scoped observations below. No new services, license acceptance, sign-in, or runtime evaluation were needed. The current skill payload is unchanged from the evaluated candidate.
+
+Further evaluations require an approved isolated workspace, host usage, database target, setup and cleanup scope. Cloud evaluation requires its own Azure SQL Database approval. Do not reuse shared/demo services, count wording tests as runtime evidence, or remove unverified labels for unrun cases. On-premises installation is not an acceptance requirement.
+
+Keep agent execution plans and session-specific preflight records local, not in public reference documentation. The repository [ignore rules](../../.gitignore) exclude Superpowers planning directories, the local runtime-proof record, dependencies, generated test output, logs, and local environment files. Publish only sanitized, reproducible acceptance evidence; local plans and package checks do not change the verification statuses above.
+
+### Recorded local candidate proof
+
+The retained run `20261026T205653Z` used an isolated native VS Code 1.143.0 session, SQL Apps candidate 0.2.1, Node.js 22.22.2, DAB 2.1.5 on .NET 10.0.13, and the Azure SQL Database preview engine (`EngineEdition=5`, `Edition=SQL Azure`, version `12.0.2000.8`). The maintainer approved the dedicated container, persisted volume, synthetic identities/data, loopback-only ports, and applicable container terms. No shared service or Azure deployment was used.
+
+| Check | Recorded result | Evidence boundary |
+| --- | --- | --- |
+| UI save and persisted reload | Passed; the same reservation ID, owner and interval matched the browser, a fresh DAB read, and independent SQL observations | Real compiled UI and SQL; not mock persistence |
+| Direct DAB authorization | Passed allowed/denied controls for ownership, forged roles/identities and all exposed write paths | Signed synthetic identities; no broad table-write grant |
+| Concurrent overlap | 20/20 trials produced exactly one successful write and one persisted reservation | Rejection was the SQL overlap rule, not a network or authentication failure |
+| Fresh-conversation rule change | Added a maximum-three-future-reservations rule after observing failing tests; all original 131 equipment and 192 reservation rows remained unchanged | A new native conversation preserved the project policy and existing authorization |
+| Concurrent member limit | 20/20 last-slot trials produced exactly one success and a final active-future count of three | Different equipment and intervals; independent SQL observations |
+| Packaged restart | Passed; a saved reservation survived compiled-web/DAB restart on the same SQL volume, and another save succeeded afterward | Clean production artifacts and restored package dependencies, not development servers |
+| Final package regression | 6 frontend unit tests plus 18 live/browser results passed; no failures or skipped tests | Includes both race sets; controlled quota/sleep responses test UI handling only |
+
+The final runtime command was `npm run test:runtime-proof` from the generated application's clean package build source. Its app-specific tests, structured SQL/HTTP results, generated source, and detailed observations remain in the retained local run, not the plugin payload. They do not form a portable public deployment recipe.
+
+Retained SHA-256 identities, rechecked against the artifacts:
+
+- SQL Apps skill payload: `db13865f8111581b4bcde23b40eba5733686f88155db74b19eb92c2bc3891c29`; all nine current skill/reference/template files match.
+- Verified generated source archive: `6cb44e7d2e7eb9ed30291450b4464d12d0ab74d965c6a8b3e8fe9fa9e3c372d4`.
+- Verified compiled package: `194919ab0f4b942ab03bb37e02dd9edd8c63d82c4cd9e0dcc3cd72e9dd1bf277`.
+
+This was supervised validation, not a clean one-shot result. The run replaced a failing DAB 2.0.12 Custom-JWT setup with 2.1.5, repaired generated-app HTTP error handling, and corrected test-only pagination/SQL observers; original failures were retained. Two known Express/body-parser advisories remain in that generated app; tested compressed-body mitigation is not an upstream patch or production approval.
+
+The local application checkpoints passed; the broader evaluation was intentionally stopped. Most onboarding cases, the matched baseline, copied installation/update, Azure deployment and the original full-plan final review remain incomplete. Native transcript coverage is incomplete, so no comparative quality/speed/cost claim is made. Run-owned containers remain stopped; the final SQL stop returned exit 137 with `OOMKilled=false`, and recovery after that final stop was not tested. No production or general cloud support is implied.
 
 ## Validation commands
 
-Run packaging tests with Node.js 22 or later:
+Run packaging tests with Node.js 22 or later and Git:
 
 ```powershell
 node --test tests\plugin.test.mjs tests\verify-release.test.mjs tests\workflow.test.mjs
@@ -52,11 +88,13 @@ claude plugin validate C:\git\sql-apps-v3
 claude plugin validate C:\git\sql-apps-v3\.claude-plugin\plugin.json
 ```
 
-Replace the checkout path as needed. Tests cover manifest/version consistency, catalogs, shared skill paths, documentation links, host instruction destinations, design/alignment and attribution guidance, the service template, the absence of runtime components, and verifier positive/negative cases. `--plugin-dir` checks development discovery only.
+Replace the checkout path as needed. Tests cover manifest/version consistency, catalogs, shared skill paths, documentation links, host instruction destinations, design/alignment and attribution guidance, the service template, the absence of runtime components, and verifier positive/negative cases. The regressions exercise linked-directory CLI launches, unexpected host components, and real Git checkouts with Windows/Unix newline settings in temporary repositories; no commits are created. `--plugin-dir` checks development discovery only.
 
 ## Package and installed-copy verification
 
 Use the [portable verifier](../../scripts/verify-release.mjs) against an **explicitly supplied independent root**. It defaults the source to the checkout containing the script, not the current working directory. It reads both roots without modifying either, compares all manifest/catalog metadata, validates release names/versions, and compares the exact file set and bytes under `skills`, including bundled references and templates.
+
+The instruction-only package contract also rejects known host-loaded component roots in both source and installed copies: hook/MCP/LSP configuration, agents, commands, rules, settings, Gemini's global context, Copilot's client namespace, and other host components such as automations and workflows. Manifest and catalog fields are restricted to the supported metadata and skill-discovery fields; inline component declarations, dependencies, experimental extensions, redirected skill paths, and non-root catalog sources fail even when source and installed metadata match. Directory links, broken links, and case variants do not bypass this check. Ordinary documentation and maintainer scripts remain allowed outside the skill payload; this is not a whole-archive signature check.
 
 ```powershell
 $packageRoot = Read-Host 'Independent unpacked SQL Apps release package root'
@@ -65,7 +103,9 @@ $installedRoot = Read-Host 'Actual host-installed SQL Apps root'
 node scripts\verify-release.mjs --source-root C:\git\sql-apps-v3 --installed-root "$installedRoot"
 ```
 
-Each success prints the version, number of skill files, compared paths, and a SHA-256 skill-payload fingerprint. Exit codes: `0` match, `1` missing/stale/mismatched package, `2` invalid command usage. Same-version content drift, missing or extra files, inconsistent compatibility metadata, malformed JSON, and linked skill payloads fail. Comparison is byte-exact, including line endings: package the reviewed bytes rather than ignoring normalization differences.
+Each success prints the version, number of skill files, compared paths, and a SHA-256 skill-payload fingerprint. Exit codes: `0` match, `1` missing/stale/mismatched package, `2` invalid command usage. Same-version content drift, missing or extra files, inconsistent compatibility metadata, malformed JSON, and linked skill payloads fail. Metadata and skill files sharing filesystem identity with any checked source file also fail, including hard links whose contents change with the source. Comparison is byte-exact, including line endings: package the reviewed bytes rather than ignoring normalization differences.
+
+The repository's [Git attributes](../../.gitattributes) enforce LF newlines for every shipped skill/reference/template file, including Windows checkouts with `core.autocrlf=true`. Build packages from those canonical bytes; the verifier deliberately does not normalize mismatches away. An older working copy can retain CRLF until refreshed: use a fresh approved release checkout rather than discarding uncommitted changes. Launching the verifier through a directory link still performs validation and returns the same exit codes.
 
 Do not substitute a repository root, marketplace catalog, `--plugin-dir`, or development link for the actual installed root. An unpacked-package pass establishes package fidelity only. An installed-root pass establishes that copy's fidelity, not which copy a running host activated. After install/update, start a **fresh session**, inspect the loaded skill/plugin path and version, and verify that exact root again. See [installed-path discovery](../installation.md#verify-the-actual-installed-root). A version-only plugin list is not payload verification.
 
@@ -86,7 +126,7 @@ try {
 }
 ```
 
-Use a previously nonexistent directory; retain diagnostics only as needed, then remove that isolated directory. CLI 1.0.102 reports local marketplace installs as `source: live` / `installedFrom: <checkout>` and explicitly says nothing was copied. This is useful discovery evidence, **not installed-package verification**; pointing the verifier at that checkout correctly fails. A published immutable artifact or a host's copied-install route is still needed to test real install/update propagation. Do not edit live caches to make a failed check pass.
+Use a previously nonexistent directory; retain diagnostics only as needed, then remove that isolated directory. The repository ignores `.release-check-copilot-*` directories so local host settings and session records are not included in public source. CLI 1.0.102 reports local marketplace installs as `source: live` / `installedFrom: <checkout>` and explicitly says nothing was copied. This is useful discovery evidence, **not installed-package verification**; pointing the verifier at that checkout correctly fails. A published immutable artifact or a host's copied-install route is still needed to test real install/update propagation. Do not edit live caches to make a failed check pass.
 
 ### Runtime acceptance remains separate
 
@@ -100,6 +140,23 @@ Before claiming end-to-end support for a host, test it with the required special
 6. Check workspace builds, real paths, `dist/index.html`, themes, keyboard behavior, and `rayfin/rayfin.yml` with `mssql`. Confirm no unintended Rayfin SDK/runtime installation or workflow handoff.
 
 Record actual commands/results and host/plugin versions. A static test or installed skill does not count as a passed application scenario.
+
+#### Onboarding routing acceptance (unverified)
+
+Exercise these cases with the same installed payload, recording questions asked, chosen path, actual setup/check results, and gaps. Static tests verify guidance and packaging, not assistant behavior or Azure SQL integration.
+
+| Starting state | Expected behavior |
+| --- | --- |
+| Working Azure SQL/DAB and recorded target | Discover/reuse capabilities; no repeat setup questionnaire or target switch |
+| Azure subscription exists, delivery undecided | Offer local or cloud; no automatic sign-in, cloud onboarding, or resource creation |
+| Cloud selected, subscription unknown/absent | Ask only the missing account question and route to Azure guidance; no account creation or spend without approval |
+| Local selected, preview container unavailable | Offer signup or explicit Azure SQL Database cloud choice; no automatic cloud switch or on-premises fallback |
+| Cloud selected | Use the approved Azure SQL target and keep DAB/least privilege; verify persistence, direct authorization, SQL concurrency, and restart |
+| No ready Azure SQL target or missing DAB | Give actionable setup guidance; continue safe scaffolding with persistence incomplete, not mocks or direct-SQL CRUD |
+| Existing on-premises project | Explain the profile conflict; do not install/extend the fallback or migrate without explicit scope |
+| Resume or move from container to cloud | Preserve supported target decisions on resume; check feature compatibility and retest actual cloud Azure SQL before claiming completion |
+
+Do not install software, change shared services/network settings, or reuse another demo's database just for this evaluation. Local and cloud integration remain unverified until exercised in separately approved environments.
 
 #### Reservation-app prompt and acceptance checks
 

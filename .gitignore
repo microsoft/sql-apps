@@ -1,0 +1,24 @@
+# Local agent execution plans and session-specific evidence
+superpowers/
+@superpowers/
+/docs/reference/runtime-proof.md
+/.release-check-copilot-*/
+
+# Local dependencies and generated test output
+node_modules/
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+/tests/.release-verification-*/
+
+# Local secrets (keep reusable examples publishable)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Local logs and operating-system metadata
+*.log
+.DS_Store
+Thumbs.db

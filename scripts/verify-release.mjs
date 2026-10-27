@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { lstatSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
@@ -13,6 +13,17 @@ const catalogs = [
   '.claude-plugin/marketplace.json', '.cursor-plugin/marketplace.json',
   '.agents/plugins/marketplace.json',
 ];
+const manifestFields = [
+  '$schema', 'name', 'version', 'description', 'author', 'homepage',
+  'repository', 'license', 'keywords', 'skills', 'interface',
+];
+const catalogFields = ['$schema', 'name', 'owner', 'metadata', 'interface', 'plugins'];
+const catalogEntryFields = [...manifestFields, 'source', 'policy', 'category'];
+const unsupportedComponents = new Set([
+  '.lsp.json', '.mcp.json', 'agents', 'automations', 'commands', 'com.github.copilot',
+  'evals', 'gemini.md', 'hooks', 'mcp.json', 'monitors', 'output-styles',
+  'package.json', 'rules', 'settings.json', 'themes', 'workflows',
+]);
 
 export function verifyRelease({ sourceRoot = checkout, installedRoot } = {}) {
   if (!installedRoot) throw new Error('An explicit installed/package root is required');
@@ -56,22 +67,45 @@ export function verifyRelease({ sourceRoot = checkout, installedRoot } = {}) {
   function checkVersion(actual, label) {
     if (actual !== version) errors.push(`${label}: version ${actual}; expected ${version}`);
   }
-  for (const [label, metadata] of [['source', source], ['installed', installed]]) {
+  function checkFields(data, allowed, label) {
+    for (const field of Object.keys(data ?? {})) {
+      if (!allowed.includes(field)) errors.push(`${label}: unsupported field ${field}; SQL Apps ships skills only`);
+    }
+    if (Object.hasOwn(data ?? {}, 'skills') && data.skills !== './skills/') {
+      errors.push(`${label}: skills must reference only ./skills/`);
+    }
+  }
+  for (const [directory, label, metadata] of [
+    [sourceRoot, 'source', source], [installedRoot, 'installed', installed],
+  ]) {
+    for (const entry of readdirSync(directory)) {
+      if (unsupportedComponents.has(entry.toLowerCase())) {
+        errors.push(`${label} ${entry}: unexpected plugin component; SQL Apps ships skills only`);
+      }
+    }
     for (const relative of manifests) {
       const data = metadata.get(relative);
       if (!data) continue;
+      checkFields(data, manifestFields, `${label} ${relative}`);
       checkName(data, 'sql-apps', `${label} ${relative}`);
       checkVersion(data.version, `${label} ${relative}`);
     }
     for (const relative of catalogs) {
       const data = metadata.get(relative);
       if (!data) continue;
+      checkFields(data, catalogFields, `${label} ${relative}`);
       checkName(data, 'sql-apps-skills', `${label} ${relative}`);
       if (!Array.isArray(data.plugins) || data.plugins.length !== 1) {
         errors.push(`${label} ${relative}: expected exactly one plugin entry`);
       }
       const plugin = data.plugins?.[0];
+      checkFields(plugin, catalogEntryFields, `${label} ${relative} plugin`);
       checkName(plugin, 'sql-apps', `${label} ${relative} plugin`);
+      const expectedSource = relative === '.agents/plugins/marketplace.json'
+        ? { source: 'local', path: './' } : './';
+      if (!isDeepStrictEqual(plugin?.source, expectedSource)) {
+        errors.push(`${label} ${relative} plugin: source must reference only the root plugin`);
+      }
       // Codex deliberately takes the version from its plugin manifest.
       if (relative !== '.agents/plugins/marketplace.json') {
         checkVersion(data.metadata?.version, `${label} ${relative} metadata`);
@@ -123,6 +157,24 @@ export function verifyRelease({ sourceRoot = checkout, installedRoot } = {}) {
   for (const file of actual.keys()) {
     if (!expected.has(file)) errors.push(`unexpected payload file: ${file}`);
   }
+  const sourceIdentities = new Set();
+  for (const [directory, label, metadata, files] of [
+    [sourceRoot, 'source', source, expected],
+    [installedRoot, 'installed', installed, actual],
+  ]) {
+    for (const relative of [...metadata.keys()].filter((file) => metadata.get(file)).concat([...files.keys()])) {
+      try {
+        const { dev, ino } = statSync(path.join(directory, relative), { bigint: true });
+        const identity = `${dev}:${ino}`;
+        if (label === 'source') sourceIdentities.add(identity);
+        else if (sourceIdentities.has(identity)) {
+          errors.push(`installed ${relative}: shares filesystem identity with source; not an independent package copy`);
+        }
+      } catch (error) {
+        errors.push(`${label} ${relative}: cannot inspect file identity: ${error.message}`);
+      }
+    }
+  }
   if (errors.length) throw new Error(`Release verification failed:\n- ${errors.join('\n- ')}`);
   const fingerprint = [...expected.keys()].sort().map((file) => [
     file, createHash('sha256').update(expected.get(file)).digest('hex'),
@@ -136,7 +188,8 @@ const usage = 'Usage: node scripts/verify-release.mjs --installed-root <installe
 function main(args) {
   const options = {};
   for (let index = 0; index < args.length; index += 2) {
-    const key = { '--installed-root': 'installedRoot', '--source-root': 'sourceRoot' }[args[index]];
+    const key = args[index] === '--installed-root' ? 'installedRoot'
+      : args[index] === '--source-root' ? 'sourceRoot' : undefined;
     const value = args[index + 1];
     if (!key || options[key] || !value || value.startsWith('--')) {
       console.error(usage);
@@ -160,6 +213,7 @@ function main(args) {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && existsSync(process.argv[1]) &&
+    realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
   process.exitCode = main(process.argv.slice(2));
 }
