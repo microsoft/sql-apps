@@ -1,0 +1,35 @@
+services:
+  sql:
+    image: sqldbpreview-dpgaeqhmgphzd4bk.azurecr.io/azure-sql/db-dev@sha256:1f6fd8be2c87e0da495f1ca4df01546c091ec7fdb14f16f3f8743b30a9e9266f
+    platform: linux/amd64
+    pull_policy: never
+    environment:
+      ACCEPT_EULA: ${ACCEPT_EULA:?Explicit SQL terms acceptance required}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Run npm run local:init}
+      SQLCMDPASSWORD: ${MSSQL_SA_PASSWORD}
+    volumes:
+      - sql-data:/var/opt/mssql
+      - ./packages/data:/schema:ro
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools18/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-C", "-b", "-l", "2", "-Q", "SELECT 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+  dab:
+    image: mcr.microsoft.com/azure-databases/data-api-builder@sha256:d07e3e1ce53bdf84d3a4a0a4ce12e44f0b902e7316c782a3d682fbe074509c0b
+    pull_policy: never
+    environment:
+      SQL_CONNECTION_STRING: ${SQL_CONNECTION_STRING:?Run npm run local:init}
+      AUTH_ISSUER: ${AUTH_ISSUER:?Set external token issuer}
+      AUTH_AUDIENCE: ${AUTH_AUDIENCE:?Set API token audience}
+      ASPNETCORE_URLS: http://+:5000
+    ports:
+      - "127.0.0.1:${DAB_PORT:-5081}:5000"
+    volumes:
+      - ./packages/data/dab-config.json:/App/dab-config.json:ro
+    depends_on:
+      sql:
+        condition: service_healthy
+volumes:
+  sql-data:

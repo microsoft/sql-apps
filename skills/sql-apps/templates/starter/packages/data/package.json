@@ -1,0 +1,7 @@
+{
+  "name": "@app/data",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "node ../../scripts/check-config.mjs" }
+}

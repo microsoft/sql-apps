@@ -342,3 +342,71 @@ test('attribution guidance consistently uses the compact version tag', async () 
   }
   assert.doesNotMatch(readme, /sql-apps-version/, 'README: obsolete attribution tag');
 });
+
+test('starter is wired into initial scoping and proves a thin slice before expansion', async () => {
+  const starterReadme = await read('skills/sql-apps/templates/starter/README.md');
+  const recipe = await read('skills/sql-apps/templates/starter/deployment.md');
+  assert.match(skill, /\.\/templates\/starter\/README\.md/);
+  assert.match(skill, /Never execute it in the plugin or overwrite an existing app/);
+  assert.match(skill, /before expanding workflows/);
+  assert.match(brief, /Starter\/identity\/routing/);
+  for (const text of [deployment, starterReadme, recipe]) {
+    assert.match(text, /identity/i);
+    assert.match(text, /routing/i);
+    assert.match(text, /unverified|unproven|separate/i);
+  }
+  assert.match(starterReadme, /There is no synthetic login fallback/);
+  assert.match(starterReadme, /wall time a labor measurement/);
+  assert.match(recipe, /Unverified\. Not permission to provision/);
+});
+
+test('starter pins its workspace and container baseline without anonymous data access', async () => {
+  const prefix = 'skills/sql-apps/templates/starter/';
+  const baseline = JSON.parse(await read(prefix + 'baseline.json'));
+  const lock = JSON.parse(await read(prefix + 'package-lock.json'));
+  const compose = await read(prefix + 'compose.yml');
+  const config = JSON.parse(await read(prefix + 'packages/data/dab-config.json'));
+  assert.equal(baseline.version, '0.1.0');
+  assert.equal(lock.lockfileVersion, 3);
+  for (const [location, entry] of Object.entries(lock.packages)) {
+    if (!location.startsWith('node_modules/') || entry.link) continue;
+    assert.equal(entry.resolved, undefined, 'Do not bind the starter lock to a maintainer-specific registry');
+    let owner = location;
+    while (lock.packages[owner].inBundle) {
+      const boundary = owner.lastIndexOf('/node_modules/');
+      assert.ok(boundary > 0, `${location}: bundled dependency must have a parent package`);
+      owner = owner.slice(0, boundary);
+    }
+    assert.match(lock.packages[owner].integrity, /^sha(1|256|384|512)-/,
+      `${location} or its containing bundle must retain an npm-supported integrity pin`);
+  }
+  for (const location of ['', 'packages/frontend', 'packages/data', 'packages/server', 'packages/shared']) {
+    const manifest = JSON.parse(await read(prefix + (location ? location + '/' : '') + 'package.json'));
+    for (const section of ['dependencies', 'devDependencies']) {
+      assert.deepEqual(manifest[section], lock.packages[location][section]);
+      for (const [name, version] of Object.entries(manifest[section] || {})) {
+        if (name.startsWith('@app/')) continue;
+        assert.match(version, /^\d+\.\d+\.\d+$/, `${name} must be pinned`);
+        assert.equal(lock.packages[`node_modules/${name}`].version, version);
+      }
+    }
+  }
+  for (const image of Object.values(baseline.images)) {
+    assert.match(image, /@sha256:[a-f0-9]{64}$/);
+    assert.ok(compose.includes(image));
+  }
+  assert.match(compose, /pull_policy: never/);
+  assert.equal(config['data-source'].options['set-session-context'], true);
+  assert.equal(config.runtime.host.authentication.provider, 'Custom');
+  for (const entity of Object.values(config.entities)) {
+    assert.ok(entity.permissions.every(permission => permission.role === 'authenticated'));
+  }
+  assert.equal(config.entities.Items.source.type, 'view');
+  assert.equal(config.entities.CreateItem.source.type, 'stored-procedure');
+  const migration = await read(prefix + 'packages/data/migrations/001-initial.sql');
+  assert.match(migration, /SESSION_CONTEXT\(N'oid'\)/);
+  assert.match(migration, /UNIQUE \(OwnerId, Label\)/);
+  assert.match(migration, /BEGIN TRANSACTION/);
+  assert.match(migration, /COMMIT TRANSACTION/);
+  assert.match(await read(prefix + 'packages/data/permissions.sql'), /DENY SELECT, INSERT, UPDATE, DELETE ON SCHEMA::dbo/);
+});

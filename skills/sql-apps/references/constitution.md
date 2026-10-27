@@ -43,6 +43,8 @@ Enforce role/ownership permissions in DAB with validated identity, and SQL polic
 
 Follow [deployment guidance](./deployment.md) from the first workflow. Local completion is deployment-ready: pinned DAB and compatible runtime, portable configuration, supported authentication, reproducible packaging of UI/custom server/DAB/SQL migrations and permissions, and a documented cloud hosting recipe with evidence status. Test packaged startup/routing/restart locally without Azure access. Assess precompiled runtime artifacts and dependencies separately from build tooling; TypeScript alone is not grounds to reject F1. No exercised core recipe is currently bundled; document the gap and promotion checks instead of claiming verified hosting.
 
+For empty apps, reuse the [versioned application starter](../templates/starter/README.md); copy, do not run it in the plugin. Confirm external identity and routing before expanding the first verified vertical slice. Keep its sample domain replaceable, its lifecycle app-owned, and real-provider/browser/local/cloud evidence distinct. Never overlay an existing app or treat a test issuer as deployed authentication.
+
 ## Complete topology and cost review
 
 For greenfield work, persist `intent: poc` and `costPreference: free-first` in the brief and durable project policy. This preference seeks low-cost qualifying free options first; it neither guarantees free operation nor authorizes spending. Users may explicitly choose `costPreference: zero-azure-spend` as a strict zero-spend requirement. Preserve existing strict choices. Production availability, scale, or compliance must be explicitly requested; "deploy" alone keeps PoC intent and does not authorize charges. Keep provisioning optional.

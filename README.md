@@ -17,6 +17,7 @@ The database targets are the local Azure SQL Database container or Azure SQL Dat
 - **A complete app, not a mockup.** Build useful screens and workflows backed by real SQL data and business rules.
 - **A clear path from local to cloud.** Start with local development; Azure provisioning is optional.
 - **An app you own.** Keep the source, migrations, tests, configuration, and run instructions.
+- **Less repeated setup.** A [copyable application starter](./skills/sql-apps/templates/starter/README.md) assembles pinned workspaces, external sign-in, DAB/SQL, local startup, and acceptance checks.
 
 ## Get started
 
@@ -57,7 +58,7 @@ The assistant helps shape the requirements, then builds and tests the app. Try s
 
 ## Preview and important limits
 
-SQL Apps is **preview guidance**, currently at version **0.2.1**. Packaging exists for five assistant families. One supervised VS Code candidate run passed local persistence, authorization, concurrency, and packaged-restart checks; broader host evaluation, copied installation/update, and Azure deployment remain unverified. Check the [verification status](./docs/reference/releasing.md#verification-status) and [local proof and limits](./docs/reference/releasing.md#recorded-local-candidate-proof) before relying on a host or deployment path.
+SQL Apps is **preview guidance**, currently at version **0.3.0**. Packaging exists for five assistant families. The new starter has build/unit and isolated local API/restart validation with synthetic test identities; real-provider sign-in and Azure deployment remain unverified. The earlier supervised VS Code application run used 0.2.1, not this changed payload. Broader host evaluation and copied installation/update remain unverified. Check the [verification status](./docs/reference/releasing.md#verification-status), [starter evidence](./docs/reference/releasing.md#starter-baseline-010), and [historical local proof](./docs/reference/releasing.md#recorded-local-candidate-proof) before relying on a host or deployment path.
 
 Review generated code, access controls, migrations, and recovery before using real or regulated data. Azure deployment requires its own review and approval; free allowances do not guarantee zero cost, and budget alerts do not stop spending. You are responsible for charges. Tools, AI providers, local database containers, and Azure services have separate availability, licensing, and pricing terms. No service-level agreement or Microsoft support commitment is provided; Azure support follows your Azure agreement. See [Support](./SUPPORT.md).
 

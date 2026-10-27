@@ -18,11 +18,11 @@ The repository is both a marketplace and a plugin. All catalog sources resolve t
 | [Gemini manifest](../../gemini-extension.json) | Extension metadata and conventional skill discovery |
 | [Routing skill](../../skills/sql-apps/SKILL.md) | Shared workflow and bundled references/templates |
 
-There are no executable hooks, MCP servers, automatic companion dependencies, or build step. There is no duplicate host-specific application implementation. The release verifier is a maintainer-run Node.js check, not a plugin runtime.
+There are no executable hooks, MCP servers, automatic companion dependencies, or plugin build step. The bundled starter contains inert application source/scripts and its own dependency lockfile: copy it into an application before installing or running it. Installing SQL Apps does not install or execute those dependencies. There is no duplicate host-specific application implementation. The release verifier is a maintainer-run Node.js check, not a plugin runtime.
 
 ## Release identity
 
-This checkout is the **0.2.1 patch release candidate**. That identifies source metadata, not a published release or an updated user installation. The marketplace identity remains `sql-apps-skills`, the plugin/extension identity remains `sql-apps`, and the install coordinate remains `sql-apps@sql-apps-skills`.
+This checkout is the **0.3.0 release candidate**, adding application starter baseline 0.1.0. That identifies source metadata, not a published release or an updated user installation. The marketplace identity remains `sql-apps-skills`, the plugin/extension identity remains `sql-apps`, and the install coordinate remains `sql-apps@sql-apps-skills`.
 
 `plugin.json` is the canonical version. Keep the Claude, Codex, Cursor, and Gemini manifests and the shared/Cursor catalog versions aligned with it. The Codex catalog in `.agents/plugins/marketplace.json` intentionally reads the plugin version rather than duplicating it.
 
@@ -32,20 +32,20 @@ Published release versions are **immutable**: never change shipped guidance or t
 
 | Host | Packaging | Native validation / loader |
 | --- | --- | --- |
-| Copilot CLI | Root manifest + shared catalog | 0.2.0 isolated local marketplace registration/install/list passed with one skill on CLI 1.0.102, but it reports `source: live`: no cached package was copied; 0.2.1 loading not exercised |
-| VS Code | Root manifest + shared catalog | Isolated VS Code 1.143.0 loaded the 0.2.1 candidate and exercised one local application workflow; native-loaded skill bytes matched the candidate. Published copied installation/update remains unverified |
+| Copilot CLI | Root manifest + shared catalog | 0.2.0 isolated local marketplace registration/install/list passed with one skill on CLI 1.0.102, but it reports `source: live`: no cached package was copied; 0.3.0 loading not exercised |
+| VS Code | Root manifest + shared catalog | Isolated VS Code 1.143.0 loaded the earlier 0.2.1 candidate and exercised one local application workflow; those bytes do not match 0.3.0. Current native loading and published copied installation/update remain unverified |
 | Claude Code | Native manifest + shared catalog | Manifest/catalog validation passed; interactive loading not exercised |
 | OpenAI Codex | Compatibility manifest + Codex catalog | Static checks only; CLI unavailable in the validation environment |
 | Gemini CLI | Extension manifest + shared skills | Static checks only; CLI unavailable in the validation environment |
 | Cursor | Portable/native manifests + Cursor catalog | Static checks only; host unavailable in the validation environment |
 
-One approved VS Code candidate evaluation passed the scoped local application checks below. This is not broad host certification, an unattended-generation claim, copied installation/update proof, or Azure deployment acceptance. Package checks alone prove none of those runtime behaviors or compatibility with an unreleased Rayfin schema.
+One approved VS Code 0.2.1 candidate evaluation passed the historical scoped local application checks below. Starter validation is recorded separately. Neither is broad host certification, an unattended-generation claim, copied installation/update proof, or Azure deployment acceptance. Package checks alone prove none of those runtime behaviors or compatibility with an unreleased Rayfin schema.
 
 ### Open runtime acceptance gate
 
 The initial 2026-10-26 preflight lacked a disposable target and execution authorization and performed no application or database changes. A later, separately approved local evaluation completed the application checkpoints before the maintainer ended the remaining evaluation. Its documentation was retained in a separate worktree and had not been incorporated here.
 
-On 2026-10-27, remediation rechecked the evaluated candidate against the current checkout, verified the retained archive hashes and structured results, and incorporated the scoped observations below. No new services, license acceptance, sign-in, or runtime evaluation were needed. The current skill payload is unchanged from the evaluated candidate.
+On 2026-10-27, remediation rechecked the evaluated candidate against the then-current 0.2.1 checkout, verified the retained archive hashes and structured results, and incorporated the scoped observations below. That reconciliation needed no new services, license acceptance, sign-in, or runtime evaluation. The subsequent 0.3.0 starter changes alter the payload; do not reuse the historical fingerprint or native-run claim for this candidate.
 
 Further evaluations require an approved isolated workspace, host usage, database target, setup and cleanup scope. Cloud evaluation requires its own Azure SQL Database approval. Do not reuse shared/demo services, count wording tests as runtime evidence, or remove unverified labels for unrun cases. On-premises installation is not an acceptance requirement.
 
@@ -69,7 +69,7 @@ The final runtime command was `npm run test:runtime-proof` from the generated ap
 
 Retained SHA-256 identities, rechecked against the artifacts:
 
-- SQL Apps skill payload: `db13865f8111581b4bcde23b40eba5733686f88155db74b19eb92c2bc3891c29`; all nine current skill/reference/template files match.
+- Historical 0.2.1 SQL Apps skill payload: `db13865f8111581b4bcde23b40eba5733686f88155db74b19eb92c2bc3891c29`; nine evaluated skill/reference/template files, not the current 0.3.0 payload.
 - Verified generated source archive: `6cb44e7d2e7eb9ed30291450b4464d12d0ab74d965c6a8b3e8fe9fa9e3c372d4`.
 - Verified compiled package: `194919ab0f4b942ab03bb37e02dd9edd8c63d82c4cd9e0dcc3cd72e9dd1bf277`.
 
@@ -88,7 +88,73 @@ claude plugin validate C:\git\sql-apps-v3
 claude plugin validate C:\git\sql-apps-v3\.claude-plugin\plugin.json
 ```
 
-Replace the checkout path as needed. Tests cover manifest/version consistency, catalogs, shared skill paths, documentation links, host instruction destinations, design/alignment and attribution guidance, the service template, the absence of runtime components, and verifier positive/negative cases. The regressions exercise linked-directory CLI launches, unexpected host components, and real Git checkouts with Windows/Unix newline settings in temporary repositories; no commits are created. `--plugin-dir` checks development discovery only.
+Replace the checkout path as needed. Tests cover manifest/version consistency, catalogs, shared skill paths, documentation links, host instruction destinations, design/alignment and attribution guidance, starter packaging/pins, the service template, the absence of host runtime components, and verifier positive/negative cases. The regressions exercise linked-directory CLI launches, unexpected host components, and real Git checkouts with Windows/Unix newline settings in temporary repositories; no commits are created. `--plugin-dir` checks development discovery only.
+
+### Starter baseline 0.1.0
+
+The [copyable starter](../../skills/sql-apps/templates/starter/README.md) was validated
+in an independent application copy on 2026-10-27 using Node 22.22.2/npm 10.9.7,
+DAB 2.1.5 and the immutable SQL/DAB image digests in its
+[baseline](../../skills/sql-apps/templates/starter/baseline.json). It is not a
+native assistant-generation evaluation or cloud deployment.
+
+- Clean `npm ci --ignore-scripts`, TypeScript/production build, four server/config and
+  three React behavior tests passed. Dependency audit reported zero advisories.
+- Approved isolated API acceptance passed direct/proxied anonymous and forged
+  identity/signature denials, positive controls, cross-owner isolation, one
+  concurrent-duplicate winner, read-entity write denial and SQL invalid-input rejection.
+- Independent API-login SQL checks confirmed base-table read/write denial and
+  procedure execution permission. The same saved row identity/content survived a full
+  SQL/DAB/web stop/start; a post-restart write succeeded.
+- The first API run exposed a missing proxy `Content-Encoding` response header;
+  that was fixed with a compressed-response regression. A test initially assumed
+  SQL `THROW` maps to HTTP 4xx; the pinned DAB returns a database-operation error
+  with HTTP 500. Acceptance now checks that explicit error contract rather than
+  treating any outage as a valid business-rule rejection.
+- Browser acceptance passed synthetic OIDC authorization-code/PKCE, real DAB/SQL
+  save and full page reload, duplicate rejection with input retention, light/dark
+  controls, narrow-width overflow and keyboard focus. Unavailable-state handling
+  used a browser-route simulation, not an actual cloud quota event.
+
+The maintainer-only [test fixture](../../scripts/test-starter-runtime.mjs) supplies
+synthetic OIDC/JWT identities and a short-lived certificate trusted only in that
+test DAB container. It is not bundled under the skill or shipped in generated apps.
+It does not register Entra applications, sign in to Azure, pull images, change OS
+certificate trust, or delete data. Test containers are stopped after API acceptance;
+the isolated volume and ignored credentials are retained.
+
+The pinned SQL preview exited 137 with `OOMKilled=false` after Docker stop.
+Restart recovery and persisted data passed, but clean engine shutdown is not
+established. Registry tarball URLs are omitted from the integrity-pinned starter
+lockfile to avoid binding generated apps to a maintainer-specific package feed.
+
+To reproduce, first obtain approval for an isolated copied starter, cached images,
+container terms, synthetic identities/data, local ports and cleanup scope. Build/test
+the copy, then run:
+
+```powershell
+node scripts\test-starter-runtime.mjs C:\approved\starter-copy "C:\Program Files\Git\usr\bin\openssl.exe"
+```
+
+`--resume` reuses only an existing fixture-owned copy without replacing its database
+credentials. `--browser` keeps the fixture/stack running for browser checks; stop
+with Ctrl+C afterward. Test certificate bypass must be scoped to the test browser,
+not the OS trust store. Real-provider sign-in, deployed identity, hosting/SKU/free
+offer eligibility, and Azure acceptance remain **unverified**. No measured speedup
+is claimed.
+
+With the browser fixture running, the optional maintainer
+[browser check](../../scripts/test-starter-browser.mjs) can use an already installed
+Playwright module and system Edge (no browser download):
+
+```powershell
+node scripts\test-starter-browser.mjs C:\approved\starter-copy C:\approved\tools\node_modules\playwright\index.mjs
+```
+
+Its DNS mapping and certificate bypass apply only to that test browser. They are
+not production settings or OS trust/DNS changes.
+Alternatively, pass `--browser-check C:\approved\tools\node_modules\playwright\index.mjs`
+to the runtime fixture command to run this check and automatically stop the stack.
 
 ## Package and installed-copy verification
 
@@ -115,7 +181,7 @@ For isolated Copilot checks, use a new configuration directory inside your check
 $savedHome = $env:COPILOT_HOME
 $savedAutoUpdate = $env:COPILOT_AUTO_UPDATE
 try {
-  $env:COPILOT_HOME = Join-Path (Get-Location).Path '.release-check-copilot-0.2.1'
+  $env:COPILOT_HOME = Join-Path (Get-Location).Path '.release-check-copilot-0.3.0'
   $env:COPILOT_AUTO_UPDATE = 'false'
   copilot plugin marketplace add C:\git\sql-apps-v3
   copilot plugin install sql-apps@sql-apps-skills
@@ -216,7 +282,7 @@ For an approved deployment, read back actual resource tags and names through the
 
 1. Review license, notices, payload, release identity, and validation results; do not reuse an existing release version for changed bytes.
 2. Run all three test files above. Prepare an independent package from the reviewed candidate and run the verifier against its unpacked root. Record the exact source revision, version, commands/results, and payload fingerprint.
-3. With maintainer authorization, publish reviewed commits to [microsoft/sql-apps](https://github.com/microsoft/sql-apps) and create the matching immutable version tag/release. A local 0.2.1 manifest change alone does not publish anything. Do not claim app/cloud acceptance based on a package check.
+3. With maintainer authorization, publish reviewed commits to [microsoft/sql-apps](https://github.com/microsoft/sql-apps) and create the matching immutable version tag/release. A local 0.3.0 manifest change alone does not publish anything. Do not claim app/cloud acceptance based on a package check.
 4. Keep installation examples pointed at this repository. For a pinned release, check the host's actual pinning syntax rather than guessing a tag parameter.
 5. Test initial installation **and** marketplace refresh/plugin update from the previously released version, using isolated host configuration where supported. Locate the actual copied package, run the verifier, start a fresh session, confirm its loaded path/version, and rerun the verifier. Record host/plugin versions and distinguish copied installs from live development sources.
 6. Verify each advertised installation route before broadening its status. Public marketplace listing may require separate submission, review, or account permissions. Keep unexercised hosts/runtime scenarios explicit.

@@ -14,6 +14,11 @@ const metadata = [
   'plugin.json', 'gemini-extension.json',
   '.claude-plugin', '.codex-plugin', '.cursor-plugin', '.agents',
 ];
+function countPayload(directory = path.join(root, 'skills')) {
+  return readdirSync(directory, { withFileTypes: true })
+    .reduce((count, entry) => count + (entry.isDirectory() ? countPayload(path.join(directory, entry.name)) : 1), 0);
+}
+const payloadCount = countPayload();
 
 function fixture(t) {
   const directory = path.join(root, 'tests', `.release-verification-${randomUUID()}`);
@@ -60,18 +65,18 @@ test('local release-check configuration is ignored without hiding public files',
 test('an independent package copy matches source metadata and every skill byte', (t) => {
   const roots = fixture(t);
   const result = verifyRelease(roots);
-  assert.equal(result.version, '0.2.1');
-  assert.equal(result.skillFiles, 9);
+  assert.equal(result.version, '0.3.0');
+  assert.equal(result.skillFiles, payloadCount);
   assert.match(result.payloadDigest, /^[a-f0-9]{64}$/);
   const command = cli(['--source-root', roots.sourceRoot, '--installed-root', roots.installedRoot]);
   assert.equal(command.status, 0, command.stderr);
-  assert.match(command.stdout, /PASS sql-apps 0\.2\.1/);
+  assert.match(command.stdout, /PASS sql-apps 0\.3\.0/);
   assert.ok(command.stdout.includes(result.payloadDigest));
 });
 
 test('this checkout satisfies the instruction-only package contract', (t) => {
   const { installedRoot } = fixture(t);
-  assert.equal(verifyRelease({ sourceRoot: root, installedRoot }).skillFiles, 9);
+  assert.equal(verifyRelease({ sourceRoot: root, installedRoot }).skillFiles, payloadCount);
 });
 
 test('the CLI defaults source to this checkout, not the current directory', (t) => {
@@ -88,7 +93,7 @@ test('the CLI verifies packages when launched through a linked script directory'
   symlinkSync(path.dirname(script), linkedScripts, process.platform === 'win32' ? 'junction' : 'dir');
   const linkedScript = path.join(linkedScripts, 'verify-release.mjs');
   for (const [name, args, status, output] of [
-    ['matching package', ['--source-root', roots.sourceRoot, '--installed-root', roots.installedRoot], 0, /PASS sql-apps 0\.2\.1/],
+    ['matching package', ['--source-root', roots.sourceRoot, '--installed-root', roots.installedRoot], 0, /PASS sql-apps 0\.3\.0/],
     ['missing package', ['--installed-root', path.join(roots.installedRoot, 'absent')], 1, /installed root: cannot read/],
     ['missing arguments', [], 2, /Usage:.*--installed-root/],
   ]) {
@@ -111,7 +116,7 @@ console.log(verifyRelease(${JSON.stringify(roots)}).skillFiles);`;
     await t.test(name, () => {
       const command = spawnSync(process.execPath, args, { cwd: root, input, encoding: 'utf8' });
       assert.equal(command.status, 0, command.stderr);
-      assert.equal(command.stdout.trim(), '9');
+      assert.equal(command.stdout.trim(), String(payloadCount));
     });
   }
 });
@@ -121,7 +126,7 @@ test('a stale installed version fails clearly', (t) => {
   editJSON(roots.installedRoot, 'plugin.json', (data) => { data.version = '0.1.0'; });
   const command = cli(['--source-root', roots.sourceRoot, '--installed-root', roots.installedRoot]);
   assert.equal(command.status, 1);
-  assert.match(command.stderr, /installed plugin\.json: version 0\.1\.0; expected 0\.2\.1/);
+  assert.match(command.stderr, /installed plugin\.json: version 0\.1\.0; expected 0\.3\.0/);
 });
 
 test('same-version changed skill bytes fail, including newline-only drift', (t) => {
@@ -165,7 +170,7 @@ test('Windows and Unix Git checkouts produce the same canonical skill bytes', (t
   git(['--work-tree', windowsRoot, 'checkout-index', '--all', '--force']);
   git(['-c', 'core.autocrlf=false', '-c', 'core.eol=lf', '--work-tree', installedRoot, 'checkout-index', '--all', '--force']);
   const result = verifyRelease({ sourceRoot: windowsRoot, installedRoot });
-  assert.equal(result.skillFiles, 9);
+  assert.equal(result.skillFiles, payloadCount);
   for (const entry of readdirSync(path.join(windowsRoot, 'skills'), { recursive: true, withFileTypes: true })) {
     if (!entry.isFile()) continue;
     const file = path.join(entry.parentPath, entry.name);
@@ -263,7 +268,7 @@ test('ordinary documentation and maintainer scripts are allowed outside the skil
   const roots = fixture(t);
   cpSync(path.join(root, 'README.md'), path.join(roots.installedRoot, 'README.md'));
   cpSync(path.join(root, 'scripts'), path.join(roots.installedRoot, 'scripts'), { recursive: true });
-  assert.equal(verifyRelease(roots).skillFiles, 9);
+  assert.equal(verifyRelease(roots).skillFiles, payloadCount);
 });
 
 test('relative links in the installed skill and its references resolve in the copied package', (t) => {

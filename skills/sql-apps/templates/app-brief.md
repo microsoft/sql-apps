@@ -20,6 +20,7 @@
 - Confirmed decisions and assumptions: <material choices and their source>
 - Accepted exceptions: <specific stack, cost, or security boundaries; none unless approved>
 - Database: <local Azure SQL container or Azure SQL Database cloud; connection topology, runtime/version evidence, and compatibility gaps>
+- Starter/identity/routing: <baseline version; external issuer, audience, owner claim, sign-in flow, public/internal origins, intended host boundary or explicit unknowns>
 
 PoC/free-first is a default, not a promise of free use or approval to spend. Preserve explicit `costPreference: zero-azure-spend`. Only explicit production availability, scale, or compliance requirements change intent; "deploy" alone does not.
 

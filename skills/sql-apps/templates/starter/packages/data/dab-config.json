@@ -1,0 +1,33 @@
+{
+  "$schema": "https://github.com/Azure/data-api-builder/releases/download/v2.1.5/dab.draft.schema.json",
+  "data-source": {
+    "database-type": "mssql",
+    "connection-string": "@env('SQL_CONNECTION_STRING')",
+    "options": { "set-session-context": true }
+  },
+  "runtime": {
+    "rest": { "enabled": true, "path": "/api" },
+    "graphql": { "enabled": false },
+    "mcp": { "enabled": false },
+    "pagination": { "default-page-size": 100, "max-page-size": 100, "next-link-relative": true },
+    "host": {
+      "mode": "production",
+      "authentication": {
+        "provider": "Custom",
+        "jwt": { "issuer": "@env('AUTH_ISSUER')", "audience": "@env('AUTH_AUDIENCE')" }
+      },
+      "cors": { "origins": [], "allow-credentials": false }
+    }
+  },
+  "entities": {
+    "Items": {
+      "source": { "object": "api.Items", "type": "view", "key-fields": ["Id"] },
+      "permissions": [{ "role": "authenticated", "actions": ["read"] }]
+    },
+    "CreateItem": {
+      "source": { "object": "api.CreateItem", "type": "stored-procedure" },
+      "rest": { "methods": ["post"] },
+      "permissions": [{ "role": "authenticated", "actions": ["execute"] }]
+    }
+  }
+}

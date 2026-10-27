@@ -1,0 +1,15 @@
+{
+  "version": "0.1.0",
+  "node": "22.22.2",
+  "dab": "2.1.5",
+  "sqlEngineEdition": 5,
+  "catalogCollation": "SQL_Latin1_General_CP1_CI_AS",
+  "images": {
+    "sql": "sqldbpreview-dpgaeqhmgphzd4bk.azurecr.io/azure-sql/db-dev@sha256:1f6fd8be2c87e0da495f1ca4df01546c091ec7fdb14f16f3f8743b30a9e9266f",
+    "dab": "mcr.microsoft.com/azure-databases/data-api-builder@sha256:d07e3e1ce53bdf84d3a4a0a4ce12e44f0b902e7316c782a3d682fbe074509c0b"
+  },
+  "identity": {
+    "contract": "External OIDC authorization-code + PKCE; tenant-bound access-token issuer/audience; oid ownership claim",
+    "cloudValidation": "unverified"
+  }
+}

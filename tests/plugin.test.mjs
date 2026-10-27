@@ -29,7 +29,7 @@ test('manifest uses only supported Agent Plugins 1.0 fields', () => {
   assert.match(manifest.name, /^(?!.*(?:--|\.\.))[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/);
   assert.ok(manifest.name.length <= 64);
   assert.match(manifest.version, /^\d+\.\d+\.\d+$/);
-  assert.equal(manifest.version, '0.2.1', 'Keep the patch release version explicit');
+  assert.equal(manifest.version, '0.3.0', 'Keep the release candidate version explicit');
   assert.equal(typeof manifest.description, 'string');
   assert.ok(manifest.description.length > 0);
   assert.equal(manifest.license, 'MIT');
@@ -130,7 +130,7 @@ test('release and installation guidance verify payloads and require discovered D
   const installation = read(path.join('docs', 'installation.md'));
   const prerequisites = read(path.join('skills', 'sql-apps', 'references', 'prerequisites.md'));
   const releasing = read(path.join('docs', 'reference', 'releasing.md'));
-  assert.match(installation, /0\.2\.1 patch release candidate/);
+  assert.match(installation, /0\.3\.0 release candidate/);
   assert.match(prerequisites, /microsoft-sql@microsoft-sql/);
   assert.match(installation, /required for a complete database-backed workflow/);
   assert.match(installation, /dab-rest-and-graphql/);
@@ -205,7 +205,7 @@ test('shared guidance persists policy for each active host without five copies',
 test('every bundled Markdown link resolves inside the plugin', () => {
   const documents = [
     'README.md', 'plan.md', 'SECURITY.md', 'SUPPORT.md', 'CODE_OF_CONDUCT.md',
-    ...filesIn('skills'), ...filesIn('docs'),
+    ...filesIn('skills').filter(file => file.endsWith('.md')), ...filesIn('docs'),
   ];
   for (const document of documents) {
     const text = read(document);
@@ -353,12 +353,15 @@ test('future service YAML preserves the proposed mssql shape and safe capability
   assert.ok(!existsSync(path.join(root, 'rayfin', 'rayfin.yml')));
 });
 
-test('payload has no executable runtime, hooks, MCP config, or vendored specialists', () => {
+test('starter source is inert template content, not a host runtime or vendored specialist', () => {
   const payload = filesIn('skills');
-  assert.equal(payload.length, 9);
+  const starter = path.join('skills', 'sql-apps', 'templates', 'starter') + path.sep;
+  assert.ok(payload.includes(starter + 'package-lock.json'));
+  assert.ok(payload.includes(starter + path.join('scripts', 'acceptance.mjs')));
   assert.ok(payload.includes(path.join('skills', 'sql-apps', 'references', 'deployment.md')));
   assert.ok(payload.includes(path.join('skills', 'sql-apps', 'references', 'deployment-attribution.md')));
-  assert.ok(payload.every((file) => file.endsWith('.md') || file.endsWith('.yml')));
+  assert.ok(payload.every((file) => file.startsWith(starter) || file.endsWith('.md') || file.endsWith('.yml')));
+  assert.ok(!payload.some(file => file.split(path.sep).some(part => ['node_modules', 'dist', '.local'].includes(part))));
   for (const component of [
     'mcp.json', '.mcp.json', '.lsp.json', 'hooks', 'agents', 'commands', 'rules',
     'settings.json', 'GEMINI.md', 'com.github.copilot', 'automations',
