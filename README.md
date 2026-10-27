@@ -8,6 +8,10 @@ Build SQL-backed web applications with the coding assistant you already use. Des
 
 SQL Apps is a lightweight assistant plugin—not an application platform. It guides your assistant to build an independent app with TypeScript, React, Data API builder (DAB), and Azure SQL Database. No SQL Apps account, hosted service, or runtime is required.
 
+> **Local database notice:** The preferred Azure SQL Database container for local development is in **Private Preview** and is not bundled with SQL Apps. [Sign up for preview access](https://aka.ms/sqldbcontainerpreview-signup) to get the registry credentials needed to pull it; see the [official getting-started guide](https://microsoft.github.io/azure-sql-database-container/getting-started.html). Scaffolding can proceed while setup is pending; persistence needs a real SQL engine and DAB.
+
+The database targets are the local Azure SQL Database container or Azure SQL Database in the cloud, not on-premises SQL Server fallbacks. If the container is unavailable, use preview signup or explicitly choose the cloud path; cloud access and resource changes require their own approvals.
+
 ## What you get
 
 - **A complete app, not a mockup.** Build useful screens and workflows backed by real SQL data and business rules.
@@ -27,6 +31,8 @@ SQL Apps is a lightweight assistant plugin—not an application platform. It gui
 | Cursor | [Team marketplace](./docs/installation.md#cursor) |
 
 The marketplace install coordinate is **`sql-apps@sql-apps-skills`**. See the [installation guide](./docs/installation.md) for host setup and required companion tools.
+
+Your assistant checks existing capabilities first and asks only for missing routing choices. Choose local or cloud; having an Azure subscription does not select cloud or authorize resource changes. Detailed setup questions wait until needed.
 
 ### 2. Build your first workflow
 
@@ -51,7 +57,7 @@ The assistant helps shape the requirements, then builds and tests the app. Try s
 
 ## Preview and important limits
 
-SQL Apps is **preview guidance**, currently at version **0.2.1**. Packaging exists for five assistant families; end-to-end application-generation and Azure deployment validation remain in progress. Check the [verification status](./docs/reference/releasing.md#verification-status) before relying on a host or deployment path.
+SQL Apps is **preview guidance**, currently at version **0.2.1**. Packaging exists for five assistant families. One supervised VS Code candidate run passed local persistence, authorization, concurrency, and packaged-restart checks; broader host evaluation, copied installation/update, and Azure deployment remain unverified. Check the [verification status](./docs/reference/releasing.md#verification-status) and [local proof and limits](./docs/reference/releasing.md#recorded-local-candidate-proof) before relying on a host or deployment path.
 
 Review generated code, access controls, migrations, and recovery before using real or regulated data. Azure deployment requires its own review and approval; free allowances do not guarantee zero cost, and budget alerts do not stop spending. You are responsible for charges. Tools, AI providers, local database containers, and Azure services have separate availability, licensing, and pricing terms. No service-level agreement or Microsoft support commitment is provided; Azure support follows your Azure agreement. See [Support](./SUPPORT.md).
 

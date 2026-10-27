@@ -14,7 +14,7 @@ The first-release profile is deliberately narrow. These are instruction-level po
 | Custom server | Node.js/Express only for necessary authentication, orchestration, or domain behavior; not an automatic CRUD replacement for DAB |
 | Database access and rules | Least-privilege DAB SQL identity; SQL constraints and transaction-safe procedures enforce business invariants, including concurrency |
 | Relational store | Azure SQL Database |
-| Local store | Azure SQL Database container, subject to current specialist-documented availability and host prerequisites |
+| Local store | Azure SQL Database container (Private Preview); no SQL Server Express or other on-premises fallback |
 | Cloud host | Evaluate free-first across the full topology; App Service is a candidate, not a preselected paid plan |
 | Optional services | Blob Storage for files, Microsoft Entra ID for sign-in, Application Insights for telemetry, Key Vault when secret storage is necessary |
 | Delivery | Local is a deployment-ready outcome; Azure provisioning is optional and separately approved |
@@ -24,6 +24,8 @@ The first-release profile is deliberately narrow. These are instruction-level po
 Use one application and one database first. DAB is a required runtime, even when no custom server is necessary. Optional services are a support boundary, not a provisioning checklist. Add them only for an actual requirement.
 
 Do not silently select another framework, ORM, data API platform, or database. Azure specialists may assess alternative hosting topologies for the required DAB app, but must disclose support boundaries and verify compatibility rather than claiming an untested platform is supported. Requests needing messaging, AI services, AKS, Fabric, or another application stack exceed this profile. Explain the conflict; an explicitly accepted exception is not a newly supported profile. Do not rewrite an existing app to force it into this profile.
+
+Discover capabilities and reuse supported target decisions before asking one grouped routing question for missing choices. Subscription ownership does not select cloud or authorize provisioning. The only database targets are the local Azure SQL Database container and Azure SQL Database cloud. If the container is unavailable, offer preview signup or explicit cloud selection; record the target, connection topology, and compatibility gaps. Do not install or extend an on-premises fallback. Existing out-of-profile projects need an explicit migration decision, not a silent rewrite. Before moving to cloud, check feature compatibility and rerun migrations, DAB authorization, SQL-invariant/concurrency, persistence, and restart on the actual cloud target.
 
 Microsoft SQL owns database expertise and local-engine setup. Azure Skills owns cloud workflows and service configuration. The assistant owns ordinary implementation, integration, and verification. Use installed guidance and host permissions, not duplicate SQL Apps lifecycle machinery.
 
@@ -100,9 +102,10 @@ The block intentionally contains the durable stack and routing constraints, not 
 ## SQL Apps project policy
 
 - Preserve `app-brief.md`, existing behavior, and accepted decisions; carry current cost, topology, security, and acceptance choices into specialist handoffs. Do not silently change the app's stack or intent.
-- Use TypeScript and React/Vite with Azure SQL through DAB. Use a Node.js/Express server only for necessary authentication, orchestration, or domain behavior; never replace DAB with direct SQL.
+- Use TypeScript and React/Vite with Azure SQL through DAB: local Azure SQL Database container or Azure SQL Database cloud only. No SQL Server Express or other on-premises fallback. Node.js/Express is only for necessary authentication, orchestration, or domain behavior, never direct-SQL CRUD.
 - Enforce identity and role/ownership permissions at DAB. Enforce transactional business rules in SQL constraints or procedures exposed through DAB, with no permission path that bypasses them. Never trust caller-supplied roles or expose credentials in browser code.
-- If SQL or DAB is unavailable, give the user its supported setup path and continue useful UI, schema, or scaffolding work. Mark persistence and end-to-end checks incomplete; never substitute mocks or another database.
+- Reuse supported setup decisions. If SQL/DAB is unavailable, offer preview signup or explicit Azure SQL cloud selection; continue useful scaffolding with persistence incomplete. Never substitute mocks or another database. Scope migration explicitly for older on-premises projects.
+- Before moving to cloud, check feature compatibility and rerun migrations, DAB authorization, SQL invariants/concurrency, persistence, and restart on the actual cloud target.
 - For new apps, record `intent: poc` and `costPreference: free-first`. Preserve explicit `zero-azure-spend` and other accepted choices; neither "deploy" nor free-first authorizes spend.
 - Local work needs no Azure sign-in or provisioning. Use the installed SQL/Azure specialist for requested cloud work; obtain explicit approval for resource writes, spend or access changes, and destructive actions. Follow host permissions.
 - For Azure work, preserve recorded `sqlapps-version`, the final `sqlapps` naming suffix, approved exceptions, and existing resource names/tags. Never relabel or rename existing resources for attribution.

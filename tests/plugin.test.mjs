@@ -152,6 +152,11 @@ test('missing SQL, Azure Skills, or Azure CLI has actionable setup guidance', ()
   const prerequisites = read(path.join('skills', 'sql-apps', 'references', 'prerequisites.md'));
   const skill = read(skillPath);
   const readme = read('README.md');
+  for (const [name, document] of [['README', readme], ['installation guide', installation]]) {
+    assert.match(document, /Azure SQL Database container.*Private Preview/, name);
+    assert.match(document, /https:\/\/aka\.ms\/sqldbcontainerpreview-signup/, name);
+    assert.match(document, /official getting-started guide/, name);
+  }
   assert.match(installation, /Quick setup when a capability is missing/);
   for (const requirement of [
     'microsoft-sql@microsoft-sql',
@@ -171,10 +176,10 @@ test('missing SQL, Azure Skills, or Azure CLI has actionable setup guidance', ()
   assert.match(prerequisites, /does not grant registry access/i);
   assert.match(prerequisites, /user must complete any interactive registry login/i);
   assert.match(prerequisites, /Do not enroll, accept terms, or authenticate without explicit approval/);
-  assert.match(prerequisites, /continue useful UI, schema, and scaffolding/);
+  assert.match(prerequisites, /useful UI, schema, and scaffolding work may continue/);
   assert.match(prerequisites, /persistence and end-to-end checks stay incomplete/);
   assert.match(prerequisites, /Do not substitute mock persistence/);
-  assert.ok(prerequisites.includes("Use SQL Apps. Inspect this host's available skills/tools"));
+  assert.match(prerequisites, /^> Use SQL Apps.*existing setup/m);
   assert.match(installation, /Local-only has no Azure CLI or subscription requirement/);
   assert.ok(skill.includes('./references/prerequisites.md'));
   assert.ok(readme.includes('./docs/installation.md#quick-setup-when-a-capability-is-missing'));
@@ -354,7 +359,11 @@ test('payload has no executable runtime, hooks, MCP config, or vendored speciali
   assert.ok(payload.includes(path.join('skills', 'sql-apps', 'references', 'deployment.md')));
   assert.ok(payload.includes(path.join('skills', 'sql-apps', 'references', 'deployment-attribution.md')));
   assert.ok(payload.every((file) => file.endsWith('.md') || file.endsWith('.yml')));
-  for (const component of ['mcp.json', '.mcp.json', 'hooks', 'agents', 'package.json']) {
+  for (const component of [
+    'mcp.json', '.mcp.json', '.lsp.json', 'hooks', 'agents', 'commands', 'rules',
+    'settings.json', 'GEMINI.md', 'com.github.copilot', 'automations',
+    'output-styles', 'workflows', 'monitors', 'themes', 'evals', 'package.json',
+  ]) {
     assert.ok(!existsSync(path.join(root, component)), `Unexpected runtime component: ${component}`);
   }
 });
