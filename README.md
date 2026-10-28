@@ -6,23 +6,14 @@
 
 Build SQL-backed web applications with the coding assistant you already use. Describe your idea, shape the important rules, and build a working application you own.
 
-SQL Apps is a lightweight assistant plugin—not an application platform. It guides your assistant to build an independent app with TypeScript, React, Data API builder (DAB), and Azure SQL Database. No SQL Apps account, hosted service, or runtime is required.
-
-DAB is the default, not a hard requirement. The explicit Static Web Apps Free
-profile uses managed Azure Functions directly against Azure SQL. See the
-[hosting profiles](./skills/sql-apps/templates/starter/hosting.md) for that integration
-and the App Service F1/DAB alternative. Both remain live-unverified.
-
-> **Local database notice:** The preferred Azure SQL Database container for local development is in **Private Preview** and is not bundled with SQL Apps. [Sign up for preview access](https://aka.ms/sqldbcontainerpreview-signup) to get the registry credentials needed to pull it; see the [official getting-started guide](https://microsoft.github.io/azure-sql-database-container/getting-started.html). Scaffolding can proceed while setup is pending; persistence needs a real SQL engine and DAB.
-
-The database targets are the local Azure SQL Database container or Azure SQL Database in the cloud, not on-premises SQL Server fallbacks. If the container is unavailable, use preview signup or explicitly choose the cloud path; cloud access and resource changes require their own approvals.
+SQL Apps is a lightweight plugin that guides your assistant—not a service that hosts your app. No SQL Apps account or subscription is required, and your finished app runs without the plugin.
 
 ## What you get
 
 - **A complete app, not a mockup.** Build useful screens and workflows backed by real SQL data and business rules.
-- **A concrete path from local to cloud.** Start locally; optional Azure deployment uses bundled Container Apps/SQL Bicep and web/DAB container recipes, without another cloud skills plugin. Cloud acceptance remains unverified.
-- **An app you own.** Keep the source, migrations, tests, configuration, and run instructions.
-- **Less repeated setup.** A [copyable application starter](./skills/sql-apps/templates/starter/README.md) assembles pinned workspaces, external sign-in, DAB/SQL, local startup, and acceptance checks.
+- **A path from your computer to the cloud.** Start locally, then use the included Azure deployment guides when you're ready. Cloud deployment still needs live testing.
+- **An app you own.** Keep the code, database changes, tests, settings, and run instructions.
+- **Less repeated setup.** A [copyable application starter](./skills/sql-apps/templates/starter/README.md) brings together the screens, sign-in, database access, and checks for a working first version.
 
 ## Get started
 
@@ -38,7 +29,7 @@ The database targets are the local Azure SQL Database container or Azure SQL Dat
 
 The marketplace install coordinate is **`sql-apps@sql-apps-skills`**. See the [installation guide](./docs/installation.md) for host setup and required companion tools.
 
-Your assistant checks existing capabilities first and asks only for missing routing choices. Choose local or cloud; having an Azure subscription does not select cloud or authorize resource changes. Detailed setup questions wait until needed.
+Your assistant checks which tools are already installed and helps with anything missing. You choose whether to work locally or use Azure; it won't create or change cloud resources just because you have a subscription. Detailed setup questions wait until needed.
 
 ### 2. Build your first workflow
 
@@ -50,11 +41,14 @@ The assistant helps shape the requirements, then builds and tests the app. Try s
 
 ## Learn more
 
+The starter uses TypeScript, React, and Azure SQL Database. Data API builder (DAB) is the default way for the app to reach SQL. Static Web Apps Free instead uses Azure Functions to connect directly to SQL, without DAB. Container Apps and App Service F1 use DAB. See the hosting guide below for the trade-offs; the cloud deployment paths still need live testing.
+
 | Topic | Guide |
 | --- | --- |
 | Missing plugins and local setup options | [Quick setup](./docs/installation.md#quick-setup-when-a-capability-is-missing) |
 | Supported architecture and project rules | [Project constitution](./skills/sql-apps/references/constitution.md) |
 | Cloud readiness, deployment approvals, and validation | [Deployment guidance](./skills/sql-apps/references/deployment.md) |
+| Choosing Container Apps, App Service F1, or Static Web Apps Free | [Hosting options](./skills/sql-apps/templates/starter/hosting.md) |
 | Concrete Container Apps and SQL deployment steps | [Bicep/container recipe](./skills/sql-apps/templates/starter/deployment.md) |
 | Resource naming and attribution tags | [Deployment attribution](./skills/sql-apps/references/deployment-attribution.md) |
 | UI conventions | [App design](./skills/sql-apps/references/app-design.md) |
@@ -64,7 +58,11 @@ The assistant helps shape the requirements, then builds and tests the app. Try s
 
 ## Preview and important limits
 
-SQL Apps is **preview guidance**, currently at version **0.3.0**. Packaging exists for five assistant families. The new starter has build/unit and isolated local API/restart validation with synthetic test identities; real-provider sign-in and Azure deployment remain unverified. The earlier supervised VS Code application run used 0.2.1, not this changed payload. Broader host evaluation and copied installation/update remain unverified. Check the [verification status](./docs/reference/releasing.md#verification-status), [starter evidence](./docs/reference/releasing.md#starter-baseline-010), and [historical local proof](./docs/reference/releasing.md#recorded-local-candidate-proof) before relying on a host or deployment path.
+SQL Apps is in **preview**, currently at version **0.3.0**. Installation packages are available for five assistant families, but they have not all been tested end to end. The starter passes build and local tests; real sign-in and Azure deployment still need verification. Earlier hands-on VS Code testing used version 0.2.1, not this version. See the [verification status](./docs/reference/releasing.md#verification-status), [starter test results](./docs/reference/releasing.md#starter-baseline-010), and [earlier hands-on results](./docs/reference/releasing.md#recorded-local-candidate-proof) for exactly what was tested.
+
+> **Local database setup:** The Azure SQL Database container for local development is in **Private Preview** and is not included with SQL Apps. [Sign up for access](https://aka.ms/sqldbcontainerpreview-signup), then follow the [official getting-started guide](https://microsoft.github.io/azure-sql-database-container/getting-started.html). You can build screens and plan the database while waiting, but saving and loading real data needs a working database and the selected API.
+
+Supported databases are Azure SQL Database, either locally in the preview container or in Azure—not on-premises SQL Server. If local access is unavailable, the assistant won't switch to Azure without your approval.
 
 Review generated code, access controls, migrations, and recovery before using real or regulated data. Azure deployment requires its own review and approval; free allowances do not guarantee zero cost, and budget alerts do not stop spending. You are responsible for charges. Tools, AI providers, local database containers, and Azure services have separate availability, licensing, and pricing terms. No service-level agreement or Microsoft support commitment is provided; Azure support follows your Azure agreement. See [Support](./SUPPORT.md).
 
