@@ -51,7 +51,7 @@ test('every specialist receives explicit architecture and cost constraints', () 
   assert.match(policy, /carry current cost, topology, security, and acceptance choices into specialist handoffs/);
 });
 
-test('DAB is mandatory and custom servers are not the default data API', () => {
+test('DAB is default, explicit Functions is allowed, and Express is not the default data API', () => {
   assert.match(skill, /DAB application data APIs/);
   assert.match(constitution, /Node\.js\/Express only for necessary authentication, orchestration, or domain behavior/);
   assert.match(skill, /azuresql-db-dab/);
@@ -62,6 +62,9 @@ test('DAB is mandatory and custom servers are not the default data API', () => {
   assert.match(constitution, /transaction-safe stored procedures/);
   assert.match(constitution, /ordinary table writes cannot bypass the invariant/);
   assert.match(policy, /no permission path that bypasses them/);
+  assert.match(constitution, /DAB is the default runtime, not a requirement for the explicit Functions profile/);
+  assert.match(skill, /static-web-apps\/functions/);
+  assert.match(policy, /Static Web Apps\/Functions/);
 });
 
 test('missing SQL/DAB guidance allows scaffold work without false persistence', () => {
@@ -156,13 +159,13 @@ test('unapproved cloud writes stop without ending safe investigation', () => {
   for (const [name, text] of Object.entries({ skill, constitution, deployment })) {
     assert.match(text, /unapproved cloud writes/i, `${name}: missing write gate`);
   }
-  assert.match(skill, /Do not silently remove authorization, SQL invariants, or DAB/);
-  assert.match(constitution, /Do not weaken DAB, authorization, or SQL invariants/);
+  assert.match(skill, /Do not silently remove authorization, SQL invariants, or the selected API/);
+  assert.match(constitution, /Do not weaken authorization or SQL invariants/);
   assert.match(policy, /obtain explicit approval for resource writes, spend or access changes, and destructive actions/);
 });
 
 test('acceptance requires observed DAB requests, direct authorization, and SQL enforcement', () => {
-  assert.match(skill, /actual request route and corresponding DAB runtime request\/log evidence/);
+  assert.match(skill, /actual request route and corresponding API runtime request\/log evidence/);
   assert.match(skill, /DAB directly as well as through the UI\/custom server/);
   assert.match(skill, /denied operation and an allowed positive control/);
   assert.match(skill, /forged-role/);
@@ -357,7 +360,7 @@ test('starter is wired into initial scoping and proves a thin slice before expan
   }
   assert.match(starterReadme, /There is no synthetic login fallback/);
   assert.match(starterReadme, /wall time a labor measurement/);
-  assert.match(recipe, /Unverified\. Not permission to provision/);
+  assert.match(recipe, /End-to-end cloud acceptance: incomplete\. Not permission to provision/);
 });
 
 test('starter pins its workspace and container baseline without anonymous data access', async () => {

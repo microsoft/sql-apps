@@ -20,7 +20,7 @@ Preserve customer tags. Compare tag keys case-insensitively so a differently cas
 
 ## Resource naming
 
-The default resource-name suffix is `sqlapps`, using the same compact product token as the `sqlapps-version` tag. Append it as the final component of newly generated resource names, using the owning Azure workflow's naming and uniqueness helpers. Place any environment and uniqueness token before the final `sqlapps` suffix. Use `-sqlapps` when hyphens are allowed; append `sqlapps` directly for alphanumeric-only names.
+The default resource-name suffix is `sqlapps`, using the same compact product token as the `sqlapps-version` tag. Append it as the final component of newly generated resource names, using the bundled Bicep recipe's stable workload/resource-group naming or the existing app's approved naming rules. Place any environment and uniqueness token before the final `sqlapps` suffix. Use `-sqlapps` when hyphens are allowed; append `sqlapps` directly for alphanumeric-only names.
 
 | Resource, if required by the approved topology | Example name |
 | --- | --- |
@@ -39,7 +39,7 @@ Record the adopted `sqlapps-version`, final `sqlapps` suffix naming pattern, and
 
 Use the selected workflow's existing infrastructure configuration, such as Bicep or Terraform tag maps and naming inputs. Do not invent Rayfin configuration fields, a new deployment engine, or a SQL Apps state file. Local-only delivery requires no Azure sign-in, provisioning, or attribution checks against Azure.
 
-During an already requested and approved deployment, read back actual resource tags and names using the owning Azure workflow's authorized tools. Compare each in-scope resource with the brief, including documented tag support and naming exceptions; a tagged parent or template declaration is not proof of child-resource metadata. Report mismatches as failed attribution validation and approved exceptions as exceptions. Do not rename/delete resources, broaden permissions, or enable paid services to make a check pass.
+During an already requested and approved deployment, read back actual resource tags and names using authorized Azure CLI/API tools. Compare each in-scope resource with the brief, including documented tag support and naming exceptions; a tagged parent or template declaration is not proof of child-resource metadata. Report mismatches as failed attribution validation and approved exceptions as exceptions. Do not rename/delete resources, broaden permissions, or enable paid services to make a check pass.
 
 ## Privacy and measurement limits
 

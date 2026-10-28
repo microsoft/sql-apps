@@ -3,6 +3,8 @@
 # Not executable configuration or a claim of released Rayfin mssql support.
 # Keep DAB as the real application data API; this is not its runtime config.
 # Carry app-brief.md intent/costPreference through any future migration.
+# Hosting/API selection lives in deployment.json, not invented Rayfin fields.
+# Use rayfin.functions.yml for the explicit Static Web Apps/Functions profile.
 services:
   auth:
     enabled: false

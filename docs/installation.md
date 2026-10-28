@@ -10,7 +10,7 @@ SQL Apps targets only the local Azure SQL Database container or Azure SQL Databa
 
 ## Pick the shortest setup path
 
-Let the assistant inspect installed capabilities and reuse project decisions first. Ask one grouped question only for missing routing choices: local or cloud, then the relevant database option. Local is the default when unspecified. If cloud is selected, establish whether an Azure subscription already exists and follow installed Azure guidance; subscription ownership alone never selects cloud or authorizes sign-in, provisioning, or spend. Defer detailed installation and deployment questions until needed.
+Let the assistant inspect installed capabilities and reuse project decisions first. Ask one grouped question only for missing routing choices: local or cloud, then the relevant database option. Local is the default when unspecified. If cloud is selected, establish whether an Azure subscription already exists and follow the bundled deployment recipe; subscription ownership alone never selects cloud or authorizes sign-in, provisioning, or spend. Defer detailed installation and deployment questions until needed.
 
 For local work, use the Azure SQL container. When unavailable, offer preview signup or explicitly selected Azure SQL Database cloud access; if neither is ready, continue useful scaffolding and keep persistence unverified. Setup/configuration changes still need scoped approval. See the [bundled routing guide](../skills/sql-apps/references/prerequisites.md#choose-the-shortest-setup-path).
 
@@ -131,14 +131,14 @@ Install companions separately using their supported host setup. SQL Apps does no
 | SQL expertise and local engine | [Microsoft SQL plugins](https://github.com/microsoft/microsoft-sql#choose-a-plugin): `microsoft-sql` for general coding hosts, or `microsoft-sql-vscode` for the MSSQL extension |
 | Application data APIs (required for a complete database-backed workflow) | Discover installed Microsoft SQL DAB guidance (`dab-rest-and-graphql` or `azuresql-db-dab`) or the MSSQL extension's DAB tool (for example, `mssql_dab`). The VS Code SQL bundle intentionally omits overlapping DAB skills because the extension supplies tools; verify that the tool is actually available |
 | Container guidance with the VS Code SQL bundle | Add `microsoft-azuresqldb-container` when needed; it is already included in the broad `microsoft-sql` bundle |
-| Azure work | [Azure Skills](https://github.com/microsoft/azure-skills), following your host's setup and authentication guidance |
+| Azure deployment | Azure CLI with Bicep, Docker, and an approved registry for the [bundled Container Apps recipe](../skills/sql-apps/templates/starter/deployment.md); no extra cloud skills plugin |
 | Build and verification | Node.js/npm supported by the app tooling, specialist-documented SQL container prerequisites, and host browser/SQL tools |
 
 For SQL/DAB setup and private-preview local-engine access, use the [bundled prerequisite guide](../skills/sql-apps/references/prerequisites.md). The listed skill/tool names are discovery examples, not a guarantee of installation.
 
 If DAB or the selected Azure SQL target is unavailable, give the user its supported setup path. Useful UI, schema, and scaffolding work can continue, but mark persistence and end-to-end checks incomplete. Do not substitute another database, mocked persistence, or direct Express-to-SQL CRUD.
 
-The default `poc` outcome is free-first, not a guarantee of zero Azure spend. Local-only has no Azure CLI or subscription requirement and does not enter cloud onboarding. A requested free Azure topology must be checked end-to-end using current specialist guidance; a missing free capability is not permission for a paid fallback. Requested cloud work still requires the specialist's prerequisites and approvals. Installing the plugin proves none of those runtime outcomes.
+The default `poc` outcome is free-first, not a guarantee of zero Azure spend. Local-only has no Azure CLI or subscription requirement and does not enter cloud onboarding. The default cloud recipe uses Container Apps Consumption grants and Azure SQL free-limit AutoPause; grants are not a hard spending cap. A requested free Azure topology must be checked end-to-end using current service documentation and SQL guidance; a missing free capability is not permission for a paid fallback. Requested cloud work still requires explicit resource, access, and spend approvals. Installing the plugin proves none of those runtime outcomes.
 
 ## Quick setup when a capability is missing
 

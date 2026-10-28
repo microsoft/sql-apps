@@ -23,7 +23,7 @@ try {
   await page.goto(env.APP_ORIGIN);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   try {
-    await page.getByText('Loaded from SQL through DAB.', { exact: true }).waitFor();
+    await page.getByText('Loaded from SQL.', { exact: true }).waitFor();
   } catch (error) {
     await page.screenshot({ path: resolve(app, '.local/browser-signin-failure.png'), fullPage: true });
     const alert = await page.getByRole('alert').allTextContents();

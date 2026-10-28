@@ -1,0 +1,4 @@
+FROM mcr.microsoft.com/azure-databases/data-api-builder@sha256:d07e3e1ce53bdf84d3a4a0a4ce12e44f0b902e7316c782a3d682fbe074509c0b
+COPY packages/data/dab-config.json /App/dab-config.json
+ENV ASPNETCORE_URLS=http://+:5000
+EXPOSE 5000

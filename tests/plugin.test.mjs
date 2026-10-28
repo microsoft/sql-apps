@@ -147,7 +147,7 @@ test('release and installation guidance verify payloads and require discovered D
   assert.ok(existsSync(path.join(root, 'scripts', 'verify-release.mjs')));
 });
 
-test('missing SQL, Azure Skills, or Azure CLI has actionable setup guidance', () => {
+test('missing SQL or Azure CLI has actionable setup guidance', () => {
   const installation = read(path.join('docs', 'installation.md'));
   const prerequisites = read(path.join('skills', 'sql-apps', 'references', 'prerequisites.md'));
   const skill = read(skillPath);
@@ -161,7 +161,7 @@ test('missing SQL, Azure Skills, or Azure CLI has actionable setup guidance', ()
   for (const requirement of [
     'microsoft-sql@microsoft-sql',
     'microsoft-sql-vscode',
-    'Azure MCP extension',
+    'az bicep version',
     'winget install --exact --id Microsoft.AzureCLI',
     'Azure Cloud Shell',
     'az version',

@@ -8,6 +8,11 @@ Build SQL-backed web applications with the coding assistant you already use. Des
 
 SQL Apps is a lightweight assistant plugin—not an application platform. It guides your assistant to build an independent app with TypeScript, React, Data API builder (DAB), and Azure SQL Database. No SQL Apps account, hosted service, or runtime is required.
 
+DAB is the default, not a hard requirement. The explicit Static Web Apps Free
+profile uses managed Azure Functions directly against Azure SQL. See the
+[hosting profiles](./skills/sql-apps/templates/starter/hosting.md) for that integration
+and the App Service F1/DAB alternative. Both remain live-unverified.
+
 > **Local database notice:** The preferred Azure SQL Database container for local development is in **Private Preview** and is not bundled with SQL Apps. [Sign up for preview access](https://aka.ms/sqldbcontainerpreview-signup) to get the registry credentials needed to pull it; see the [official getting-started guide](https://microsoft.github.io/azure-sql-database-container/getting-started.html). Scaffolding can proceed while setup is pending; persistence needs a real SQL engine and DAB.
 
 The database targets are the local Azure SQL Database container or Azure SQL Database in the cloud, not on-premises SQL Server fallbacks. If the container is unavailable, use preview signup or explicitly choose the cloud path; cloud access and resource changes require their own approvals.
@@ -15,7 +20,7 @@ The database targets are the local Azure SQL Database container or Azure SQL Dat
 ## What you get
 
 - **A complete app, not a mockup.** Build useful screens and workflows backed by real SQL data and business rules.
-- **A clear path from local to cloud.** Start with local development; Azure provisioning is optional.
+- **A concrete path from local to cloud.** Start locally; optional Azure deployment uses bundled Container Apps/SQL Bicep and web/DAB container recipes, without another cloud skills plugin. Cloud acceptance remains unverified.
 - **An app you own.** Keep the source, migrations, tests, configuration, and run instructions.
 - **Less repeated setup.** A [copyable application starter](./skills/sql-apps/templates/starter/README.md) assembles pinned workspaces, external sign-in, DAB/SQL, local startup, and acceptance checks.
 
@@ -50,6 +55,7 @@ The assistant helps shape the requirements, then builds and tests the app. Try s
 | Missing plugins and local setup options | [Quick setup](./docs/installation.md#quick-setup-when-a-capability-is-missing) |
 | Supported architecture and project rules | [Project constitution](./skills/sql-apps/references/constitution.md) |
 | Cloud readiness, deployment approvals, and validation | [Deployment guidance](./skills/sql-apps/references/deployment.md) |
+| Concrete Container Apps and SQL deployment steps | [Bicep/container recipe](./skills/sql-apps/templates/starter/deployment.md) |
 | Resource naming and attribution tags | [Deployment attribution](./skills/sql-apps/references/deployment-attribution.md) |
 | UI conventions | [App design](./skills/sql-apps/references/app-design.md) |
 | Future Fabric migration boundaries | [Rayfin alignment](./skills/sql-apps/references/rayfin-alignment.md) |

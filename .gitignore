@@ -10,6 +10,7 @@ coverage/
 .nyc_output/
 test-results/
 playwright-report/
+.deployment/
 /tests/.release-verification-*/
 
 # Local secrets (keep reusable examples publishable)

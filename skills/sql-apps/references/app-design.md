@@ -12,7 +12,7 @@ Record a short visual direction in the app brief: intended audience, tone, typog
 - Tailwind CSS v4 with semantic CSS custom-property tokens in `packages/frontend/src/global.css`. Define colors, typography, spacing, radii, and focus styles there before styling screens.
 - Radix primitives for complex interactive controls such as dialogs, menus, and tabs; ordinary semantic HTML for simple controls. Use only the primitives needed by the app.
 - Lucide React for UI icons. Decorative icons are hidden from assistive technology; icon-only actions have accessible names.
-- A small `cn()` helper using `clsx` and `tailwind-merge` for conditional classes. Verify token-based size/color utilities do not conflict when merged.
+- Add `clsx` and `tailwind-merge` only when conditional class merging is needed. Keep plain class strings otherwise; when merging, verify token-based size/color utilities do not conflict.
 - Vitest and React Testing Library for relevant UI behavior. Use the host's existing browser tooling for real workflow checks; do not add a separate runner merely to match a template.
 
 Select current mutually compatible stable versions through normal package tooling, not copied alpha versions from a Rayfin template. Do not import `@microsoft/rayfin-*` or copy Rayfin's build hooks. These libraries are generated-app dependencies, not dependencies of this plugin. Preserve an existing app's tooling unless a change is explicitly in scope.

@@ -4,6 +4,11 @@ Baseline **0.1.0**. Copy this directory into an empty application directory, inc
 dotfiles and the lockfile. Do not execute it inside the installed plugin. This is
 ordinary app-owned source, not a SQL Apps runtime or a complete business application.
 
+The default remains Container Apps/DAB. [Hosting profiles](./hosting.md) add explicit
+App Service F1/DAB and Static Web Apps Free/managed Functions integrations, selected
+in `deployment.json`. DAB is optional only for the Functions profile. Host selection
+does not deploy, migrate data, or grant access; live evidence is tracked separately.
+
 The sample is deliberately small: sign in, create your own uniquely labelled item,
 and reload it from SQL. A SQL unique constraint rejects concurrent duplicates.
 Replace this sample with the first real vertical workflow before expanding scope.
@@ -17,8 +22,9 @@ Replace this sample with the first real vertical workflow before expanding scope
   catalog collation, a separate least-privilege API login, and a persisted volume.
 - One foreground startup command with SQL/DAB/web readiness and supervised shutdown.
 - Unit checks and a real-API acceptance command, including a full stack restart.
+- Separate web/DAB container build recipes and [Container Apps/SQL Bicep](./infra/main.bicep) with an explicit operator bootstrap; cloud acceptance remains unverified.
 
-The server is only static hosting/routing: it has no SQL driver, CRUD implementation,
+In DAB profiles, the server is only static hosting/routing: it has no SQL driver, CRUD implementation,
 or authority to grant roles. DAB validates tokens; SQL derives ownership from the
 validated `oid` session context. Only the read view and create procedure are exposed.
 
@@ -65,6 +71,9 @@ npm run local:start
 Open the configured `APP_ORIGIN`. Sign in, save an item, and reload. The same label
 must be rejected for the same owner but allowed for another owner. The UI shows the
 latest 100 records; extend pagination when the real workflow requires it.
+Expired or API-rejected sessions return to Sign in rather than retrying stale
+tokens. A denied sign-in callback reports the error and leaves Sign in available
+for another attempt. The starter does not silently renew tokens.
 
 Choose unused `APP_PORT`/`DAB_PORT` and matching `APP_ORIGIN`/`DAB_URL` before startup.
 Register the exact origin's `/` redirect URI. SQL has no host-published port. Each
@@ -120,9 +129,10 @@ second comparable measured build.
 
 ## Cloud boundary
 
-Read [deployment.md](./deployment.md) before selecting hosting. Nothing here creates
-Azure resources or proves a free host supports the full topology. `npm start` serves
-the compiled UI using runtime identity/routing settings; the local Compose path is
-not the cloud deployment recipe. A public deployment requires TLS ingress, reviewed
-identity and SQL access, supervised DAB/web processes, migration execution, cost
-review and separate acceptance. No exercised cloud recipe is bundled.
+Read [deployment.md](./deployment.md) before deployment. The concrete default is
+public web and internal HTTPS DAB on Container Apps Consumption plus Azure SQL
+free-offer AutoPause. Container Apps monthly grants are not a hard spending cap.
+No extra cloud skills plugin is needed. The local Compose path is not the cloud
+recipe. A public deployment requires explicit resource/spend/access approval,
+published immutable images, external identity configuration, SQL connectivity and
+operator bootstrap, and separate acceptance. No exercised cloud recipe is bundled.

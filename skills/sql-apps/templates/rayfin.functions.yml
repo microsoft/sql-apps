@@ -1,0 +1,35 @@
+# Proposed Rayfin migration intent only, not executable hosting configuration.
+# Copy to rayfin/rayfin.yml only for deployment.json static-web-apps/functions.
+# SQL migrations remain in packages/data; the Functions API owns database access.
+# No claim that a released Rayfin runtime supports this MSSQL/Functions contract.
+services:
+  auth:
+    enabled: false
+    password:
+      enabled: false
+    allowedRedirectUris: []
+    fabric:
+      enabled: false
+  data:
+    enabled: false
+    dialect: mssql
+    path: packages/data
+    buildCommand: npm run build
+  realtime:
+    enabled: false
+    backplane: none
+  storage:
+    enabled: false
+  functions:
+    enabled: true
+    path: packages/functions
+    buildCommand: node --check src/index.mjs
+    durable:
+      enabled: false
+  staticHosting:
+    enabled: true
+    path: packages/frontend
+    folder: dist
+    buildCommand: npm run build
+    indexDocument: index.html
+    assetAccess: public

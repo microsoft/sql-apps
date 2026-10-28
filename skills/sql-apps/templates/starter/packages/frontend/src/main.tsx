@@ -3,8 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { Plus, RefreshCw } from 'lucide-react';
 import type { UserManager } from 'oidc-client-ts';
 import type { Item } from '@app/shared';
-import { loadIdentity } from './auth';
-import { requestItems } from './api';
+import { completeSignin, loadIdentity } from './auth';
+import { AuthenticationRequiredError, requestItems } from './api';
 import './global.css';
 
 export function App() {
@@ -16,18 +16,34 @@ export function App() {
   const [error, setError] = useState('');
   const [status, setStatus] = useState('Connecting to your identity provider...');
   const [theme, setTheme] = useState('system');
-  const report = (error: unknown) => setError(error instanceof Error ? error.message : 'An unexpected error occurred.');
+  const report = (error: unknown) => {
+    if (error instanceof AuthenticationRequiredError) {
+      setToken(''); setItems([]);
+      setStatus('Sign in to save and reload your own items.');
+    }
+    setError(error instanceof Error ? error.message : 'An unexpected error occurred.');
+  };
+
+  useEffect(() => {
+    if (!identity) return;
+    return identity.events.addAccessTokenExpired(() => {
+      setToken(''); setItems([]);
+      setStatus('Sign in to save and reload your own items.');
+      setError('Your session expired. Sign in again.');
+    });
+  }, [identity]);
 
   useEffect(() => {
     void (async () => {
       try {
         const manager = await loadIdentity();
         setIdentity(manager);
+        await completeSignin(manager);
         const user = await manager.getUser();
         if (user && !user.expired) {
           setToken(user.access_token);
           setItems(await requestItems(user.access_token));
-          setStatus('Loaded from SQL through DAB.');
+          setStatus('Loaded from SQL.');
         } else {
           setStatus('Sign in to save and reload your own items.');
         }
@@ -40,7 +56,7 @@ export function App() {
     setBusy(true); setError('');
     try {
       setItems(await requestItems(token));
-      setStatus('Reloaded from SQL through DAB.');
+      setStatus('Reloaded from SQL.');
     } catch (error) { report(error); }
     finally { setBusy(false); }
   }
@@ -61,7 +77,7 @@ export function App() {
     <header>
       <p className="eyebrow">SQL APPS / FIRST VERTICAL SLICE</p>
       <h1>Your work, persisted.</h1>
-      <p>A small foundation: external sign-in, a protected DAB API, and SQL-enforced rules.</p>
+      <p>A small foundation: external sign-in, a protected API, and SQL-enforced rules.</p>
       <label>Appearance <select value={theme} onChange={event => setTheme(event.target.value)}>
         <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
       </select></label>

@@ -1,0 +1,14 @@
+.git
+.env
+.env.*
+.local
+.deployment
+**/node_modules
+**/dist
+**/coverage
+**/*.log
+**/*.pem
+**/*.key
+tests
+infra
+rayfin

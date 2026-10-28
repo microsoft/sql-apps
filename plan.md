@@ -2,9 +2,9 @@
 
 ## 1. The product in one sentence
 
-**SQL Apps configures an existing coding assistant to build free-first TypeScript proofs of concept on Azure SQL Database with Data API builder (DAB), routing specialist work to existing plugins.**
+**SQL Apps configures an existing coding assistant to build free-first TypeScript proofs of concept on Azure SQL Database with DAB by default, or explicit managed Functions, routing specialist work to existing plugins.**
 
-The user describes an app. SQL Apps supplies the stack constitution and keeps the work aligned with it. The assistant builds the application using its ordinary coding tools, Microsoft SQL guidance, and Azure Skills when needed.
+The user describes an app. SQL Apps supplies the stack constitution and keeps the work aligned with it. The assistant builds the application using its ordinary coding tools, Microsoft SQL guidance, and a bundled Container Apps/Bicep deployment recipe.
 
 SQL Apps is not an application runtime, scaffolding framework, cloud control plane, or agent orchestration engine. It is a small distribution of instructions and routing guidance. Generated applications do not depend on SQL Apps to run.
 
@@ -33,7 +33,13 @@ Keep the valuable parts: clarify consequential requirements, build real workflow
 
 ## 3. The constitution
 
-The intentionally narrow profile is TypeScript and React/Vite, DAB over Azure SQL, and SQL-enforced business rules. Database targets are the local Azure SQL Database container or Azure SQL Database cloud, never an on-premises fallback; follow the [prerequisite routing](./skills/sql-apps/references/prerequisites.md). Custom server code is conditional; Azure provisioning is optional. If SQL/DAB is missing, users may still build UI, schema, and scaffolding, but persistence remains incomplete.
+The profile is TypeScript and React/Vite, Azure SQL, and SQL-enforced business rules. DAB is the default API; explicit Static Web Apps Free/managed Functions can connect directly to SQL with equivalent identity/ownership controls. Database targets remain the local Azure SQL Database container or Azure SQL Database cloud, never an on-premises fallback; follow the [prerequisite routing](./skills/sql-apps/references/prerequisites.md). Missing SQL or the selected API leaves persistence incomplete, not UI/schema work.
+
+The [hosting profiles](./skills/sql-apps/templates/starter/hosting.md) record the
+Container Apps/DAB, F1/DAB and Static Web Apps/Functions integrations. App-owned
+`deployment.json` selects one implemented pair; the corresponding Rayfin intent
+remains non-executing metadata. Local compilation/smoke checks do not certify a
+cloud host. The release guide records verification and remaining live blockers.
 
 The [constitution](./skills/sql-apps/references/constitution.md) owns current stack, security, and cost policy. [Deployment guidance](./skills/sql-apps/references/deployment.md) owns cloud review and evidence; [attribution guidance](./skills/sql-apps/references/deployment-attribution.md) owns resource tags and naming. These policies are guardrails, not a provisioning checklist or runtime.
 
@@ -45,25 +51,26 @@ The assistant is the orchestrator. A skill supplies guidance; a tool performs an
 | --- | --- | --- |
 | Editing, implementation, task tracking, delegation, test execution | Existing coding assistant | App intent and constitution |
 | DAB APIs/authorization, schema, T-SQL, migrations, SQL authentication, local engine, SQL diagnostics | [Microsoft SQL plugins](https://github.com/microsoft/microsoft-sql) | Relevant app rules and required DAB/SQL boundary |
-| Azure preparation, resource planning, costs, deployment, identity configuration, diagnostics | [Azure Skills](https://github.com/microsoft/azure-skills) | Selected service boundary and requested outcome |
-| App-specific integration and acceptance | The coordinating assistant | Ensure UI requests traverse DAB, SQL enforces rules, and actual resource settings match the approved cost posture |
+| Azure resource planning, costs, deployment, identity configuration, diagnostics | Existing assistant with Bicep, Azure CLI/API tools, and current first-party documentation | Concrete Container Apps/SQL recipe, selected service boundary, and requested outcome |
+| App-specific integration and acceptance | The coordinating assistant | Ensure UI requests traverse the selected API, SQL enforces rules, and actual resource settings match the approved cost posture |
 | Durable product context | Ordinary application repository | One short brief and project instructions |
 
 ### Microsoft SQL
 
 Use one suitable SQL bundle rather than installing every overlapping plugin. Upstream recommends `microsoft-sql` for general coding agents or `microsoft-sql-vscode` for the MSSQL extension experience. Container guidance is already included in the broad bundle; the VS Code bundle can be paired with the container plugin when needed.
 
-Examples of routes are `dab-rest-and-graphql`, `azuresql-db-dab`, `design-azure-sql-schema`, `schema-migrations-safely`, and `azuresql-db-container`. Resolve actual installed capabilities before invoking them. Missing DAB blocks database integration, not useful UI/schema/scaffolding work; never substitute Express CRUD. Follow current prerequisites and limitations; a remembered skill name is not proof of availability.
+Examples of routes are `dab-rest-and-graphql`, `azuresql-db-dab`, `design-azure-sql-schema`, `schema-migrations-safely`, and `azuresql-db-container`. Resolve actual installed capabilities before invoking them. Missing DAB blocks integration only for DAB profiles, not explicit Functions or useful UI/schema/scaffolding work; never substitute Express CRUD. Follow current prerequisites and limitations; a remembered skill name is not proof of availability.
 
-### Azure Skills
+### Direct Azure deployment
 
-Do not wrap every Azure skill in a SQL Apps skill. Choose the applicable workflow and let it own its lifecycle:
+Use the [bundled Container Apps recipe](./skills/sql-apps/templates/starter/deployment.md) rather than another plugin's onboarding pipeline:
 
-- For an explicitly selected azd workflow, use `azure-prepare`, then `azure-validate`, then `azure-deploy`, satisfying their current prerequisites.
-- For non-azd onboarding, `azure-app-onboard` owns its complete pipeline, including its own deployment path. Do not invoke it as a small planning helper or mix its state with the azd pipeline.
-- For a service-specific issue, route directly to the relevant installed guidance, such as `azure-diagnostics`, `azure-storage`, or `entra-app-registration`.
+- Default new PoCs to Container Apps Consumption for public web/internal HTTPS DAB and Azure SQL's free offer with quota-stop AutoPause.
+- Build and parameterize ordinary app-owned Bicep and images. No separate cloud skills plugin or SQL Apps execution runtime is required.
+- Use current service documentation and available CLI/API tools for diagnostics, quotas, identity, and settings readback; use Microsoft SQL guidance for SQL-specific work.
+- Preserve existing approved deployment artifacts. Cloud resource, access, and spend changes require explicit approval; Container Apps grants are not a hard spending cap.
 
-Do not invoke cloud onboarding during a local-only build: its workflow includes Azure account context and deployment gates. Do not claim SQL Apps can skip an upstream skill's mandatory steps.
+Do not invoke cloud onboarding during a local-only build. Local packaging/compilation needs no Azure account context. The concrete recipe's cloud acceptance remains unverified until separately approved deployment checks pass.
 
 ### Rayfin: alignment and eventual migration, not a competing runtime
 
@@ -111,7 +118,7 @@ Skills can deliver the behavior. The plugin exists to make that behavior easy to
 
 ## 6. Routing behavior
 
-The [routing skill](./skills/sql-apps/SKILL.md) is the source of truth for choosing installed SQL/Azure specialists, carrying accepted decisions into handoffs, and continuing safe work when capabilities are missing. Ordinary implementation stays with the coding assistant; SQL Apps adds no orchestration runtime.
+The [routing skill](./skills/sql-apps/SKILL.md) is the source of truth for choosing SQL guidance, using the bundled cloud recipe, carrying accepted decisions into handoffs, and continuing safe work when capabilities are missing. Implementation and cloud deployment stay with the coding assistant; SQL Apps adds no orchestration runtime.
 
 ## 7. A complete user journey
 
@@ -131,7 +138,7 @@ Implement only the package above. Evaluate:
 2. A new conversation adds a rule without losing the constitution or existing behavior.
 3. Missing SQL/DAB prerequisites offer supported setup guidance and allow useful UI/schema/scaffolding work; persistence remains incomplete until real prerequisites are available.
 4. Local-only delivery does not enter cloud onboarding or provision resources.
-5. An authorized Azure deployment follows one upstream workflow, preserves scoped approvals and passes deployed architecture/cost acceptance. Evidence gaps get a bounded resolution path; unapproved writes stop without automatic upgrades. Strict zero-spend choices remain strict.
+5. An authorized Azure deployment follows the concrete Bicep recipe, preserves scoped approvals and passes deployed architecture/cost acceptance. Evidence gaps get a bounded resolution path; unapproved writes stop without automatic upgrades. Strict zero-spend choices remain strict.
 
 Before implementing any additional SQL Apps component, ask:
 
@@ -146,9 +153,9 @@ The product earns its existence only if this small package makes the chosen stac
 Reviewed against the published sources on 2026-10-21. Upstream names and workflows can change; compatibility must be checked with the installed versions.
 
 - [Microsoft SQL catalog and bundle overlap guidance](https://github.com/microsoft/microsoft-sql#choose-a-plugin)
-- [Azure Skills capabilities and installation](https://github.com/microsoft/azure-skills)
-- [Azure onboarding workflow](https://github.com/microsoft/azure-skills/blob/main/skills/azure-app-onboard/SKILL.md)
-- [Azure preparation scope and prerequisites](https://github.com/microsoft/azure-skills/blob/main/skills/azure-prepare/SKILL.md)
+- [Container Apps billing and Consumption grants](https://learn.microsoft.com/azure/container-apps/billing)
+- [Azure SQL free offer](https://learn.microsoft.com/azure/azure-sql/database/free-tier)
+- [Bicep deployment and what-if](https://learn.microsoft.com/azure/azure-resource-manager/bicep/deploy-what-if)
 - [Rayfin platform and local-development scope](https://github.com/microsoft/rayfin)
 - [Rayfin getting-started routing pattern](https://github.com/microsoft/rayfin/blob/main/skills/rayfin-getting-started/SKILL.md)
 - [Mission Control orchestration guidance](https://github.blog/ai-and-ml/github-copilot/how-to-orchestrate-agents-using-mission-control/)

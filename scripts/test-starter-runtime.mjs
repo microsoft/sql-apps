@@ -133,18 +133,30 @@ let child;
 try {
   const browserCheck = process.argv.indexOf('--browser-check');
   const browser = process.argv.includes('--browser') || browserCheck !== -1;
-  child = fork(resolve(appRoot, browser ? 'scripts/local.mjs' : 'scripts/acceptance.mjs'), browser ? ['start'] : [], {
+  const imageCheck = process.argv.includes('--image-check');
+  const interactive = browser || imageCheck;
+  child = fork(resolve(appRoot, interactive ? 'scripts/local.mjs' : 'scripts/acceptance.mjs'), interactive ? ['start'] : [], {
     cwd: appRoot, env: { ...env, ACCEPTANCE_TOKEN_A: token(users[0]), ACCEPTANCE_TOKEN_B: token(users[1]) },
     stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
   });
-  if (browser) {
+  if (interactive) {
     await Promise.race([once(child, 'message'), once(child, 'exit').then(() => { throw new Error('Browser stack startup failed.'); })]);
-    console.log(`BROWSER TEST ORIGIN ${origin}; test issuer ${issuer}. Ignore the test certificate only in this browser context.`);
+    if (browser) console.log(`BROWSER TEST ORIGIN ${origin}; test issuer ${issuer}. Ignore the test certificate only in this browser context.`);
     const stop = () => { if (child.connected) child.send('stop'); };
     process.on('SIGINT', stop);
     process.on('SIGTERM', stop);
     process.on('message', message => { if (message === 'stop') stop(); });
-    if (browserCheck !== -1) {
+    if (imageCheck) {
+      const check = spawn(process.execPath, [fileURLToPath(new URL('./test-deployment-images.mjs', import.meta.url)), appRoot], {
+        env: { ...env, ACCEPTANCE_TOKEN_A: token(users[0]), ACCEPTANCE_TOKEN_B: token(users[1]) }, stdio: 'inherit',
+      });
+      const [code] = await once(check, 'exit');
+      const exited = once(child, 'exit');
+      stop();
+      const [stackCode] = await exited;
+      assert.equal(stackCode, 0, 'Image test fixture must shut down cleanly.');
+      assert.equal(code, 0, 'Deployment image acceptance must succeed.');
+    } else if (browserCheck !== -1) {
       if (!process.argv[browserCheck + 1]) throw new Error('--browser-check requires an existing Playwright module entry.');
       const check = spawn(process.execPath, [fileURLToPath(new URL('./test-starter-browser.mjs', import.meta.url)),
         appRoot, process.argv[browserCheck + 1]], { stdio: 'inherit' });

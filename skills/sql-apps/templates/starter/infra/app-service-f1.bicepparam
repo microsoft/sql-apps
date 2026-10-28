@@ -1,0 +1,15 @@
+using './app-service-f1.bicep'
+
+param workload = 'demo'
+param location = 'eastus'
+param sqlappsVersion = 'REPLACE_ADOPTED_VERSION'
+// Replace both zero digests with the actual published immutable digests.
+param webImage = 'ghcr.io/REPLACE_OWNER/REPLACE_WEB@sha256:0000000000000000000000000000000000000000000000000000000000000000'
+param dabImage = 'ghcr.io/REPLACE_OWNER/REPLACE_DAB@sha256:0000000000000000000000000000000000000000000000000000000000000000'
+param sqlHost = 'REPLACE_APPROVED_SQL.database.windows.net'
+param sqlDatabaseName = 'REPLACE_APPROVED_DATABASE'
+param authAuthority = 'https://login.microsoftonline.com/REPLACE_TENANT/v2.0'
+param authIssuer = 'https://login.microsoftonline.com/REPLACE_TENANT/v2.0'
+param authAudience = 'REPLACE_API_AUDIENCE'
+param authClientId = 'REPLACE_SPA_CLIENT_ID'
+param authScope = 'openid profile api://REPLACE_API_CLIENT_ID/access_as_user'

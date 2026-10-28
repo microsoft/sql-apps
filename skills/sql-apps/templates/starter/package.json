@@ -12,6 +12,7 @@
     "local:start": "node scripts/local.mjs start",
     "local:stop": "node scripts/local.mjs stop",
     "acceptance": "node scripts/acceptance.mjs",
+    "deployment:prepare": "node scripts/deployment.mjs",
     "start": "node packages/server/server.mjs"
   },
   "devDependencies": {
