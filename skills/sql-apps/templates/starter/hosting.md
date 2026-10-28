@@ -37,7 +37,11 @@ npm run deployment:prepare
 ```
 
 Preparation validates the host/API pair. Static Web Apps stages built assets and
-a standalone API package under `.deployment/static-web-apps`; DAB profiles stage a
+a standalone API package under `.deployment/static-web-apps`. Build first:
+the API entry point is compiled `dist/index.js`, not TypeScript source.
+The staged API contains compiled code, host settings, and package manifests;
+it needs production dependencies but no TypeScript compiler on the host.
+DAB profiles stage a
 selection receipt and use the existing Docker recipes. Preparation refuses an
 existing output directory to avoid mixing revisions. Retain or move that exact
 directory before preparing again; it is not an automatic cleanup/deploy command.

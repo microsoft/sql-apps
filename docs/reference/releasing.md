@@ -323,6 +323,36 @@ Remaining blockers and next actions:
 These are engineering/evidence blockers, not permission to broaden access, spend,
 replace identities, relax SQL free limits or use a test issuer in deployment.
 
+### Backend TypeScript migration (2026-10-28)
+
+The starter web server, shared environment configuration, and Functions API now
+use strict TypeScript with compilation errors blocking output. Root
+`npm run build` compiles the backend before workspace builds. The container runs
+`dist/packages/server/server.js`; managed Functions runs `dist/index.js`.
+Setup/release scripts and Node tests remain JavaScript in this migration.
+
+Verification used fresh isolated copies, not dependencies or compiled output in
+the installed plugin payload:
+
+- The final workspace lock passed `npm ci --ignore-scripts`, a complete
+  TypeScript/Vite build, all 15 Node backend tests and all 10 frontend tests.
+  The server tests include compiled application-root resolution and occupied-port
+  shutdown; existing Functions behavior tests execute compiled JavaScript.
+- All 54 focused repository packaging, hosting, policy and deployment tests passed.
+  Staging rejects an unbuilt Functions API before creating output and includes
+  only compiled API code, host settings and package manifests.
+- The staged API passed standalone `npm ci --omit=dev --ignore-scripts` without a
+  TypeScript compiler. Actual Functions Core Tools loaded the emitted entry point:
+  public config returned 200, and anonymous, forged bearer and forged identity
+  header requests each returned 401.
+- The production web image built successfully using the configured HTTPS package
+  mirror. Its compiled server served health, public config and frontend at
+  0.25 CPU/512 MiB without runtime `node_modules`.
+
+No Azure resources, real SQL connections or real-provider sign-in were exercised.
+The three existing moderate dependency findings and the cloud/SQL acceptance
+gates above remain open; this language migration does not resolve or certify them.
+
 ### Earlier starter baseline evidence
 
 - Clean `npm ci --ignore-scripts`, TypeScript/production build, four server/config and

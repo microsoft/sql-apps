@@ -1,19 +1,26 @@
+import type { HttpRequest } from '@azure/functions';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
-import { authenticationConfiguration, guid } from './config.mjs';
+import type { JWTVerifyGetKey } from 'jose';
+import { authenticationConfiguration, guid } from './config.js';
 
 export class HttpError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
 }
 
-export function createAuthenticator(env, keys) {
+export function createAuthenticator(env: NodeJS.ProcessEnv, keys?: JWTVerifyGetKey) {
   const config = authenticationConfiguration(env);
   const jwks = keys || createRemoteJWKSet(
     new URL(`https://login.microsoftonline.com/${config.tenant}/discovery/v2.0/keys`),
     { timeoutDuration: 5000, cooldownDuration: 30000, cacheMaxAge: 600000 },
   );
-  return async request => {
+  return async (request: HttpRequest): Promise<string> => {
     const header = request.headers.get('authorization');
-    const match = /^Bearer ([^\s,]+)$/i.exec(header || '');
+    const match = /^Bearer\s+([^\s]+)$/i.exec(header || '');
     if (!match) throw new HttpError(401, 'A bearer access token is required.');
     let payload;
     try {

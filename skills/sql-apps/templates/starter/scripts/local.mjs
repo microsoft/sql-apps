@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 
 import { resolve } from 'node:path';
 import { spawnSync, fork } from 'node:child_process';
 import { once } from 'node:events';
-import { configuration, readEnvironment, root } from './config.mjs';
+import { configuration, readEnvironment, root } from '../dist/scripts/config.js';
 
 process.chdir(root);
 const command = process.argv[2];
@@ -129,7 +129,7 @@ if (command === 'init') {
       compose(['up', '-d', 'dab'], { stdio: 'inherit' });
       await healthy(`${config.dab}/`, () => stopRequested);
       if (stopRequested) throw new Error('Startup interrupted by a stop request.');
-      web = fork(resolve(root, 'packages/server/server.mjs'), [], { env, stdio: ['inherit', 'inherit', 'inherit', 'ipc'] });
+      web = fork(resolve(root, 'dist/packages/server/server.js'), [], { env, stdio: ['inherit', 'inherit', 'inherit', 'ipc'] });
       await Promise.race([
         once(web, 'message'),
         once(web, 'exit').then(() => { throw new Error('Packaged web server exited before readiness.'); }),

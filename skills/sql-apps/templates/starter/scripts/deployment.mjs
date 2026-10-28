@@ -1,7 +1,8 @@
-import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { root } from './config.mjs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const root = fileURLToPath(new URL('../', import.meta.url));
 
 export function deploymentProfile(value) {
   const profiles = {
@@ -19,20 +20,22 @@ export function deploymentProfile(value) {
 
 export async function prepareDeployment(directory = root) {
   const profile = deploymentProfile(JSON.parse(await readFile(resolve(directory, 'deployment.json'), 'utf8')));
+  if (profile.api === 'functions') {
+    await access(resolve(directory, 'packages/functions/dist/index.js'));
+  }
   const output = resolve(directory, '.deployment', profile.hosting);
   // Refuse existing output rather than mixing stale code or dependencies with a new artifact.
   await mkdir(resolve(directory, '.deployment'), { recursive: true });
   await mkdir(output);
   if (profile.hosting === 'static-web-apps') {
     await cp(resolve(directory, 'packages/frontend/dist'), resolve(output, 'app'), { recursive: true });
-    await cp(resolve(directory, 'packages/functions'), resolve(output, 'api'), {
-      recursive: true,
-      filter: source => {
-        const name = source.split(/[\\/]/).at(-1);
-        return name !== 'node_modules' && !name.startsWith('local.settings') &&
-          !name.startsWith('.env') && !/\.(pem|key)$/i.test(name);
-      },
-    });
+    await mkdir(resolve(output, 'api'));
+    for (const file of ['dist', 'host.json', 'package.json', 'package-lock.json']) {
+      await cp(resolve(directory, 'packages/functions', file), resolve(output, 'api', file), {
+        recursive: true,
+        filter: source => !/\.(pem|key)$/i.test(source),
+      });
+    }
     await cp(resolve(directory, 'staticwebapp.config.json'), resolve(output, 'app/staticwebapp.config.json'));
   }
   await writeFile(resolve(output, 'profile.json'), `${JSON.stringify(profile, null, 2)}\n`);

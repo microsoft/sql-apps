@@ -34,7 +34,9 @@ test('container artifacts preserve real DAB and exclude local secrets', () => {
   assert.match(web, /npm run build/);
   assert.match(web, /USER node/);
   assert.match(web, /APP_HOST=0\.0\.0\.0/);
-  assert.match(web, /CMD \["node", "packages\/server\/server\.mjs"\]/);
+  assert.match(web, /CMD \["node", "dist\/packages\/server\/server\.js"\]/);
+  assert.match(web, /COPY .*tsconfig\.backend\.json/);
+  assert.match(web, /COPY --from=build --chown=node:node \/app\/dist \.\/dist/);
   assert.ok(dab.includes(baseline.images.dab));
   assert.match(dab, /COPY packages\/data\/dab-config\.json/);
   for (const entry of ['.env', '.env.*', '.local', '**/node_modules', '.git']) {

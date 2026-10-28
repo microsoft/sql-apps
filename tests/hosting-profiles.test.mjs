@@ -27,10 +27,16 @@ test('SWA staging includes built assets and a self-contained API, not local secr
   t.after(() => rm(directory, { recursive: true, force: true }));
   await mkdir(join(directory, 'packages/frontend/dist'), { recursive: true });
   await mkdir(join(directory, 'packages/functions/node_modules'), { recursive: true });
+  await mkdir(join(directory, 'packages/functions/dist'), { recursive: true });
+  await mkdir(join(directory, 'packages/functions/src'), { recursive: true });
   for (const [file, contents] of [
     ['deployment.json', '{"hosting":"static-web-apps","api":"functions"}'],
     ['packages/frontend/dist/index.html', '<h1>Built</h1>'],
     ['packages/functions/host.json', '{"version":"2.0"}'],
+    ['packages/functions/package.json', '{"type":"module","main":"dist/index.js"}'],
+    ['packages/functions/dist/index.js', 'export {};'],
+    ['packages/functions/src/index.ts', 'export {};'],
+    ['packages/functions/tsconfig.json', '{}'],
     ['packages/functions/package-lock.json', '{}'],
     ['packages/functions/local.settings.json', '{"secret":"never"}'],
     ['packages/functions/.env', 'secret=never'],
@@ -42,11 +48,20 @@ test('SWA staging includes built assets and a self-contained API, not local secr
   assert.equal(await readFile(join(output, 'app/index.html'), 'utf8'), '<h1>Built</h1>');
   assert.ok(existsSync(join(output, 'api/host.json')));
   assert.ok(existsSync(join(output, 'api/package-lock.json')));
-  for (const file of ['node_modules', 'local.settings.json', '.env', '.env.production']) {
+  assert.equal(await readFile(join(output, 'api/dist/index.js'), 'utf8'), 'export {};');
+  for (const file of ['src', 'tsconfig.json', 'node_modules', 'local.settings.json', '.env', '.env.production']) {
     assert.ok(!existsSync(join(output, 'api', file)), `Staged private/local file: ${file}`);
   }
   assert.equal(JSON.parse(await readFile(join(output, 'app/staticwebapp.config.json'), 'utf8')).platform.apiRuntime, 'node:22');
   await assert.rejects(prepareDeployment(directory), { code: 'EEXIST' });
+});
+
+test('SWA preparation rejects an unbuilt Functions API before creating output', async t => {
+  const directory = await mkdtemp(join(tmpdir(), 'sqlapps-unbuilt-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await writeFile(join(directory, 'deployment.json'), '{"hosting":"static-web-apps","api":"functions"}');
+  await assert.rejects(prepareDeployment(directory), { code: 'ENOENT' });
+  assert.equal(existsSync(join(directory, '.deployment')), false);
 });
 
 function compile(file) {
@@ -101,7 +116,7 @@ test('both Rayfin intent variants keep SQL but enable only the selected runtime'
   assert.match(dab, /functions:\s+enabled: false/);
   assert.match(functions, /data:\s+enabled: false\s+dialect: mssql/);
   assert.match(functions, /functions:\s+enabled: true\s+path: packages\/functions/);
-  assert.match(functions, /buildCommand: node --check src\/index\.mjs/);
+  assert.match(functions, /functions:\s+enabled: true\s+path: packages\/functions\s+buildCommand: npm run build/);
   assert.match(functions, /not executable/);
 });
 

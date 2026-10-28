@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
-import { createAuthenticator } from '../packages/functions/src/auth.mjs';
-import { createDatabase, execute, sqlConfiguration } from '../packages/functions/src/database.mjs';
-import { createHandlers } from '../packages/functions/src/handlers.mjs';
-import { publicConfiguration } from '../packages/functions/src/config.mjs';
+import { createAuthenticator } from '../packages/functions/dist/auth.js';
+import { createDatabase, execute, sqlConfiguration } from '../packages/functions/dist/database.js';
+import { createHandlers } from '../packages/functions/dist/handlers.js';
+import { publicConfiguration } from '../packages/functions/dist/config.js';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { EventEmitter } from 'node:events';
@@ -284,7 +284,7 @@ test('rollback, connection error and reset failure discard leases without hangin
 });
 
 test('Node v4 registers only the intended anonymous HTTP routes under /api', async () => {
-  const { registerRoutes } = await import('../packages/functions/src/index.mjs');
+  const { registerRoutes } = await import('../packages/functions/dist/index.js');
   const registered = [];
   const routes = { items() {}, createItem() {}, config() {} };
   registerRoutes({ http: (name, options) => registered.push({ name, ...options }) }, routes);
@@ -295,5 +295,5 @@ test('Node v4 registers only the intended anonymous HTTP routes under /api', asy
   const host = JSON.parse(await readFile(new URL('../packages/functions/host.json', import.meta.url)));
   assert.equal(host.extensions.http.routePrefix, 'api');
   const pkg = JSON.parse(await readFile(new URL('../packages/functions/package.json', import.meta.url)));
-  assert.equal(pkg.main, 'src/index.mjs');
+  assert.equal(pkg.main, 'dist/index.js');
 });

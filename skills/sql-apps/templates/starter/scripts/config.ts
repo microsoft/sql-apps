@@ -3,20 +3,34 @@ import { parseEnv } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
-export const root = fileURLToPath(new URL('../', import.meta.url));
+export const root = fileURLToPath(new URL('../../', import.meta.url));
+
+export interface PublicConfiguration {
+  authority: string;
+  clientId: string;
+  scope: string;
+  redirectUri: string;
+}
+
+export interface AppConfiguration {
+  host: string;
+  port: number;
+  dab: string;
+  publicConfig: PublicConfiguration;
+}
 
 export function readEnvironment() {
   const file = resolve(root, '.env');
   return { ...(existsSync(file) ? parseEnv(readFileSync(file, 'utf8')) : {}), ...process.env };
 }
 
-export function configuration(env) {
-  const required = (name) => {
+export function configuration(env: NodeJS.ProcessEnv): AppConfiguration {
+  const required = (name: string) => {
     const value = env[name]?.trim();
     if (!value || value.includes('REPLACE_')) throw new Error(`Configure ${name} in .env before startup.`);
     return value;
   };
-  const secureUrl = (name, allowLoopback = false) => {
+  const secureUrl = (name: string, allowLoopback = false) => {
     const value = required(name);
     const url = new URL(value);
     const local = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname);

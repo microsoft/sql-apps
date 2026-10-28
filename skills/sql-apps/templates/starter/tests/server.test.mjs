@@ -8,13 +8,18 @@ import { gzipSync } from 'node:zlib';
 import { fork } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { createAppServer } from '../packages/server/server.mjs';
-import { configuration } from '../scripts/config.mjs';
+import { createAppServer } from '../dist/packages/server/server.js';
+import { configuration, root } from '../dist/scripts/config.js';
 
 const publicConfig = {
   authority: 'https://identity.example.test/tenant',
   clientId: 'public-client', scope: 'openid api-access', redirectUri: 'http://127.0.0.1/',
 };
+
+test('compiled configuration resolves the application root, not the output directory', () => {
+  assert.equal(root, fileURLToPath(new URL('../', import.meta.url)));
+});
+
 async function listen(server) {
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -78,14 +83,15 @@ test('configuration fails closed for missing identity, remote HTTP, or invalid o
 
 test('occupied web port fails startup and closes the supervisor IPC channel', { timeout: 10_000 }, async () => {
   const app = await mkdtemp(join(tmpdir(), 'sqlapps-bind-'));
-  for (const directory of ['packages/server', 'packages/frontend/dist', 'scripts']) await mkdir(join(app, directory), { recursive: true });
-  await copyFile(fileURLToPath(new URL('../packages/server/server.mjs', import.meta.url)), join(app, 'packages/server/server.mjs'));
-  await copyFile(fileURLToPath(new URL('../scripts/config.mjs', import.meta.url)), join(app, 'scripts/config.mjs'));
+  for (const directory of ['dist/packages/server', 'packages/frontend/dist', 'dist/scripts']) await mkdir(join(app, directory), { recursive: true });
+  await writeFile(join(app, 'package.json'), '{"type":"module"}');
+  await copyFile(fileURLToPath(new URL('../dist/packages/server/server.js', import.meta.url)), join(app, 'dist/packages/server/server.js'));
+  await copyFile(fileURLToPath(new URL('../dist/scripts/config.js', import.meta.url)), join(app, 'dist/scripts/config.js'));
   await writeFile(join(app, 'packages/frontend/dist/index.html'), '<h1>Test</h1>');
   const occupied = createServer();
   const origin = await listen(occupied);
   const port = new URL(origin).port;
-  const child = fork(join(app, 'packages/server/server.mjs'), [], {
+  const child = fork(join(app, 'dist/packages/server/server.js'), [], {
     silent: true,
     env: { ...process.env, AUTH_AUTHORITY: publicConfig.authority, AUTH_ISSUER: publicConfig.authority,
       AUTH_AUDIENCE: 'api', AUTH_CLIENT_ID: 'client', AUTH_SCOPE: 'openid api-access',

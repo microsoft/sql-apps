@@ -3,13 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "src/index.mjs",
+  "main": "dist/index.js",
   "engines": { "node": ">=22.22.2" },
+  "scripts": {
+    "build": "tsc"
+  },
   "dependencies": {
     "@azure/functions": "4.17.0",
     "@azure/identity": "4.13.0",
     "jose": "6.2.13",
     "tarn": "3.1.2",
     "tedious": "19.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.11",
+    "typescript": "5.9.3"
   }
 }

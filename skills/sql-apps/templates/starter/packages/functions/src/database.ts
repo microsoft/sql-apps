@@ -1,11 +1,20 @@
 import { Connection, Request, TYPES } from 'tedious';
 import tarn from 'tarn';
-import { guid, required } from './config.mjs';
+import { guid, required } from './config.js';
 
-export function sqlConfiguration(env) {
+type SqlParameter = [string, Parameters<Request['addParameter']>[1], string];
+type DatabaseRow = Record<string, unknown>;
+type SqlAuthentication =
+  | { type: 'default'; options: { userName: string; password: string } }
+  | {
+    type: 'azure-active-directory-service-principal-secret';
+    options: { tenantId: string; clientId: string; clientSecret: string };
+  };
+
+export function sqlConfiguration(env: NodeJS.ProcessEnv) {
   const server = required(env, 'SQL_SERVER');
   const local = ['localhost', '127.0.0.1', '::1'].includes(server);
-  let authentication;
+  let authentication: SqlAuthentication;
   if (env.SQL_USER || env.SQL_PASSWORD) {
     if (!local || env.WEBSITE_INSTANCE_ID || env.WEBSITE_HOSTNAME ||
         env.SQL_CLIENT_ID || env.SQL_CLIENT_SECRET || env.SQL_TENANT_ID) throw new Error('SQL passwords are local-only.');
@@ -34,25 +43,32 @@ export function sqlConfiguration(env) {
   };
 }
 
-export function execute(connection, text, parameters = []) {
+export function execute(connection: Connection, text: string, parameters: SqlParameter[] = []): Promise<DatabaseRow[]> {
   return new Promise((resolve, reject) => {
-    const request = new Request(text, (error, _count, rows) => {
+    const request = new Request(text, (error, _count, rows: Array<Array<{ metadata: { colName: string }; value: unknown }>> | undefined) => {
       if (error) reject(error);
-      else resolve(rows.map(row => Object.fromEntries(row.map(column => [column.metadata.colName, column.value]))));
+      else resolve((rows ?? []).map(row => {
+        const result: DatabaseRow = {};
+        for (const column of row) result[column.metadata.colName] = column.value;
+        return result;
+      }));
     });
     for (const [name, type, value] of parameters) request.addParameter(name, type, value);
     connection.execSql(request);
   });
 }
 
-export function createDatabase(env, { run = execute, connect } = {}) {
+export function createDatabase(
+  env: NodeJS.ProcessEnv,
+  { run = execute, connect }: { run?: typeof execute; connect?: () => Promise<Connection> } = {},
+) {
   const config = sqlConfiguration(env);
-  const discarded = new WeakSet();
-  const discard = connection => {
+  const discarded = new WeakSet<Connection>();
+  const discard = (connection: Connection): void => {
     discarded.add(connection);
     connection.close();
   };
-  const establish = connect || (() => new Promise((resolve, reject) => {
+  const establish = connect || (() => new Promise<Connection>((resolve, reject) => {
     const connection = new Connection(config);
     connection.on('error', () => { discard(connection); });
     connection.connect(error => {
@@ -60,7 +76,7 @@ export function createDatabase(env, { run = execute, connect } = {}) {
       else resolve(connection);
     });
   }));
-  const pool = new tarn.Pool({
+  const pool = new tarn.Pool<Connection>({
     min: 0, max: 4, acquireTimeoutMillis: 10000, createTimeoutMillis: 12000,
     destroyTimeoutMillis: 5000, idleTimeoutMillis: 30000, propagateCreateError: true,
     create: async () => {
@@ -71,7 +87,7 @@ export function createDatabase(env, { run = execute, connect } = {}) {
     validate: connection => !discarded.has(connection) && !connection.closed,
     destroy: discard,
   });
-  async function operation(oid, text, parameters) {
+  async function operation(oid: string, text: string, parameters: SqlParameter[]): Promise<DatabaseRow[]> {
     if (!guid.test(oid)) throw new Error('Invalid oid.');
     if (pool.numPendingAcquires() >= 8) throw new Error('Database is busy.');
     const connection = await pool.acquire().promise;
@@ -92,10 +108,10 @@ export function createDatabase(env, { run = execute, connect } = {}) {
     }
   }
   return {
-    list: (oid, label) => operation(oid,
+    list: (oid: string, label?: string) => operation(oid,
       `SELECT TOP (100) Id, Label, CreatedAt FROM api.Items${label === undefined ? '' : ' WHERE Label = @Label'} ORDER BY CreatedAt DESC, Id DESC;`,
       label === undefined ? [] : [['Label', TYPES.NVarChar, label]]),
-    create: (oid, label) => operation(oid, 'EXEC api.CreateItem @Label=@Label;', [['Label', TYPES.NVarChar, label]]),
+    create: (oid: string, label: string) => operation(oid, 'EXEC api.CreateItem @Label=@Label;', [['Label', TYPES.NVarChar, label]]),
     close: () => pool.destroy(),
   };
 }

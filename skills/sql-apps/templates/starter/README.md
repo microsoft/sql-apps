@@ -56,6 +56,12 @@ maintainer-specific feed. Preserve this with
 `npm install --package-lock-only --ignore-scripts --omit-lockfile-registry-resolved`
 when intentionally updating dependencies, then repeat build and acceptance.
 
+The frontend, web server, and Functions API are TypeScript. `npm run build`
+checks types and compiles runnable JavaScript; `npm start` serves that compiled
+web app. The web server and shared configuration build into `dist/`, while
+Functions builds into `packages/functions/dist/`. Keep these generated files
+out of source control. Setup scripts and Node tests remain JavaScript.
+
 In PowerShell, from the copied app directory:
 
 ```powershell

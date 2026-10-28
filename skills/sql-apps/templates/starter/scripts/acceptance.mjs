@@ -4,7 +4,7 @@ import { fork } from 'node:child_process';
 import { spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { resolve } from 'node:path';
-import { configuration, readEnvironment, root } from './config.mjs';
+import { configuration, readEnvironment, root } from '../dist/scripts/config.js';
 
 const env = readEnvironment();
 const config = configuration(env);

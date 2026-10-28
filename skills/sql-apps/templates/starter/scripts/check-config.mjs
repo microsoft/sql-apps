@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { root } from './config.mjs';
+import { root } from '../dist/scripts/config.js';
 
 const read = file => readFileSync(resolve(root, file), 'utf8');
 const baseline = JSON.parse(read('baseline.json'));

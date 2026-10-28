@@ -6,14 +6,19 @@
   "workspaces": ["packages/*"],
   "engines": { "node": ">=22.22.2" },
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "test": "node --test tests/*.test.mjs && npm run test --workspace @app/frontend",
+    "build": "npm run build:backend && npm run build --workspaces --if-present",
+    "build:backend": "tsc -p tsconfig.backend.json",
+    "test": "npm run build:backend && npm run build --workspace @app/functions && node --test tests/*.test.mjs && npm run test --workspace @app/frontend",
+    "prelocal:init": "npm run build:backend",
+    "prelocal:start": "npm run build:backend",
+    "prelocal:stop": "npm run build:backend",
+    "preacceptance": "npm run build:backend",
     "local:init": "node scripts/local.mjs init",
     "local:start": "node scripts/local.mjs start",
     "local:stop": "node scripts/local.mjs stop",
     "acceptance": "node scripts/acceptance.mjs",
     "deployment:prepare": "node scripts/deployment.mjs",
-    "start": "node packages/server/server.mjs"
+    "start": "node dist/packages/server/server.js"
   },
   "devDependencies": {
     "@types/node": "22.19.11",

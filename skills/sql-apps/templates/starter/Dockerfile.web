@@ -1,7 +1,7 @@
 FROM node:22.22.2-bookworm-slim@sha256:9f6d5975c7dca860947d3915877f85607946403fc55349f39b4bc3688448bb6e AS build
 ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org/
 WORKDIR /app
-COPY package.json package-lock.json baseline.json compose.yml ./
+COPY package.json package-lock.json baseline.json compose.yml tsconfig.backend.json ./
 COPY packages ./packages
 COPY scripts ./scripts
 RUN npm ci && npm run build
@@ -10,8 +10,8 @@ FROM node:22.22.2-bookworm-slim@sha256:9f6d5975c7dca860947d3915877f85607946403fc
 ENV NODE_ENV=production APP_HOST=0.0.0.0 APP_PORT=5180
 WORKDIR /app
 COPY --from=build --chown=node:node /app/packages/frontend/dist ./packages/frontend/dist
-COPY --from=build --chown=node:node /app/packages/server ./packages/server
-COPY --from=build --chown=node:node /app/scripts/config.mjs ./scripts/config.mjs
+COPY --from=build --chown=node:node /app/dist ./dist
+COPY --from=build --chown=node:node /app/package.json ./package.json
 USER node
 EXPOSE 5180
-CMD ["node", "packages/server/server.mjs"]
+CMD ["node", "dist/packages/server/server.js"]

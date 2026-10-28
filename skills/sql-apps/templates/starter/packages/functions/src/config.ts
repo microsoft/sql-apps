@@ -1,12 +1,12 @@
 export const guid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function required(env, name) {
+export function required(env: NodeJS.ProcessEnv, name: string): string {
   const value = env[name]?.trim();
   if (!value || value.includes('REPLACE_')) throw new Error(`Configure ${name}.`);
   return value;
 }
 
-export function publicConfiguration(env) {
+export function publicConfiguration(env: NodeJS.ProcessEnv) {
   const origin = new URL(required(env, 'APP_ORIGIN'));
   const authority = new URL(required(env, 'AUTH_AUTHORITY'));
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname);
@@ -28,7 +28,7 @@ export function publicConfiguration(env) {
   };
 }
 
-export function authenticationConfiguration(env) {
+export function authenticationConfiguration(env: NodeJS.ProcessEnv) {
   const issuer = required(env, 'AUTH_ISSUER');
   const match = /^(?:https:\/\/login\.microsoftonline\.com\/([0-9a-f-]+)\/v2\.0|https:\/\/sts\.windows\.net\/([0-9a-f-]+)\/)$/i.exec(issuer);
   const tenant = match?.[1] || match?.[2];

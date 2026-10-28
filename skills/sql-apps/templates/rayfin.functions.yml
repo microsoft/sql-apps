@@ -23,7 +23,7 @@ services:
   functions:
     enabled: true
     path: packages/functions
-    buildCommand: node --check src/index.mjs
+    buildCommand: npm run build
     durable:
       enabled: false
   staticHosting:
