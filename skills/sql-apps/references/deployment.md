@@ -19,6 +19,25 @@ health, shutdown/restart and migrations. Do not put secret values in docs.
 Successful builds do not prove hosting, identity, network, quota or ingress work.
 Check current first-party service limits and installed SQL guidance.
 
+## Generate a read-only deployment plan
+
+The starter exposes `npm run deployment:preflight` and
+`npm run deployment:plan`. Preflight checks the selected local profile, required
+files and installed CLI tools, and reads only the configured npm registry URL.
+Credential fields and query values are removed; non-HTTPS registries are rejected.
+It does not sign in, request consent, contact Azure, write resources, publish
+artifacts, or establish
+subscription/region provisioning eligibility.
+
+The plan command emits a canonical, digest-linked draft with per-component cost
+classes and explicit publication, identity and network actions. Missing owner or
+target inputs, artifact digests, unknown cost exposure and unverified shape
+evidence remain uncertainties; they are not success-shaped defaults. A configured
+registry is observed configuration, not publication approval. Review the
+generated plan and its hash in the copied app's single `deployment.md` record.
+`compareApprovedScope` reports whether a proposed plan still matches an approved
+scope; matching hashes and receipts do not authorize any operation.
+
 ## Keep one deployment record
 
 For cloud work, adapt the copied `deployment.md` and record:

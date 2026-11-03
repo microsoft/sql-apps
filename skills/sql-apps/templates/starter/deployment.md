@@ -24,6 +24,23 @@ protected save/reload journey. Local build/start is not real-user acceptance.
 This runbook is for the default Container Apps/DAB profile. F1 and Functions
 installers replace it with a short guide for the selected profile.
 
+## Read-only preflight and plan
+
+Before any cloud approval, run:
+
+```powershell
+npm run deployment:preflight
+npm run deployment:plan
+```
+
+Both commands inspect local configuration only. They do not sign in, request
+consent, contact Azure, write resources or publish artifacts. The plan is a
+canonical draft, not authorization. Missing business/target inputs, immutable
+artifact digests, cost evidence and provisioning eligibility remain explicit
+uncertainties; a listed SKU or configured package registry is not an approval.
+Record the reviewed plan and its hash in this file before any separately approved
+cloud operation.
+
 ## Prepare the selected deployment
 
 From the copied app, explicitly build/test before preparation:
