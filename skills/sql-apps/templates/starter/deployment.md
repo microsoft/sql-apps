@@ -20,6 +20,18 @@ another runbook policy copy.
 
 Explain external identity registration/consent and its owner before timing the
 protected save/reload journey. Local build/start is not real-user acceptance.
+In Results/open gates, preserve the original UTC idea-start, local-verified and
+deployed-verified milestones; append resumed phase events without rewriting them.
+Report approval/sign-in wait intervals separately from wall-clock totals. Only
+real SQL browser save/reload and owned-runtime restart/persistence evidence can
+support customer verification. Record later owner acceptance as a separate
+milestone; pending owner review is not fully accepted delivery.
+
+Correction feedback is a redacted single-line reproduction/expected/actual/impact/
+correction summary. Keep it in the local record unless an issue destination is
+explicitly authorized. If unavailable, preserve the local feedback and do not
+retry under another identity. Public submission/private owner remains an explicit
+reviewed policy, never a fake-login bypass.
 
 This runbook is for the default Container Apps/DAB profile. F1 and Functions
 installers replace it with a short guide for the selected profile.
@@ -163,17 +175,18 @@ From the copied app directory, with approved dependency access and cached/approv
 base images:
 
 ```powershell
-npm run images:build -- --web-image app-web:review --dab-image app-dab:review
+npm run images:build -- --web-image app-web:review --dab-image app-dab:review --npm-registry https://registry.npmjs.org/
 az bicep build --file infra\main.bicep --outfile .local\main.json
 ```
 
 Create `.local` first if absent. Compilation needs no Azure sign-in. Installing a
 missing compiler or pulling images changes the host and requires applicable
 permission. Choose approved image names for `--web-image` and `--dab-image`.
-The helper discovers only the host's effective `npm config get registry`, not
-other npm settings ([npm configuration](https://docs.npmjs.com/cli/v11/commands/npm-config)).
-Its registry URL must be HTTPS without credentials, query or fragment; it copies
-no `.npmrc` or tokens. The advanced manual Docker build path still accepts
+Choose and explicitly approve the non-secret package route for `--npm-registry`.
+The URL must be HTTPS without credentials, query or fragment; it is passed only
+to the web-image build as `NPM_CONFIG_REGISTRY`. The build copies no `.npmrc` or
+tokens. A registry observed by preflight or included in a draft plan is not
+publication approval. The advanced manual Docker build path still accepts
 `--build-arg NPM_CONFIG_REGISTRY=https://approved-mirror/`.
 Mirror credentials/custom trust need a separately reviewed mechanism, not build
 arguments. Never use `strict-ssl=false` or `NODE_TLS_REJECT_UNAUTHORIZED=0`.
@@ -238,6 +251,37 @@ rules, SKUs and tags. A what-if is not end-to-end runtime validation or spend ap
 Creating the group itself is a separate approved resource write; use the recorded
 region and `sqlapps-version` tag if creating one. Do not assume a subscription or
 group exists, auto-register providers, or retry writes without reconciling actual state.
+
+## Phase execution and status
+
+The execution library exposes the ordered `publish`, `foundation`, `bootstrap`,
+`applications`, and `verify` phases. A VS Code host must supply a live
+authorization callback and a deployment adapter for each phase; a plan hash or
+receipt alone never authorizes a write. The `deployment:apply` npm command is
+deliberately disabled outside that host because the starter does not bundle an
+Azure write adapter. Do not use the standalone command as a deployment method.
+
+The host must persist each returned receipt to `.deployment/receipt.json` and pass
+it back for the next phase. Completed phases are reconciled read-only before they
+can be reused or execution can continue. If an adapter outcome is uncertain,
+persist the error's attached receipt and reconcile actual state before retrying.
+Bootstrap may succeed only with a consecutive version/checksum record for every
+forward migration. Use the existing [migration procedure](./deployment-migrations.md);
+never edit applied migrations or reset the database to pass a checksum check.
+
+`npm run deployment:status` reads and validates the sanitized receipt without
+Azure access. `npm run deployment:prepare` remains validation/staging only and
+does not create that receipt. The host/adapter integration is not a cloud
+acceptance result; no Azure writes are performed by local tests.
+
+`reconcileDeployment` compares provider-specific resource states with generic
+inventory and phase observations. A failed SQL name reservation remains visible
+even when generic inventory omits it. Unknown ownership, changed resource/image
+references, and partial bootstrap stop continuation; proposals are review-only
+and never delete/recreate resources or switch region/tier automatically. Existing
+SQL/data/image references are preserved. Generated staging outputs use a
+content-checksummed ownership marker; changed files and symlinks are preserved
+and rejected rather than overwritten.
 
 ## 3. Apply only the approved resource/access/spend changes
 

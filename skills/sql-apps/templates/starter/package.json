@@ -21,6 +21,8 @@
     "deployment:prepare": "node scripts/deployment.mjs",
     "deployment:preflight": "node scripts/deployment-plan.mjs preflight",
     "deployment:plan": "node scripts/deployment-plan.mjs plan",
+    "deployment:apply": "node scripts/deployment-execution.mjs apply",
+    "deployment:status": "node scripts/deployment-execution.mjs status",
     "images:build": "node scripts/build-images.mjs",
     "local:adopt-sql": "node scripts/adopt-sql.mjs",
     "start": "npm run local:start",

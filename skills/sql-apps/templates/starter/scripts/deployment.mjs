@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { access, cp, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rename, rm, writeFile } from 'node:fs/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { resolve } from 'node:path';
@@ -13,21 +14,31 @@ async function regularDirectory(directory) {
   if (!info.isDirectory() || info.isSymbolicLink()) throw new Error(`Refusing non-directory or symlink: ${directory}`);
 }
 
-async function stagedFiles(directory, prefix = '') {
+async function stagedManifest(directory, prefix = '') {
   await regularDirectory(directory);
-  const result = [];
+  const entries = [];
+  const fileDigests = {};
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const name = prefix ? `${prefix}/${entry.name}` : entry.name;
     if (entry.isSymbolicLink()) throw new Error(`Refusing staged symlink: ${name}`);
     if (entry.isDirectory()) {
       // npm ci owns this dependency tree; it must be reinstalled after re-staging.
       if (name !== 'api/node_modules') {
-        result.push(`${name}/`, ...await stagedFiles(resolve(directory, entry.name), name));
+        entries.push(`${name}/`);
+        const nested = await stagedManifest(resolve(directory, entry.name), name);
+        entries.push(...nested.entries);
+        Object.assign(fileDigests, nested.fileDigests);
       }
-    } else if (entry.isFile()) result.push(name);
+    } else if (entry.isFile()) {
+      entries.push(name);
+      fileDigests[name] = createHash('sha256').update(await readFile(resolve(directory, entry.name))).digest('hex');
+    }
     else throw new Error(`Unrecognized staged entry: ${name}`);
   }
-  return result.sort();
+  return {
+    entries: entries.sort(),
+    fileDigests: Object.fromEntries(Object.entries(fileDigests).sort(([left], [right]) => left.localeCompare(right))),
+  };
 }
 
 async function ownedOutput(output, profile) {
@@ -37,14 +48,17 @@ async function ownedOutput(output, profile) {
     throw error;
   }
   await regularDirectory(output);
-  const current = (await stagedFiles(output)).filter(file => file !== '.generated.json');
+  const current = await stagedManifest(output);
+  current.entries = current.entries.filter(file => file !== '.generated.json');
+  delete current.fileDigests['.generated.json'];
   let marker;
   try { marker = JSON.parse(await readFile(resolve(output, '.generated.json'), 'utf8')); }
   catch (error) {
     throw new Error('Existing deployment output has no valid generated marker. Preserve it and review the directory.', { cause: error });
   }
-  if (!marker || marker.version !== 1 || !isDeepStrictEqual(marker.profile, profile) ||
-      !isDeepStrictEqual(marker.entries, current)) {
+  if (!marker || marker.version !== 2 || !isDeepStrictEqual(marker.profile, profile) ||
+      !isDeepStrictEqual(marker.entries, current.entries) ||
+      !isDeepStrictEqual(marker.fileDigests, current.fileDigests)) {
     throw new Error('Existing deployment output contains unrecognized files or a changed marker. Preserve it and review the directory.');
   }
   return true;
@@ -77,8 +91,9 @@ export async function prepareDeployment(directory = root) {
     }
     await cp(resolve(directory, 'staticwebapp.config.json'), resolve(staging, 'app/staticwebapp.config.json'));
     await writeFile(resolve(staging, 'profile.json'), `${JSON.stringify(profile, null, 2)}\n`);
+    const manifest = await stagedManifest(staging);
     await writeFile(resolve(staging, '.generated.json'), `${JSON.stringify({
-      version: 1, profile, entries: await stagedFiles(staging),
+      version: 2, profile, ...manifest,
     }, null, 2)}\n`);
     if (previous) {
       backup = `${staging}-previous`;

@@ -38,6 +38,23 @@ generated plan and its hash in the copied app's single `deployment.md` record.
 `compareApprovedScope` reports whether a proposed plan still matches an approved
 scope; matching hashes and receipts do not authorize any operation.
 
+## Execute through an authorized host
+
+The starter exposes `deployment:apply` and `deployment:status`. The standalone
+`deployment:apply` command deliberately refuses to run: the VS Code host must
+provide a live authorization callback and phase adapter, and the starter does not
+bundle an Azure write adapter. A phase receipt/hash is state, never authorization.
+The host runs `publish`, `foundation`, `bootstrap`, `applications`, and `verify`
+in order, reconciles completed phases before reuse/continuation, and persists the
+sanitized receipt in the copied app's ignored `.deployment/receipt.json`.
+Uncertain writes must be reconciled before retry. Bootstrap requires consecutive
+forward-migration checksums; use the copied app's existing
+`deployment-migrations.md` procedure and never alter an applied migration.
+
+`deployment:status` validates and reports that receipt without Azure access.
+`deployment:prepare` remains local validation/staging only. No local command
+establishes live cloud acceptance or performs Azure writes.
+
 ## Keep one deployment record
 
 For cloud work, adapt the copied `deployment.md` and record:
@@ -85,6 +102,15 @@ resources, possible costs, free-limit settings, post-create checks and cleanup
 scope. Strict zero-spend forbids unresolved charge exposure. Stop unapproved cloud
 writes, not safe local engineering.
 
+The starter's `reconcileDeployment` compares resource-specific observations with
+generic inventory and recorded phase state. Failed name reservations remain
+visible even when inventory omits them. Unknown ownership, changed SQL/image
+references, partial migrations or altered generated output stop continuation.
+Recovery proposals carry explicit scope deltas and never delete/recreate resources
+or switch region/tier automatically. Reuse the Bicep region-sensitive SQL naming
+rule only for a separately reviewed plan; preserve existing SQL/data/image
+references until the owner approves a scoped change.
+
 ## Evidence and promotion
 
 **No bundled cloud recipe has been verified end to end by an independent user.**
@@ -99,6 +125,20 @@ approved isolated deployment; selected-API positive and negative checks; SQL
 invariants and concurrency; browser sign-in; restart/persistence; and resource
 and metadata checks. Retest when pinned components or topology change. Local
 builds, fixtures and generated templates are not cloud evidence.
+
+The starter's `recordBenchmarkEvent` keeps the first idea-start, local-verified
+and deployed-verified milestones immutable. Resumed phases append events; approval
+and sign-in waits are measured as separate intervals and are never subtracted from
+wall-clock totals. Require real SQL browser save/reload evidence for customer
+verification. Record owner acceptance separately after deployment verification;
+pending owner review is not full customer acceptance. Public submission/private
+owner remains a separately reviewed policy, never a fake-login bypass.
+
+Correction feedback is a redacted single-line reproduction/expected/actual/impact/
+correction summary. Preserve it locally first; post only to an explicitly
+authorized issue destination and do not retry under another identity if that
+destination is unavailable. No historical timing baseline was available in the
+checked-out repository, so do not claim a comparative improvement.
 
 Current references: [Container Apps billing](https://learn.microsoft.com/azure/container-apps/billing),
 [ingress](https://learn.microsoft.com/azure/container-apps/ingress-overview),

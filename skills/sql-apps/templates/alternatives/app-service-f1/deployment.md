@@ -11,8 +11,9 @@ Use this file as the app's single target, approval and result record.
 
 ## App Service F1 operator steps
 
-1. Build and test the copied DAB app, then build immutable web/DAB images through
-   `npm run images:build`. Publish only to the approved registry.
+1. Build and test the copied DAB app, then build immutable web/DAB images with
+   explicit approved image names and a credential-free HTTPS `--npm-registry`.
+   Publish only to the separately approved registry.
 2. Use existing approved Azure SQL. Follow [shared SQL migration
    steps](./deployment-migrations.md), then run `infra/bootstrap.sql`
    with the deployed DAB managed-identity client ID. Preserve an existing
