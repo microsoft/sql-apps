@@ -29,14 +29,14 @@ param authClientId string
 param authScope string
 
 var unique = take(uniqueString(resourceGroup().id, workload), 6)
-var webName = 'web-${workload}-${unique}-sqlapps'
-var dabName = 'dab-${workload}-${unique}-sqlapps'
+var webName = 'web-${workload}-${unique}'
+var dabName = 'dab-${workload}-${unique}'
 var tags = {
   'sqlapps-version': sqlappsVersion
 }
 
 resource plan 'Microsoft.Web/serverfarms@2024-11-01' = {
-  name: 'plan-${workload}-${unique}-sqlapps'
+  name: 'plan-${workload}-${unique}'
   location: location
   tags: tags
   kind: 'linux'
@@ -50,7 +50,7 @@ resource plan 'Microsoft.Web/serverfarms@2024-11-01' = {
 }
 
 resource identity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
-  name: 'id-f1-${workload}-${unique}-sqlapps'
+  name: 'id-f1-${workload}-${unique}'
   location: location
   tags: tags
 }

@@ -3,6 +3,7 @@ superpowers/
 @superpowers/
 /docs/reference/runtime-proof.md
 /.release-check-copilot-*/
+/docs/reference/
 
 # Local dependencies and generated test output
 node_modules/

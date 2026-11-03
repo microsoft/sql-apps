@@ -1,4 +1,4 @@
-# App design: aligned with Rayfin, independent of its runtime
+# App design
 
 Use this guidance for new UI and material visual changes. It summarizes transferable principles from Rayfin's app-design and CRUD guidance; it does not vendor its component kits or require its hooks, SDK, authentication gate, or Fabric services.
 
@@ -30,11 +30,11 @@ Select current mutually compatible stable versions through normal package toolin
 
 Implement loading, empty, error, saving, success, and permission-denied states. Treat authorization/configuration failures as errors, not endless loading or empty-success results. Sanitize errors while preserving an actionable explanation.
 
-Validate against DAB permissions and SQL-enforced rules, not an assumed Express CRUD layer. Keep form values on failure, prevent duplicate submissions, and identify destructive targets in confirmation prompts. Use optimistic UI only with rollback and explicit failure handling. A fulfilled wrapper promise is not proof of a successful save; honor the operation's actual success contract. Show actionable unavailable/quota-exhausted states when a free PoC sleeps or reaches its limits; never silently upgrade resources.
+Validate against the selected API's permissions and SQL-enforced rules, not an assumed Express CRUD layer. Keep form values on failure, prevent duplicate submissions, and identify destructive targets in confirmation prompts. Use optimistic UI only with rollback and explicit failure handling. A fulfilled wrapper promise is not proof of a successful save; honor the operation's actual success contract. Show actionable unavailable/quota-exhausted states when a free PoC sleeps or reaches its limits; never silently upgrade resources.
 
 ## Review the rendered result
 
-Exercise the primary workflow through real DAB requests backed by SQL; inspect desktop and narrow widths, keyboard interaction, both themes, empty/error states, and dense repeated elements. Build/type-check without suppressing TypeScript errors. Keep the app's design direction and relevant checks in the brief/run documentation, not another design-management system.
+Exercise the primary workflow through the selected API backed by SQL; inspect desktop and narrow widths, keyboard interaction, both themes, empty/error states, and dense repeated elements. Build/type-check without suppressing TypeScript errors. Keep the app's design direction and relevant checks in the brief/run documentation, not another design-management system.
 
 ## Upstream reference
 

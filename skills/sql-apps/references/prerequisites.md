@@ -8,17 +8,17 @@ Inspect the host/OS, installed tools, and existing project decisions first, with
 
 | Situation | Next action |
 | --- | --- |
-| Working Azure SQL/DAB and a recorded target | Reuse them; do not repeat onboarding or change the target |
+| Working Azure SQL/selected API and a recorded target | Reuse them; do not repeat onboarding or change the target |
 | Target unknown | Offer local or cloud; default to local when no preference is stated |
 | Cloud selected | Ask whether an Azure subscription exists only if unknown, then use the bundled deployment recipe; if none, explain account options without creating or signing into one |
 | Azure subscription exists, target undecided | Still offer local or cloud; ownership is not cloud intent or provisioning approval |
 | Local selected, Azure SQL container unavailable | Offer [Private Preview signup](https://aka.ms/sqldbcontainerpreview-signup) or explicitly selected Azure SQL Database cloud access; never switch to cloud automatically |
-| Neither Azure SQL target is ready, or DAB is missing | Give the selected profile's supported setup step; continue useful UI/schema/scaffolding and mark integration incomplete; Functions does not require DAB |
+| Neither Azure SQL target is ready, or the selected API is missing | Give the selected profile's supported setup step; continue useful UI/schema/scaffolding and mark integration incomplete; Functions does not require DAB |
 | Existing on-premises database | Explain that it is outside this profile; do not reuse it as a fallback, install another engine, or migrate it without explicit scope |
 
 Explain needed installation/configuration actions together where their effects are known, then obtain scoped approval. Do not turn every discovery or ordinary local build/test into another product questionnaire. Host permissions, interactive sign-in, license acceptance, and cloud/access/destructive approvals still apply.
 
-## SQL, DAB, and local database
+## SQL, selected API, and local database
 
 For general coding hosts, install the broad [Microsoft SQL plugin](https://github.com/microsoft/microsoft-sql#installation). For Copilot CLI:
 
@@ -27,11 +27,23 @@ copilot plugin marketplace add microsoft/microsoft-sql
 copilot plugin install microsoft-sql@microsoft-sql
 ```
 
-In VS Code, install or enable the [Microsoft SQL Server extension](https://marketplace.visualstudio.com/items?itemName=ms-mssql.mssql), enable its DAB capability, and confirm the DAB tool is discovered. It normally replaces the overlapping `microsoft-sql-vscode` bundle. On other hosts, use Microsoft's [host-specific instructions](https://github.com/microsoft/microsoft-sql#installation).
+In VS Code, install or enable the [Microsoft SQL Server extension](https://marketplace.visualstudio.com/items?itemName=ms-mssql.mssql). For DAB profiles, enable its DAB capability and confirm the tool is discovered. It normally replaces the overlapping `microsoft-sql-vscode` bundle. On other hosts, use Microsoft's [host-specific instructions](https://github.com/microsoft/microsoft-sql#installation).
 
-After setup, refresh or restart the host and check DAB skill/tool discovery. The preferred Azure SQL Database container is currently in **Private Preview**. Using it requires [preview access](https://aka.ms/sqldbcontainerpreview-signup) and the [official quickstart](https://microsoft.github.io/azure-sql-database-container/getting-started.html). Installing SQL guidance does not grant registry access. The user must complete any interactive registry login; never handle or paste credentials. Do not enroll, accept terms, or authenticate without explicit approval.
+After setup, refresh or restart the host and check the selected capabilities. The preferred Azure SQL Database container is currently in **Private Preview**. Using it requires [preview access](https://aka.ms/sqldbcontainerpreview-signup) and the [official quickstart](https://microsoft.github.io/azure-sql-database-container/getting-started.html). Installing SQL guidance does not grant registry access. The user must complete any interactive registry login; never handle or paste credentials. Do not enroll, accept terms, or authenticate without explicit approval.
 
-If the container is unavailable, let the user decide between signup and Azure SQL Database in the cloud. Cloud selection is not approval to sign in, create resources, spend, or change access; follow the bundled deployment recipe, SQL guidance, and approved target scope. Record the selected local-container or cloud target and connection topology. SQL Server Express and other on-premises engines are not fallback paths. If DAB or the selected Azure SQL target is missing, useful UI, schema, and scaffolding work may continue, but database persistence and end-to-end checks stay incomplete until real DAB and Azure SQL are available. Do not substitute mock persistence, another database, or direct Express-to-SQL CRUD. Explicit managed Functions is an alternative API, not an Express CRUD fallback. Node.js/Express is only for necessary authentication, orchestration, or domain behavior.
+If the container is unavailable, offer signup or explicit Azure SQL Database cloud
+selection; follow the [deployment gates](./deployment.md) before cloud actions.
+Reuse the recorded target/topology. Missing Azure SQL or selected API leaves
+persistence/end-to-end checks incomplete, but safe UI/schema/scaffolding can
+continue. The [constitution](./constitution.md) forbids engine/mock/Express CRUD
+fallbacks; explicitly selected Functions is a supported API, not a fallback.
+
+For explicitly selected Static Web Apps/Functions, DAB discovery is unnecessary.
+Local development needs approved, installed Functions Core Tools 4 and SWA CLI 2,
+plus the same SQL preview image. The copied app checks tools without installing
+them and requires an explicit loopback SQL port. Follow the
+[local Functions workflow](../templates/starter/hosting.md#local-development);
+SWA's fake authentication identities are not real-provider acceptance.
 
 ## Azure tools
 

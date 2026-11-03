@@ -72,17 +72,17 @@ param operatorIpAddress string = ''
 param deployApplications bool = false
 
 var unique = take(uniqueString(resourceGroup().id, workload), 6)
-var environmentName = 'env-${workload}-${unique}-sqlapps'
-var webName = 'web-${workload}-${unique}-sqlapps'
-var dabName = 'dab-${workload}-${unique}-sqlapps'
-var sqlName = 'sql-${workload}-${unique}-sqlapps'
-var databaseName = 'app-${workload}-sqlapps'
+var environmentName = 'env-${workload}-${unique}'
+var webName = 'web-${workload}-${unique}'
+var dabName = 'dab-${workload}-${unique}'
+var sqlName = 'sql-${workload}-${unique}'
+var databaseName = 'app-${workload}'
 var tags = {
   'sqlapps-version': sqlappsVersion
 }
 
 resource runtimeIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
-  name: 'id-${workload}-${unique}-sqlapps'
+  name: 'id-${workload}-${unique}'
   location: location
   tags: tags
 }
@@ -146,7 +146,7 @@ resource database 'Microsoft.Sql/servers/databases@2023-08-01' = {
 
 resource azureServicesRule 'Microsoft.Sql/servers/firewallRules@2023-08-01' = if (allowAzureServices) {
   parent: sqlServer
-  name: 'azure-services-sqlapps'
+  name: 'azure-services'
   properties: {
     startIpAddress: '0.0.0.0'
     endIpAddress: '0.0.0.0'
@@ -155,7 +155,7 @@ resource azureServicesRule 'Microsoft.Sql/servers/firewallRules@2023-08-01' = if
 
 resource operatorRule 'Microsoft.Sql/servers/firewallRules@2023-08-01' = if (!empty(operatorIpAddress)) {
   parent: sqlServer
-  name: 'bootstrap-operator-sqlapps'
+  name: 'bootstrap-operator'
   properties: {
     startIpAddress: operatorIpAddress
     endIpAddress: operatorIpAddress

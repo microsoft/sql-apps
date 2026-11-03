@@ -1,55 +1,68 @@
 # Deployment attribution
 
-Identify infrastructure generated with SQL Apps using ordinary, customer-editable Azure metadata. This is provenance, not a SQL Apps management runtime or application telemetry.
+Use ordinary customer-editable Azure metadata for provenance, not telemetry or a
+SQL Apps runtime. Local-only work needs no Azure attribution check.
 
-## Attribution metadata
+## Required version tag
 
-Use only this default attribution tag; its presence identifies SQL Apps:
+`sqlapps-version` identifies the SQL Apps guidance version intentionally adopted
+for generated infrastructure, not the app or API version. Read it from the actual
+installed [`plugin.json`](../../../plugin.json) and record it once in the app's
+`deployment.md`. Do not invent an unverifiable version; resolve the gap or record
+an explicitly approved exception before claiming validation.
 
-| Tag | Value |
-| --- | --- |
-| `sqlapps-version` | SQL Apps guidance version adopted for the project's generated infrastructure |
+Merge that tag into each newly created in-scope tag-capable resource and new
+resource group. Group tags are not inherited. Preserve the adopted version on
+resume/redeployment; loading a newer plugin does not reattribute infrastructure.
+Change it only through an intentional guidance/infrastructure update.
 
-Read the version from the actual plugin manifest, [`plugin.json`](../../../plugin.json), when generating or intentionally adopting the guidance. Persist it in the application's brief. It is not the application or DAB version. Do not invent a value when the manifest/version cannot be verified: report the gap and resolve it or record an explicitly approved exception before claiming attribution validation.
+Preserve customer metadata and compare keys case-insensitively. Surface conflicting
+values, tag-limit exhaustion and unsupported tagging before provisioning rather
+than overwriting/deleting tags. Record approved opt-outs and unsupported resources
+in the same deployment record. Do not tag existing/shared dependencies merely
+because the app uses them; reattribution requires explicit scope approval.
 
-Preserve the recorded version on resume and redeployment. Merely loading a newer installed plugin must not relabel existing infrastructure. Change the recorded version only through an intentional guidance/infrastructure update; it is not a runtime version or a last-seen timestamp.
+## Optional resource suffix
 
-In the selected Azure workflow's generated infrastructure, merge the tag into the existing tag map of each newly created tag-capable resource and any newly created resource group. Resource-group tags are not inherited by their resources. Do not tag an existing/shared group or shared dependencies simply because an app uses them; reattribution requires explicit scope approval.
+The `sqlapps` product suffix is **optional**, not an acceptance requirement. Use
+the customer's approved stable naming convention. If chosen, place environment
+and uniqueness components before a final `-sqlapps` (or `sqlapps` for
+alphanumeric-only names). Examples: `app-demo-dev-a1b2c3-sqlapps` and
+`stdemodeva1b2c3sqlapps`. These are examples, not a resource checklist.
 
-Preserve customer tags. Compare tag keys case-insensitively so a differently cased existing key does not create a duplicate; use the recorded version value exactly. Surface conflicting values or tag-limit exhaustion before provisioning rather than overwriting or deleting customer metadata. Record unsupported tagging and approved opt-outs as exceptions, not silent omissions. Do not add resources or permissions just to make attribution possible.
+Validate actual provider length, characters, reserved names, scope and uniqueness
+rules; retain service-mandated child names such as `default`. Do not introduce a
+tracking identifier. **Preserve existing deployed names**: never rename, replace
+or recreate resources merely to add or remove branding. New-template naming
+changes are not a migration instruction.
 
-## Resource naming
+## Verify during the approved deployment
 
-The default resource-name suffix is `sqlapps`, using the same compact product token as the `sqlapps-version` tag. Append it as the final component of newly generated resource names, using the bundled Bicep recipe's stable workload/resource-group naming or the existing app's approved naming rules. Place any environment and uniqueness token before the final `sqlapps` suffix. Use `-sqlapps` when hyphens are allowed; append `sqlapps` directly for alphanumeric-only names.
-
-| Resource, if required by the approved topology | Example name |
-| --- | --- |
-| New resource group | `rg-demo-dev-sqlapps` |
-| Web app | `app-demo-dev-a1b2c3-sqlapps` |
-| SQL logical server | `sql-demo-dev-a1b2c3-sqlapps` |
-| Storage account | `stdemodeva1b2c3sqlapps` |
-
-These examples are not a universal name generator or a provisioning checklist. Validate each actual resource type's length, allowed characters, scope, reserved names, and uniqueness rules. Storage account names, for example, allow only lowercase letters and digits and at most 24 characters. For constrained names, shorten the non-sensitive workload token rather than truncating the `sqlapps` suffix or required uniqueness token; record an override if the convention cannot fit. Keep names and generated uniqueness tokens stable across redeployments; do not introduce a product tracking identifier.
-
-Customer naming requirements take precedence through a recorded override. Preserve service-mandated child names such as `default`; record nonconfigurable/unsupported names as exceptions rather than inventing an invalid name. Never rename or replace existing resources for attribution. Retrofitting tags onto existing resources also requires an explicitly approved scope.
-
-## Carry and verify the contract
-
-Record the adopted `sqlapps-version`, final `sqlapps` suffix naming pattern, and exceptions in the application brief and preserve the rules in its active host's durable project instructions. Explicitly include those choices in Azure planning, provisioning, validation, and redeployment handoffs alongside the approved topology and cost constraints.
-
-Use the selected workflow's existing infrastructure configuration, such as Bicep or Terraform tag maps and naming inputs. Do not invent Rayfin configuration fields, a new deployment engine, or a SQL Apps state file. Local-only delivery requires no Azure sign-in, provisioning, or attribution checks against Azure.
-
-During an already requested and approved deployment, read back actual resource tags and names using authorized Azure CLI/API tools. Compare each in-scope resource with the brief, including documented tag support and naming exceptions; a tagged parent or template declaration is not proof of child-resource metadata. Report mismatches as failed attribution validation and approved exceptions as exceptions. Do not rename/delete resources, broaden permissions, or enable paid services to make a check pass.
+Use the selected workflow's existing Bicep/Terraform tag maps and naming inputs.
+During already requested/approved validation, compare actual in-scope metadata
+with `deployment.md` using authorized CLI/API reads. Record results there alongside
+resource-setting checks; do not create repeated handoff/readback records or a new
+state file. Template declarations and tagged parents are not proof of resource
+tags. Report mismatches and exceptions honestly; never broaden access, add paid
+resources or rename/delete infrastructure to pass attribution.
 
 ## Privacy and measurement limits
 
-Tags are plaintext and names can appear in URLs, inventories, exports, and logs. Do not include personal, sensitive, or confidential information in either. Use a short, non-sensitive workload token, not a person, tenant, email, or customer-data identifier.
+Tags are plaintext; names appear in URLs, inventories, exports and logs. Use only
+non-sensitive workload tokens, never personal, tenant, email or customer-data
+identifiers. Attribution must not query customer data/metrics, enable diagnostics,
+add SDKs/events/callbacks/collectors, create monitoring resources or grant access.
+Separately requested operational monitoring has its own requirements and approvals.
 
-No runtime events, SDK instrumentation, callbacks, collectors, or new monitoring resources are added for attribution. Do not query customer data or metrics, enable diagnostics, grant access, or add a reporting endpoint for this purpose. An application's separately requested operational monitoring remains governed by its own requirements and approvals.
+The tag can indicate current accessible resource footprint by adopted guidance
+version, not active usage, people, unique apps, deployment counts, local usage or
+lifetime adoption. Editable tags, copied templates and deleted resources are not
+tamper-resistant evidence. Names are only an optional secondary discovery aid.
 
-The tag is the primary attribution signal; name matching is only a secondary discovery aid. Metadata can indicate current resource footprint by recorded version and resource type, not active application usage, unique people, unique applications, or deployment-event counts. It cannot measure local-only usage or lifetime adoption. Tags may be edited, resources deleted, and templates copied; this is not tamper-resistant evidence.
-
-This convention does not grant Microsoft additional access or send SQL Apps a usage report. Azure Resource Graph is limited to resources the querying principal can access. Any Microsoft-side reporting would require an independently approved metadata source; do not assume one exists or promise Microsoft-wide visibility.
+This grants Microsoft no additional access and sends no SQL Apps usage report.
+Azure Resource Graph sees only resources its querying principal may access.
+Microsoft-side reporting would require an independently approved metadata source;
+do not assume one exists or promise Microsoft-wide visibility.
 
 ## Official references
 

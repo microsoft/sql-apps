@@ -1,5 +1,5 @@
 import type { HttpRequest } from '@azure/functions';
-import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { createRemoteJWKSet, errors, jwtVerify } from 'jose';
 import type { JWTVerifyGetKey } from 'jose';
 import { authenticationConfiguration, guid } from './config.js';
 
@@ -28,10 +28,17 @@ export function createAuthenticator(env: NodeJS.ProcessEnv, keys?: JWTVerifyGetK
         algorithms: ['RS256'], issuer: config.issuer, audience: config.audience,
         requiredClaims: ['exp', 'iat', 'tid'], clockTolerance: 5,
       }));
-      if (typeof payload.tid !== 'string' || payload.tid.toLowerCase() !== config.tenant.toLowerCase()) {
-        throw new Error('Tenant mismatch.');
+    } catch (error) {
+      if (error instanceof errors.JWTClaimValidationFailed || error instanceof errors.JWTExpired ||
+          error instanceof errors.JWTInvalid || error instanceof errors.JWSInvalid ||
+          error instanceof errors.JOSEAlgNotAllowed || error instanceof errors.JOSENotSupported ||
+          error instanceof errors.JWSSignatureVerificationFailed ||
+          error instanceof errors.JWKSNoMatchingKey) {
+        throw new HttpError(401, 'The access token is not accepted.');
       }
-    } catch {
+      throw error;
+    }
+    if (typeof payload.tid !== 'string' || payload.tid.toLowerCase() !== config.tenant.toLowerCase()) {
       throw new HttpError(401, 'The access token is not accepted.');
     }
     if (typeof payload.oid !== 'string' || !guid.test(payload.oid) ||

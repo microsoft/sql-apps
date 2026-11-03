@@ -14,9 +14,11 @@ type SqlAuthentication =
 export function sqlConfiguration(env: NodeJS.ProcessEnv) {
   const server = required(env, 'SQL_SERVER');
   const local = ['localhost', '127.0.0.1', '::1'].includes(server);
+  const developmentHost = env.AZURE_FUNCTIONS_ENVIRONMENT === 'Development' &&
+    /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/i.test(env.WEBSITE_HOSTNAME || '');
   let authentication: SqlAuthentication;
   if (env.SQL_USER || env.SQL_PASSWORD) {
-    if (!local || env.WEBSITE_INSTANCE_ID || env.WEBSITE_HOSTNAME ||
+    if (!local || env.WEBSITE_INSTANCE_ID || (env.WEBSITE_HOSTNAME && !developmentHost) ||
         env.SQL_CLIENT_ID || env.SQL_CLIENT_SECRET || env.SQL_TENANT_ID) throw new Error('SQL passwords are local-only.');
     const userName = required(env, 'SQL_USER');
     if (userName.toLowerCase() === 'sa') throw new Error('Use a restricted application login.');

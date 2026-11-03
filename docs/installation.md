@@ -4,7 +4,7 @@
 
 Choose your host below. Packaging and verification are different: consult the [verification matrix](./reference/releasing.md#verification-status) before relying on a host-specific workflow.
 
-> **Local database notice:** The Azure SQL Database container is in **Private Preview**. You must [sign up for preview access](https://aka.ms/sqldbcontainerpreview-signup) to get the registry credentials needed to pull it. Read the [official getting-started guide](https://microsoft.github.io/azure-sql-database-container/getting-started.html) before setting up local SQL. SQL Apps can still scaffold while access is pending, but database persistence cannot be verified without a real SQL engine and DAB.
+> **Local database notice:** The Azure SQL Database container is in **Private Preview**. You must [sign up for preview access](https://aka.ms/sqldbcontainerpreview-signup) to get the registry credentials needed to pull it. Read the [official getting-started guide](https://microsoft.github.io/azure-sql-database-container/getting-started.html) before setting up local SQL. SQL Apps can still scaffold while access is pending, but database persistence cannot be verified without real Azure SQL and the selected API.
 
 SQL Apps targets only the local Azure SQL Database container or Azure SQL Database in the cloud. If preview access is unavailable, offer signup or an explicitly selected cloud path, not an on-premises database fallback.
 
@@ -16,7 +16,7 @@ For local work, use the Azure SQL container. When unavailable, offer preview sig
 
 ## Before you install
 
-The marketplace is `sql-apps-skills`, and the plugin is `sql-apps`. The source repository is [microsoft/sql-apps](https://github.com/microsoft/sql-apps). The version in this checkout is the **0.3.0 release candidate**, not evidence that 0.3.0 has been published. Remote examples below install what is actually published in that repository. Existing installations do not become 0.3.0 when a checkout changes: refresh the marketplace, update the plugin, and verify the installed bytes.
+The marketplace is `sql-apps-skills`, and the plugin is `sql-apps`. The source repository is [microsoft/sql-apps](https://github.com/microsoft/sql-apps). This checkout is the **0.3.0 release candidate**, not evidence of publication. Remote commands install the published version. For an existing installation refresh/update through your host, then check its reported version and skill discovery in a fresh session.
 
 Local examples use `C:\git\sql-apps-v3`; replace that with your downloaded checkout. Installation/registration changes host configuration, so review its prompts. Registration alone does not install a plugin.
 
@@ -45,7 +45,7 @@ copilot plugin update sql-apps@sql-apps-skills
 copilot plugin list --json
 ```
 
-Start a fresh session and check `/plugin list`, then [verify the actual installed root](#verify-the-actual-installed-root). VS Code versions with marketplace chat commands use `/plugin marketplace add microsoft/sql-apps` followed by `/plugin install sql-apps@sql-apps-skills`; use that host's marketplace refresh and plugin update actions for an existing installation. CLI and VS Code installations/caches are separate: updating one does not prove the other changed. See the [VS Code plugin guide](https://code.visualstudio.com/docs/agent-customization/agent-plugins).
+Start a fresh session, check `/plugin list` for the version, and invoke SQL Apps from skill discovery. VS Code versions with marketplace chat commands use `/plugin marketplace add microsoft/sql-apps` followed by `/plugin install sql-apps@sql-apps-skills`; use that host's refresh/update actions for an existing installation. CLI and VS Code installations are separate. See the [VS Code plugin guide](https://code.visualstudio.com/docs/agent-customization/agent-plugins).
 
 ### Local VS Code development
 
@@ -129,47 +129,32 @@ Install companions separately using their supported host setup. SQL Apps does no
 | Capability | Setup |
 | --- | --- |
 | SQL expertise and local engine | [Microsoft SQL plugins](https://github.com/microsoft/microsoft-sql#choose-a-plugin): `microsoft-sql` for general coding hosts, or `microsoft-sql-vscode` for the MSSQL extension |
-| Application data APIs (required for a complete database-backed workflow) | Discover installed Microsoft SQL DAB guidance (`dab-rest-and-graphql` or `azuresql-db-dab`) or the MSSQL extension's DAB tool (for example, `mssql_dab`). The VS Code SQL bundle intentionally omits overlapping DAB skills because the extension supplies tools; verify that the tool is actually available |
+| Selected application API | For DAB only, discover Microsoft SQL DAB guidance (`dab-rest-and-graphql` or `azuresql-db-dab`) or the MSSQL extension's DAB tool (for example, `mssql_dab`). The VS Code SQL bundle omits overlapping DAB skills because the extension supplies tools. Explicit Functions needs Core Tools 4 and SWA CLI 2 for local work, not DAB |
 | Container guidance with the VS Code SQL bundle | Add `microsoft-azuresqldb-container` when needed; it is already included in the broad `microsoft-sql` bundle |
 | Azure deployment | Azure CLI with Bicep, Docker, and an approved registry for the [bundled Container Apps recipe](../skills/sql-apps/templates/starter/deployment.md); no extra cloud skills plugin |
 | Build and verification | Node.js/npm supported by the app tooling, specialist-documented SQL container prerequisites, and host browser/SQL tools |
 
-For SQL/DAB setup and private-preview local-engine access, use the [bundled prerequisite guide](../skills/sql-apps/references/prerequisites.md). The listed skill/tool names are discovery examples, not a guarantee of installation.
+For SQL/selected-API setup and private-preview local-engine access, use the [bundled prerequisite guide](../skills/sql-apps/references/prerequisites.md). The listed skill/tool names are discovery examples, not a guarantee of installation.
 
-If DAB or the selected Azure SQL target is unavailable, give the user its supported setup path. Useful UI, schema, and scaffolding work can continue, but mark persistence and end-to-end checks incomplete. Do not substitute another database, mocked persistence, or direct Express-to-SQL CRUD.
+If the selected API or Azure SQL target is unavailable, give its supported setup path. Useful UI, schema, and scaffolding work can continue, but mark persistence and end-to-end checks incomplete. Do not substitute another database, mocked persistence, or direct Express-to-SQL CRUD.
 
-The default `poc` outcome is free-first, not a guarantee of zero Azure spend. Local-only has no Azure CLI or subscription requirement and does not enter cloud onboarding. The default cloud recipe uses Container Apps Consumption grants and Azure SQL free-limit AutoPause; grants are not a hard spending cap. A requested free Azure topology must be checked end-to-end using current service documentation and SQL guidance; a missing free capability is not permission for a paid fallback. Requested cloud work still requires explicit resource, access, and spend approvals. Installing the plugin proves none of those runtime outcomes.
+Local-only work needs no Azure CLI or subscription. Cloud work has separate
+[resource, cost and access gates](../skills/sql-apps/references/deployment.md);
+free-first is not guaranteed zero spend or permission for a paid fallback.
+Installation proves no application/runtime outcome.
 
 ## Quick setup when a capability is missing
 
-The [bundled prerequisite guide](../skills/sql-apps/references/prerequisites.md) has host-specific setup paths for SQL/DAB and Azure tools, local database access, safe continuation while prerequisites are missing, and approval boundaries. Local-only work does not require Azure CLI, sign-in, or a subscription.
-
-## Verify the actual installed root
-
-Use Node.js 22 or later and the [release verifier](../scripts/verify-release.mjs) from the approved release checkout. Find the root the host **actually loaded**, containing `plugin.json` and `skills`, using its plugin diagnostics/listing or the loaded skill's path. Do not supply the repository, `--plugin-dir`, Gemini's development link, or merely the marketplace registration path.
-
-For VS Code, enumerate cache candidates without modifying them:
-
-```powershell
-Get-ChildItem "$env:APPDATA\Code\agentPlugins" -Directory -Filter '*sql-apps*' |
-  ForEach-Object { Get-ChildItem $_.FullName -Directory } |
-  Select-Object -ExpandProperty FullName
-```
-
-There may be several hash-named copies. Match the one used by the current host session; the newest-looking directory alone is not proof of the active install. With that actual path:
-
-```powershell
-$installedRoot = Read-Host 'Actual installed SQL Apps package root'
-node C:\git\sql-apps-v3\scripts\verify-release.mjs --source-root C:\git\sql-apps-v3 --installed-root "$installedRoot"
-```
-
-Success reports `PASS sql-apps 0.3.0`, the compared roots, skill file count, and a SHA-256 payload fingerprint. The verifier checks every manifest/catalog, release identity/version, and all shipped skill/reference/template bytes, including missing or extra files. It rejects the source itself, linked skill payloads, and unexpected host-loaded components such as hooks, MCP configuration, commands, agents, rules, or global context. A stale version, same-version edited guidance, missing file, or wrong root exits nonzero with the failing paths. Shipped skill files use canonical LF newlines through the repository's Git attributes; see the [release checks](./reference/releasing.md#package-and-installed-copy-verification) if an older Windows working copy retains CRLF.
-
-After install/update, restart or open a fresh session, confirm the reported plugin version and loaded path, and rerun this command on that path. Then explicitly invoke SQL Apps and check actual Microsoft SQL DAB discovery before app work. A verified unpacked package or `source: live` listing does not prove the host loaded a copied install, and byte verification does not prove app execution. See the [release checks](./reference/releasing.md#package-and-installed-copy-verification) for packaging and isolated testing.
+The [bundled prerequisite guide](../skills/sql-apps/references/prerequisites.md) has host-specific SQL/selected-API and Azure setup, local database access, safe continuation and approval boundaries. Local-only work needs no Azure CLI, sign-in or subscription.
 
 ## Project instructions and troubleshooting
 
 Open the application directory, not the installed plugin directory. Ask the assistant explicitly to use SQL Apps. If discovery fails, check plugin enablement, refresh/restart the host, and check for duplicate skill names.
+
+Normal installation ends with the host-reported version, skill discovery and a
+fresh session. Suspected stale/corrupt packages and maintainer install/update
+testing use [installed-root byte verification](./reference/releasing.md#verify-the-actual-installed-root);
+cache enumeration and payload fingerprints are not routine onboarding.
 
 The generated project retains a policy block in the active host's instruction file:
 

@@ -4,10 +4,12 @@ import { fork } from 'node:child_process';
 import { spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { resolve } from 'node:path';
-import { configuration, readEnvironment, root } from '../dist/scripts/config.js';
+import { composeArguments, localApi, localConfiguration, localEndpoints, readEnvironment, root } from './config.ts';
 
 const env = readEnvironment();
-const config = configuration(env);
+const api = localApi();
+const config = localConfiguration(env, api);
+const apiOrigin = localEndpoints(env, api).api;
 const tokens = [env.ACCEPTANCE_TOKEN_A, env.ACCEPTANCE_TOKEN_B];
 if (tokens.some(token => !token)) throw new Error('Supply ACCEPTANCE_TOKEN_A and ACCEPTANCE_TOKEN_B for two distinct synthetic test users, via environment only.');
 const claims = tokens.map(token => JSON.parse(Buffer.from(token.split('.')[1], 'base64url')));
@@ -44,13 +46,13 @@ async function rows(base, token) {
   const response = await request(base, '/api/Items?$first=100', token);
   assert.equal(response.status, 200, 'Authenticated read must succeed.');
   const result = await response.json();
-  assert.ok(Array.isArray(result.value), 'DAB must return a value array.');
+  assert.ok(Array.isArray(result.value), 'The API must return a value array.');
   return result.value;
 }
 try {
   await start();
   const label = `Acceptance ${randomUUID()}`;
-  for (const base of [origin, config.dab]) {
+  for (const base of [origin, apiOrigin]) {
     const denied = await request(base, '/api/Items', undefined);
     assert.ok([401, 403].includes(denied.status), 'Anonymous read must be denied.');
     const forged = await request(base, '/api/Items', undefined, undefined, { 'X-MS-API-ROLE': 'authenticated', 'X-MS-CLIENT-PRINCIPAL': 'forged' });
@@ -60,7 +62,7 @@ try {
   }
   const writes = await Promise.all([
     request(origin, '/api/CreateItem', tokens[0], { Label: label }),
-    request(config.dab, '/api/CreateItem', tokens[0], { Label: label }),
+    request(apiOrigin, '/api/CreateItem', tokens[0], { Label: label }),
   ]);
   assert.equal(writes.filter(response => response.ok).length, 1, 'Exactly one concurrent duplicate must succeed.');
   assert.equal(writes.filter(response => response.status === 409).length, 1, 'The duplicate must be a conflict rejection, not an auth or service failure.');
@@ -73,16 +75,18 @@ try {
   const before = await exact(tokens[0]);
   assert.equal(before.length, 1, 'Exactly one row must persist.');
   assert.equal((await exact(tokens[1])).length, 0, 'Other owners must not see the saved row.');
-  const control = await request(config.dab, '/api/CreateItem', tokens[1], { Label: label });
+  const control = await request(apiOrigin, '/api/CreateItem', tokens[1], { Label: label });
   assert.ok(control.ok, 'The same label must be allowed for a distinct owner.');
-  const bypass = await request(config.dab, '/api/Items', tokens[0], { Label: 'Bypass' });
+  const bypass = await request(apiOrigin, '/api/Items', tokens[0], { Label: 'Bypass' });
   assert.ok([400, 403, 405].includes(bypass.status), 'The read entity must not permit direct writes.');
-  const invalid = await request(config.dab, '/api/CreateItem', tokens[0], { Label: ' ' });
+  const invalid = await request(apiOrigin, '/api/CreateItem', tokens[0], { Label: ' ' });
   const invalidResult = await invalid.json();
-  assert.ok([400, 500].includes(invalid.status) && invalidResult.error?.code === 'DatabaseOperationFailed',
-    `SQL validation must be a database rejection, not an outage: ${invalid.status} ${JSON.stringify(invalidResult)}`);
+  assert.ok(api === 'functions' ?
+    invalid.status === 400 && invalidResult.error === 'Label must contain 1 to 120 characters.' :
+    [400, 500].includes(invalid.status) && invalidResult.error?.code === 'DatabaseOperationFailed',
+    `API validation must be the expected rejection, not an outage: ${invalid.status} ${JSON.stringify(invalidResult)}`);
   const sql = query => {
-    const result = spawnSync('docker', ['compose', '--project-name', env.COMPOSE_PROJECT_NAME,
+    const result = spawnSync('docker', [...composeArguments(env, api),
       'exec', '-T', '-e', 'SQLCMDPASSWORD', 'sql', '/opt/mssql-tools18/bin/sqlcmd',
       '-S', 'localhost', '-U', 'app_api', '-C', '-b', '-d', 'appdb', '-h', '-1', '-W', '-Q', query],
     { cwd: root, env: { ...env, SQLCMDPASSWORD: env.APP_SQL_PASSWORD }, encoding: 'utf8' });
@@ -92,13 +96,13 @@ try {
   };
   assert.equal(sql("SET NOCOUNT ON; SELECT HAS_PERMS_BY_NAME('dbo.Items','OBJECT','SELECT'), HAS_PERMS_BY_NAME('dbo.Items','OBJECT','INSERT'), HAS_PERMS_BY_NAME('api.CreateItem','OBJECT','EXECUTE');"), '0 0 1',
     'API SQL identity must not read or write base tables.');
-  const deniedSql = spawnSync('docker', ['compose', '--project-name', env.COMPOSE_PROJECT_NAME,
+  const deniedSql = spawnSync('docker', [...composeArguments(env, api),
     'exec', '-T', '-e', 'SQLCMDPASSWORD', 'sql', '/opt/mssql-tools18/bin/sqlcmd',
     '-S', 'localhost', '-U', 'app_api', '-C', '-b', '-d', 'appdb', '-Q', 'SELECT * FROM dbo.Items;'],
   { cwd: root, env: { ...env, SQLCMDPASSWORD: env.APP_SQL_PASSWORD }, encoding: 'utf8' });
   if (deniedSql.error) throw deniedSql.error;
   assert.notEqual(deniedSql.status, 0, 'Direct base-table access must fail.');
-  await rows(config.dab, tokens[0]);
+  await rows(apiOrigin, tokens[0]);
   await stop();
   await start();
   assert.deepEqual(await exact(tokens[0]), before, 'Row identity and contents must survive a full stack restart.');
