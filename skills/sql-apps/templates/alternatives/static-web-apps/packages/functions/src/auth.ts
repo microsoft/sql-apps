@@ -1,7 +1,7 @@
 import type { HttpRequest } from '@azure/functions';
 import { createRemoteJWKSet, errors, jwtVerify } from 'jose';
 import type { JWTVerifyGetKey } from 'jose';
-import { authenticationConfiguration, guid } from './config.js';
+import { authenticationConfiguration, nonzeroGuid } from './config.js';
 
 export class HttpError extends Error {
   status: number;
@@ -41,7 +41,7 @@ export function createAuthenticator(env: NodeJS.ProcessEnv, keys?: JWTVerifyGetK
     if (typeof payload.tid !== 'string' || payload.tid.toLowerCase() !== config.tenant.toLowerCase()) {
       throw new HttpError(401, 'The access token is not accepted.');
     }
-    if (typeof payload.oid !== 'string' || !guid.test(payload.oid) ||
+    if (typeof payload.oid !== 'string' || !nonzeroGuid(payload.oid) ||
         typeof payload.scp !== 'string' || !config.scopes.some(scope => payload.scp.split(' ').includes(scope))) {
       throw new HttpError(403, 'A user identity and delegated API scope are required.');
     }

@@ -2,17 +2,9 @@
 
 [Back to SQL Apps](../README.md)
 
-Choose your host below. Packaging and verification are different: consult the [verification matrix](./reference/releasing.md#verification-status) before relying on a host-specific workflow.
-
-> **Local database notice:** The Azure SQL Database container is in **Private Preview**. You must [sign up for preview access](https://aka.ms/sqldbcontainerpreview-signup) to get the registry credentials needed to pull it. Read the [official getting-started guide](https://microsoft.github.io/azure-sql-database-container/getting-started.html) before setting up local SQL. SQL Apps can still scaffold while access is pending, but database persistence cannot be verified without real Azure SQL and the selected API.
-
-SQL Apps targets only the local Azure SQL Database container or Azure SQL Database in the cloud. If preview access is unavailable, offer signup or an explicitly selected cloud path, not an on-premises database fallback.
-
-## Pick the shortest setup path
-
-Let the assistant inspect installed capabilities and reuse project decisions first. Ask one grouped question only for missing routing choices: local or cloud, then the relevant database option. Local is the default when unspecified. If cloud is selected, establish whether an Azure subscription already exists and follow the bundled deployment recipe; subscription ownership alone never selects cloud or authorizes sign-in, provisioning, or spend. Defer detailed installation and deployment questions until needed.
-
-For local work, use the Azure SQL container. When unavailable, offer preview signup or explicitly selected Azure SQL Database cloud access; if neither is ready, continue useful scaffolding and keep persistence unverified. Setup/configuration changes still need scoped approval. See the [bundled routing guide](../skills/sql-apps/references/prerequisites.md#choose-the-shortest-setup-path).
+Choose your assistant below, install SQL Apps, then start a fresh session and
+confirm skill discovery. Installation adds guidance only; it does not install
+application dependencies, configure identity, create a database or deploy an app.
 
 ## Before you install
 
@@ -122,7 +114,19 @@ For a team marketplace:
 
 This requires an eligible Teams/Enterprise plan and applicable permissions. Public Cursor Marketplace listing is a separate submission/review process; this repository is not automatically listed. Cursor supports the portable root manifest as well as the included native compatibility metadata. See [Cursor marketplaces](https://cursor.com/docs/plugins) and [plugin formats](https://cursor.com/docs/reference/plugins).
 
-## Prerequisites
+## Application prerequisites
+
+Read this section only when building or running an app. The supported database is
+the local Azure SQL Database container or Azure SQL Database in Azure; neither
+preview access nor an existing subscription silently selects cloud deployment.
+If the local container is unavailable, ask before choosing cloud, and keep
+persistence unverified until real SQL and the selected API work.
+
+The local SQL container is in **Private Preview**. Access requires [preview
+signup](https://aka.ms/sqldbcontainerpreview-signup) and the [official
+quickstart](https://microsoft.github.io/azure-sql-database-container/getting-started.html).
+For tool setup and profile-specific identity, read the
+[prerequisite guide](../skills/sql-apps/references/prerequisites.md).
 
 Install companions separately using their supported host setup. SQL Apps does not bundle or auto-install them.
 
@@ -139,13 +143,7 @@ For SQL/selected-API setup and private-preview local-engine access, use the [bun
 If the selected API or Azure SQL target is unavailable, give its supported setup path. Useful UI, schema, and scaffolding work can continue, but mark persistence and end-to-end checks incomplete. Do not substitute another database, mocked persistence, or direct Express-to-SQL CRUD.
 
 Local-only work needs no Azure CLI or subscription. Cloud work has separate
-[resource, cost and access gates](../skills/sql-apps/references/deployment.md);
-free-first is not guaranteed zero spend or permission for a paid fallback.
-Installation proves no application/runtime outcome.
-
-## Quick setup when a capability is missing
-
-The [bundled prerequisite guide](../skills/sql-apps/references/prerequisites.md) has host-specific SQL/selected-API and Azure setup, local database access, safe continuation and approval boundaries. Local-only work needs no Azure CLI, sign-in or subscription.
+[resource, cost and access gates](../skills/sql-apps/references/deployment.md).
 
 ## Project instructions and troubleshooting
 

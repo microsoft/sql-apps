@@ -130,6 +130,11 @@ export function verifyRelease({ sourceRoot = checkout, installedRoot } = {}) {
         }
         for (const entry of readdirSync(path.join(directory, relative), { withFileTypes: true })) {
           const file = `${relative}/${entry.name}`;
+          if (['node_modules', 'dist', 'coverage', '.local', '.deployment', '.npmrc'].includes(entry.name) ||
+              (entry.name.startsWith('.env') && entry.name !== '.env.example') || /\.(log|pem|key)$/i.test(entry.name)) {
+            if (label === 'installed') errors.push(`installed ${file}: unexpected local build artifact in package`);
+            continue;
+          }
           if (entry.isSymbolicLink()) {
             errors.push(`${label} ${file}: linked payload is not an independent package copy`);
           } else if (entry.isDirectory()) {

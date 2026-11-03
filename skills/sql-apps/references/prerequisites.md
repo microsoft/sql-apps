@@ -1,68 +1,74 @@
-# Prerequisites and missing capabilities
+# Missing setup
 
-SQL Apps does not bundle SQL companion plugins, the local database engine, DAB, or Azure CLI. Discover what the active host actually provides before relying on it. Use the supported setup for that host, and ask before changing host or system configuration.
+Check the selected app, host and installed tools before asking questions. Reuse
+recorded decisions. If the target is unknown, ask local or cloud; local is the
+default. Ask only for decisions that affect the next step.
 
-## Choose the shortest setup path
-
-Inspect the host/OS, installed tools, and existing project decisions first, without reading credentials or signing in. Reuse known answers. Ask one grouped routing question only for unknown choices; defer installation details and app/deployment questions until they affect the next action.
-
-| Situation | Next action |
+| Situation | Next step |
 | --- | --- |
-| Working Azure SQL/selected API and a recorded target | Reuse them; do not repeat onboarding or change the target |
-| Target unknown | Offer local or cloud; default to local when no preference is stated |
-| Cloud selected | Ask whether an Azure subscription exists only if unknown, then use the bundled deployment recipe; if none, explain account options without creating or signing into one |
-| Azure subscription exists, target undecided | Still offer local or cloud; ownership is not cloud intent or provisioning approval |
-| Local selected, Azure SQL container unavailable | Offer [Private Preview signup](https://aka.ms/sqldbcontainerpreview-signup) or explicitly selected Azure SQL Database cloud access; never switch to cloud automatically |
-| Neither Azure SQL target is ready, or the selected API is missing | Give the selected profile's supported setup step; continue useful UI/schema/scaffolding and mark integration incomplete; Functions does not require DAB |
-| Existing on-premises database | Explain that it is outside this profile; do not reuse it as a fallback, install another engine, or migrate it without explicit scope |
+| SQL/API and target already work | Keep using them |
+| Target unknown | Offer local or cloud; choose local if no preference is given |
+| Local SQL container unavailable | Offer preview signup or explicitly chosen Azure SQL cloud; do not switch automatically |
+| Selected API unavailable | Give setup for that API; Functions does not require DAB |
+| Neither supported SQL target is ready | Continue safe UI/schema work and mark persistence unverified |
+| Existing on-premises SQL Server | Explain it is unsupported here; do not install, fall back or migrate without scope |
 
-Explain needed installation/configuration actions together where their effects are known, then obtain scoped approval. Do not turn every discovery or ordinary local build/test into another product questionnaire. Host permissions, interactive sign-in, license acceptance, and cloud/access/destructive approvals still apply.
+Ask before changing host/system settings, signing in, accepting terms, provisioning
+resources, changing access or deleting data. Do not turn routine local builds or
+tests into a new onboarding questionnaire.
 
-## SQL, selected API, and local database
+## SQL and API tools
 
-For general coding hosts, install the broad [Microsoft SQL plugin](https://github.com/microsoft/microsoft-sql#installation). For Copilot CLI:
+The supported databases are the local Azure SQL Database container and Azure SQL
+Database in Azure. The container is in **Private Preview** and requires [access
+signup](https://aka.ms/sqldbcontainerpreview-signup) and the [official
+quickstart](https://microsoft.github.io/azure-sql-database-container/getting-started.html).
+SQL Apps does not install the engine or handle registry credentials.
 
-```text
-copilot plugin marketplace add microsoft/microsoft-sql
-copilot plugin install microsoft-sql@microsoft-sql
-```
+For general SQL guidance, use the
+[Microsoft SQL plugin](https://github.com/microsoft/microsoft-sql#installation);
+in VS Code, use the [MSSQL extension](https://marketplace.visualstudio.com/items?itemName=ms-mssql.mssql).
+For DAB apps, also enable one DAB capability (`dab-rest-and-graphql`,
+`azuresql-db-dab` or the host's DAB tool). Functions apps instead need installed
+Functions Core Tools 4 and SWA CLI 2. Follow the copied app's README for its ports,
+identity and lifecycle.
 
-In VS Code, install or enable the [Microsoft SQL Server extension](https://marketplace.visualstudio.com/items?itemName=ms-mssql.mssql). For DAB profiles, enable its DAB capability and confirm the tool is discovered. It normally replaces the overlapping `microsoft-sql-vscode` bundle. On other hosts, use Microsoft's [host-specific instructions](https://github.com/microsoft/microsoft-sql#installation).
+The protected profile needs a real external identity registration, redirect URI,
+and consent. Ask the identity owner for the exact values listed in the copied
+README. Continue safe scaffolding if identity or SQL is unavailable; do not invent
+users, use fake sign-in as acceptance, or claim persistence.
 
-After setup, refresh or restart the host and check the selected capabilities. The preferred Azure SQL Database container is currently in **Private Preview**. Using it requires [preview access](https://aka.ms/sqldbcontainerpreview-signup) and the [official quickstart](https://microsoft.github.io/azure-sql-database-container/getting-started.html). Installing SQL guidance does not grant registry access. The user must complete any interactive registry login; never handle or paste credentials. Do not enroll, accept terms, or authenticate without explicit approval.
+## Azure CLI
 
-If the container is unavailable, offer signup or explicit Azure SQL Database cloud
-selection; follow the [deployment gates](./deployment.md) before cloud actions.
-Reuse the recorded target/topology. Missing Azure SQL or selected API leaves
-persistence/end-to-end checks incomplete, but safe UI/schema/scaffolding can
-continue. The [constitution](./constitution.md) forbids engine/mock/Express CRUD
-fallbacks; explicitly selected Functions is a supported API, not a fallback.
+Local-only work needs no Azure CLI, Azure sign-in or subscription. The bundled
+Container Apps recipe uses Azure CLI, Bicep, Docker Linux containers and an approved
+registry. Check whether these tools exist before proposing installation. Installing
+or changing host tools needs approval.
 
-For explicitly selected Static Web Apps/Functions, DAB discovery is unnecessary.
-Local development needs approved, installed Functions Core Tools 4 and SWA CLI 2,
-plus the same SQL preview image. The copied app checks tools without installing
-them and requires an explicit loopback SQL port. Follow the
-[local Functions workflow](../templates/starter/hosting.md#local-development);
-SWA's fake authentication identities are not real-provider acceptance.
-
-## Azure tools
-
-The [bundled Container Apps recipe](../templates/starter/deployment.md) uses Azure CLI with Bicep for cloud deployment and Docker for image builds. No separate cloud skills plugin, MCP extension, or Azure Developer CLI is required. Existing CLI/API tools may assist inspection but are not an additional mandatory dependency.
-
-Local-only development needs no Azure CLI, sign-in, or subscription. Local Bicep compilation requires the Bicep compiler but not authentication. Check `az bicep version`; installing it with `az bicep install` changes the host and requires approval. Use [Bicep installation guidance](https://learn.microsoft.com/azure/azure-resource-manager/bicep/install) if it is missing. Docker images must be built and published to an approved registry before Azure can pull them; registry publication/access changes require separate approval. The recipe creates no registry automatically.
-
-On Windows, when the requested Azure workflow needs `az`, install it only with the user's approval and subject to device policy:
+On Windows, install Azure CLI only with user approval and subject to device policy:
 
 ```powershell
 winget install --exact --id Microsoft.AzureCLI
 ```
 
-Restart the terminal and check `az version`. See Microsoft's [Azure CLI Windows installation guide](https://learn.microsoft.com/cli/azure/install-azure-cli-windows). Azure Cloud Shell is another option after the user signs in; the assistant must not assume it can operate that browser session or that local Docker builds are available there.
+`az login` is interactive and user-controlled. Run it only for a selected cloud
+task; verify context with `az account show`. Never request, read or print secrets.
+Do not install `azd` unless the selected workflow needs it.
 
-`az login` is interactive user-controlled sign-in, not an install step. Run it only for a chosen Azure task and let the user complete the sign-in flow. Never ask for, read, store, or echo credentials, tokens, or secrets. Confirm the intended context with `az account show`. Do not install `azd` unless the selected workflow requires it.
+## Adopt a cached SQL image
 
-## Ask the assistant to check capabilities
+A matching tag is not proof of the required image. Inspect local Docker
+`RepoDigests` and platform; require the exact pinned repository and immutable
+digest. Do not silently change the pin or pull `latest`.
 
-> Use SQL Apps to check my existing setup first. Reuse known decisions, ask only for missing routing choices, and recommend the next useful step. If the Azure SQL container is unavailable, offer preview signup or an explicitly selected Azure SQL Database cloud path. Keep setup changes and sign-in under my control; continue safe scaffolding while integration is incomplete.
+With explicit approval, an initialized copied app whose containers are stopped can
+adopt a cached `linux/amd64` digest from the same repository:
 
-Approval to install or enable a plugin/extension is not approval to sign in to Azure, create resources, spend money, change access, or perform destructive work. If setup fails, report the result and offer one supported alternative; do not repeat discovery indefinitely.
+```powershell
+npm run local:adopt-sql -- --image <same-approved-repository@sha256:digest> --reason "<non-secret reason>"
+```
+
+The command records the original and new pins, updates both references together,
+and leaves integration checks pending. It does not log in, pull or start SQL.
+Verify EngineEdition 5, the app database, migrations, permissions, selected API and
+end-to-end behavior before claiming compatibility.

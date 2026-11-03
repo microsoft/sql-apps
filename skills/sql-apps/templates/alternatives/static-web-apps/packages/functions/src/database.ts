@@ -1,6 +1,6 @@
 import { Connection, Request, TYPES } from 'tedious';
 import tarn from 'tarn';
-import { guid, required } from './config.js';
+import { guid, nonzeroGuid, required } from './config.js';
 
 type SqlParameter = [string, Parameters<Request['addParameter']>[1], string];
 type DatabaseRow = Record<string, unknown>;
@@ -109,11 +109,30 @@ export function createDatabase(
       throw error;
     }
   }
+  async function publicOperation(text: string, parameters: SqlParameter[]): Promise<DatabaseRow[]> {
+    if (pool.numPendingAcquires() >= 8) throw new Error('Database is busy.');
+    const connection = await pool.acquire().promise;
+    try {
+      const rows = await run(connection, text, parameters);
+      pool.release(connection);
+      return rows;
+    } catch (error) {
+      try { discard(connection); }
+      finally { pool.release(connection); }
+      throw error;
+    }
+  }
   return {
     list: (oid: string, label?: string) => operation(oid,
       `SELECT TOP (100) Id, Label, CreatedAt FROM api.Items${label === undefined ? '' : ' WHERE Label = @Label'} ORDER BY CreatedAt DESC, Id DESC;`,
       label === undefined ? [] : [['Label', TYPES.NVarChar, label]]),
     create: (oid: string, label: string) => operation(oid, 'EXEC api.CreateItem @Label=@Label;', [['Label', TYPES.NVarChar, label]]),
+    submit: (label: string) => publicOperation('EXEC api.Submit @Label=@Label;', [['Label', TYPES.NVarChar, label]]),
+    submissions: async (tenant: string, oid: string) => {
+      if (!nonzeroGuid(tenant) || !nonzeroGuid(oid)) throw new Error('Invalid owner identity.');
+      return publicOperation('EXEC api.Submissions @TenantId=@TenantId, @OwnerId=@OwnerId;',
+        [['TenantId', TYPES.UniqueIdentifier, tenant], ['OwnerId', TYPES.UniqueIdentifier, oid]]);
+    },
     close: () => pool.destroy(),
   };
 }

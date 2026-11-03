@@ -2,21 +2,29 @@ import assert from 'node:assert/strict';
 import { fork } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
-import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { installAlternative } from '../skills/sql-apps/templates/alternatives/install.mjs';
+import { copyStarter } from './fixtures/starter-copy.mjs';
 
-async function unusedPort() {
-  const probe = createServer();
-  probe.listen(0, '127.0.0.1');
-  await once(probe, 'listening');
-  const port = String(probe.address().port);
-  await new Promise(resolve => probe.close(resolve));
-  return port;
+async function unusedPorts(count) {
+  const probes = [];
+  try {
+    for (let index = 0; index < count; index++) {
+      const probe = createServer();
+      probes.push(probe);
+      probe.listen(0, '127.0.0.1');
+      await once(probe, 'listening');
+    }
+    return probes.map(probe => String(probe.address().port));
+  } finally {
+    await Promise.all(probes.filter(probe => probe.listening)
+      .map(probe => new Promise(resolve => probe.close(resolve))));
+  }
 }
 
 for (const mode of ['foreground', 'external', 'startup-cleanup-failure']) {
@@ -24,7 +32,7 @@ for (const mode of ['foreground', 'external', 'startup-cleanup-failure']) {
     const app = await mkdtemp(join(tmpdir(), 'sqlapps-functions-supervisor-'));
     const children = [];
     try {
-      await cp(new URL('../skills/sql-apps/templates/starter/', import.meta.url), app, { recursive: true });
+      await copyStarter(app);
       await installAlternative('static-web-apps', app);
       await mkdir(join(app, 'dist/scripts'), { recursive: true });
       await writeFile(join(app, 'dist/scripts/config.js'), '');
@@ -32,8 +40,7 @@ for (const mode of ['foreground', 'external', 'startup-cleanup-failure']) {
         await mkdir(join(app, 'packages', directory, 'dist'), { recursive: true });
         await writeFile(join(app, 'packages', directory, 'dist', file), '');
       }
-      const APP_PORT = await unusedPort();
-      const FUNCTIONS_PORT = await unusedPort();
+      const [APP_PORT, FUNCTIONS_PORT] = await unusedPorts(2);
       const env = {
         ...process.env, COMPOSE_FILE: '', COMPOSE_PROJECT_NAME: `sqlapps-${randomBytes(6).toString('hex')}`,
         ACCEPT_EULA: 'Y', SQL_PORT: '14330', APP_PORT, FUNCTIONS_PORT,

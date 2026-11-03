@@ -37,6 +37,11 @@ are metered allowances, not spending caps; scale-to-zero reduces exposure but
 does not prevent overages. The runbook supplies the two-stage foundation/bootstrap/
 application sequence and explicitly approved SQL network path.
 
+For new resources, `sqlLocation` defaults to hosting `location` but may use a
+separately approved eligible SQL region. The SQL name varies with that region,
+not the hosting names. This is not a migration or permission to rename/delete
+existing resources; preserve existing deployed names and review adoption separately.
+
 ## App Service F1 / DAB
 
 The [Linux custom-container quickstart](https://learn.microsoft.com/azure/app-service/quickstart-custom-container?pivots=container-linux)
@@ -79,10 +84,7 @@ does not certify that cloud connection. See [SWA operator/publication steps](./d
 Open gates include real SQL ownership/pooling, Node 22 publication, provider
 sign-in, idle/resume, quota errors and persisted reload after redeployment.
 
-### Local development
-
-Both public starts dispatch the selected profile after Build.
-[Local setup](./README.md#first-local-run) owns commands and ports; Functions
-requires existing Core Tools/SWA CLI and loopback SQL, not DAB.
-The [SWA auth emulator](https://learn.microsoft.com/azure/static-web-apps/local-development)
-supplies fake identities, not real-provider acceptance.
+The copied app's README owns the selected profile's local commands and ports.
+Functions needs Core Tools/SWA CLI and loopback SQL, not DAB. The
+[SWA auth emulator](https://learn.microsoft.com/azure/static-web-apps/local-development)
+does not prove real-provider sign-in.

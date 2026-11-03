@@ -1,11 +1,18 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { localApi, root } from './config.ts';
+import { pathToFileURL } from 'node:url';
+import { localAccess, localApi, root } from './config.ts';
 
 const read = file => readFileSync(resolve(root, file), 'utf8');
 const baseline = JSON.parse(read('baseline.json'));
 const api = localApi();
+if (api === 'functions') {
+  for (const file of ['packages/functions/src/profile.ts', 'packages/frontend/src/profile.ts']) {
+    const { accessProfile } = await import(pathToFileURL(resolve(root, file)).href);
+    assert.equal(accessProfile, localAccess(), 'Application access code must match deployment.json. Select a fresh profile or review a migration.');
+  }
+}
 if (api === 'dab') {
   const dab = JSON.parse(read('packages/data/dab-config.json'));
   assert.ok(dab.$schema.includes(`/v${baseline.dab}/`));

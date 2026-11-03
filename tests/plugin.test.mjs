@@ -10,6 +10,8 @@ const skillPath = path.join('skills', 'sql-apps', 'SKILL.md');
 
 function filesIn(directory) {
   return readdirSync(path.join(root, directory), { withFileTypes: true }).flatMap((entry) => {
+    if (['node_modules', 'dist', 'coverage', '.local', '.deployment', '.npmrc'].includes(entry.name) ||
+        (entry.name.startsWith('.env') && entry.name !== '.env.example') || /\.(log|pem|key)$/i.test(entry.name)) return [];
     const relative = path.join(directory, entry.name);
     return entry.isDirectory() ? filesIn(relative) : [relative];
   });
@@ -127,9 +129,11 @@ test('Gemini extension uses native skill discovery without global context or cod
 });
 
 test('every bundled Markdown link resolves inside the plugin', () => {
+  const copiedAppDocument = file => file.startsWith(path.join('skills', 'sql-apps', 'templates', 'alternatives') + path.sep) &&
+    ['README.md', 'deployment.md'].includes(path.basename(file));
   const documents = [
     'README.md', 'SECURITY.md', 'SUPPORT.md', 'CODE_OF_CONDUCT.md',
-    ...filesIn('skills').filter(file => file.endsWith('.md')), ...filesIn('docs'),
+    ...filesIn('skills').filter(file => file.endsWith('.md') && !copiedAppDocument(file)), ...filesIn('docs'),
   ];
   for (const document of documents) {
     const text = read(document);
@@ -147,7 +151,9 @@ test('every bundled Markdown link resolves inside the plugin', () => {
 
 test('skill links resolve within an independent installed payload', () => {
   const skillFiles = filesIn('skills');
-  for (const document of skillFiles.filter((file) => file.endsWith('.md'))) {
+  const copiedAppDocument = file => file.startsWith(path.join('skills', 'sql-apps', 'templates', 'alternatives') + path.sep) &&
+    ['README.md', 'deployment.md'].includes(path.basename(file));
+  for (const document of skillFiles.filter(file => file.endsWith('.md') && !copiedAppDocument(file))) {
     const text = read(document);
     for (const match of text.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
       const target = match[1];

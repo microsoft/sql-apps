@@ -7,6 +7,9 @@ param workload string = 'demo'
 
 param location string = resourceGroup().location
 
+@description('Explicitly approved SQL region. Listed SKUs do not establish subscription provisioning eligibility. Preserve deployed names when adopting this parameter.')
+param sqlLocation string = location
+
 @description('Recorded SQL Apps guidance version adopted by this app; preserve on redeployment.')
 @minLength(1)
 param sqlappsVersion string
@@ -75,7 +78,8 @@ var unique = take(uniqueString(resourceGroup().id, workload), 6)
 var environmentName = 'env-${workload}-${unique}'
 var webName = 'web-${workload}-${unique}'
 var dabName = 'dab-${workload}-${unique}'
-var sqlName = 'sql-${workload}-${unique}'
+var sqlUnique = sqlLocation == location ? unique : take(uniqueString(resourceGroup().id, workload, sqlLocation), 6)
+var sqlName = 'sql-${workload}-${sqlUnique}'
 var databaseName = 'app-${workload}'
 var tags = {
   'sqlapps-version': sqlappsVersion
@@ -104,7 +108,7 @@ resource environment 'Microsoft.App/managedEnvironments@2025-01-01' = {
 
 resource sqlServer 'Microsoft.Sql/servers@2023-08-01' = {
   name: sqlName
-  location: location
+  location: sqlLocation
   tags: tags
   properties: {
     version: '12.0'
@@ -124,7 +128,7 @@ resource sqlServer 'Microsoft.Sql/servers@2023-08-01' = {
 resource database 'Microsoft.Sql/servers/databases@2023-08-01' = {
   parent: sqlServer
   name: databaseName
-  location: location
+  location: sqlLocation
   tags: tags
   sku: {
     name: 'GP_S_Gen5'

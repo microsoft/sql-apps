@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { parseEnv } from 'node:util';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,6 +8,7 @@ import test from 'node:test';
 import { composeArguments, localConfiguration, localEndpoints } from '../skills/sql-apps/templates/starter/scripts/config.ts';
 import { installAlternative } from '../skills/sql-apps/templates/alternatives/install.mjs';
 import { inspectDevelopment } from '../skills/sql-apps/templates/starter/scripts/development.mjs';
+import { copyStarter } from './fixtures/starter-copy.mjs';
 
 const env = {
   COMPOSE_PROJECT_NAME: 'sqlapps-0123456789ab', SQL_PORT: '14330',
@@ -71,7 +72,7 @@ test('Functions Status and Ready inspect only SQL and the selected API, not DAB'
 test('Functions Compose selects only SQL and reuses the pinned isolated database', async t => {
   const app = await mkdtemp(join(tmpdir(), 'sqlapps-functions-compose-'));
   t.after(() => rm(app, { recursive: true, force: true }));
-  await cp(new URL('../skills/sql-apps/templates/starter/', import.meta.url), app, { recursive: true });
+  await copyStarter(app);
   await installAlternative('static-web-apps', app);
   const sample = parseEnv(await readFile(join(app, '.env.example'), 'utf8'));
   assert.equal(sample.FUNCTIONS_PORT, '7071');

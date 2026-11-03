@@ -2,6 +2,7 @@ using './main.bicep'
 
 param workload = 'demo'
 param location = 'eastus'
+// SQL defaults to hosting region. Override sqlLocation only for a separately approved NEW SQL target.
 // Copy the actual adopted plugin.json version from app-brief.md.
 param sqlappsVersion = 'REPLACE_ADOPTED_VERSION'
 param webImage = 'ghcr.io/REPLACE_OWNER/REPLACE_WEB@sha256:REPLACE_DIGEST'

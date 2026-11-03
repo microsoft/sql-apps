@@ -11,6 +11,19 @@ export interface PublicConfig {
   redirectUri: string;
 }
 
+export interface PublicSubmissionConfig {
+  access: 'public-submissions';
+  redirectUri: string;
+  ownerAuth: PublicConfig | null;
+}
+
+export function isPublicSubmissionConfig(value: unknown): value is PublicSubmissionConfig {
+  return typeof value === 'object' && value !== null &&
+    'access' in value && value.access === 'public-submissions' &&
+    'redirectUri' in value && typeof value.redirectUri === 'string' &&
+    'ownerAuth' in value && (value.ownerAuth === null || isPublicConfig(value.ownerAuth));
+}
+
 export function isItem(value: unknown): value is Item {
   return typeof value === 'object' && value !== null &&
     'Id' in value && typeof value.Id === 'string' &&

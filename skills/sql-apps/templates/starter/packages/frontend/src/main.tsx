@@ -6,8 +6,11 @@ import type { Item } from '@app/shared';
 import { completeSignin, loadIdentity } from './auth';
 import { AuthenticationRequiredError, requestItems } from './api';
 import './global.css';
+import { accessProfile } from './profile';
+import { PublicApp } from './PublicApp';
 
 export function App() {
+  useEffect(() => { document.title = 'My items | SQL Apps'; }, []);
   const [identity, setIdentity] = useState<UserManager>();
   const [token, setToken] = useState('');
   const [items, setItems] = useState<Item[]>([]);
@@ -75,9 +78,8 @@ export function App() {
 
   return <main data-theme={theme}>
     <header>
-      <p className="eyebrow">SQL APPS / FIRST VERTICAL SLICE</p>
-      <h1>Your work, persisted.</h1>
-      <p>A small foundation: external sign-in, a protected API, and SQL-enforced rules.</p>
+      <h1>My items</h1>
+      <p>Save and reload your items.</p>
       <label>Appearance <select value={theme} onChange={event => setTheme(event.target.value)}>
         <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
       </select></label>
@@ -110,9 +112,9 @@ export function App() {
         <p className="hint">Showing the latest 100 items. This starter is not a full collection browser.</p>
       </section>
     </>}
-    <footer>Starter workflow only. Local acceptance and deployed acceptance are separate milestones.</footer>
   </main>;
 }
 
 const rootElement = document.getElementById('root');
-if (rootElement) createRoot(rootElement).render(<App/>);
+const publicSubmissions = accessProfile === 'public-submissions';
+if (rootElement) createRoot(rootElement).render(publicSubmissions ? <PublicApp/> : <App/>);

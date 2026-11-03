@@ -1,34 +1,25 @@
-# SQL Apps constitution
+# SQL Apps project policy
 
-This is the authoritative durable policy, not a security sandbox or runtime.
-The [skill router](../SKILL.md) selects task guidance; [app design](./app-design.md),
-[prerequisites](./prerequisites.md), and [deployment](./deployment.md) supply steps.
-Preserve existing apps rather than rewriting them to fit the profile.
+This block is durable project guidance, not a security sandbox or runtime.
+The [skill router](../SKILL.md) selects task guidance. Read [app design](./app-design.md)
+for UI work and [prerequisites](./prerequisites.md) when setup is missing.
 
-## Durable project policy
-
-Merge this single block into the active host's instruction file, preserving other
-instructions: `.github/copilot-instructions.md`, `CLAUDE.md`, `AGENTS.md` for
-Codex/Cursor, or `GEMINI.md`. Respect an existing configured location. Replace the
-marked block only for an intentional policy update; do not accumulate inactive-host
-copies. `app-brief.md` holds app decisions and business constraints, not another
-constitution. One app-owned `deployment.md` holds cloud target, cost/access
-approvals, operator instructions and observed deployment results.
+Merge the marked block into the active host instruction file, preserving unrelated
+instructions. Do not create competing copies for inactive hosts. The app brief
+holds business decisions; the app's `deployment.md` holds cloud targets, approvals
+and results.
 
 ```markdown
 <!-- sql-apps:constitution:start -->
 ## SQL Apps project policy
 
-- Preserve source/behavior/decisions/unrelated work. Deliver one workflow using TypeScript, React/Vite, npm workspaces/browser-safe contracts; no plugin runtime.
-- Select DAB by default or explicit Static Web Apps/Functions. DAB prerequisites/acceptance apply only to DAB; no unused API or parallel Express CRUD.
-- Use local Azure SQL Database container (Private Preview) or Azure SQL Database cloud: EngineEdition 5, application catalog (`appdb` locally), never `master`/on-premises. Missing SQL/API leaves persistence incomplete; no mocks/fabricated acceptance.
-- Validate real external identity/ownership; never trust caller roles/headers, UI controls or fake login. Keep secrets server-side, outside source/chat/arguments/logs. Use least-privilege SQL and constraints/procedures for transactional/concurrent invariants, without table-write bypass.
-- Preserve credentials/volumes/history; forward-only checksum migrations, never edited applied migrations/data resets. Pin immutable runtimes/dependencies and reproducible lockfiles.
-- Explicit Build precedes Start, compiled-code Test and acceptance; no compiler hooks. `npm start` aliases `local:start`, dispatching the selected profile; `serve:web` is internal DAB hosting. Init/preflight/Status/Preview/Connect/Stop need no compiled output. Stop only owned processes/containers; retain volumes.
-- Separate build/unit, readiness, authenticated direct/proxied API, browser save/reload, SQL concurrency, restart/persistence and cloud evidence. Denials need allowed controls; report failed/unrun checks. Fixtures/local success never certify cloud.
-- Default `intent: poc`, `costPreference: free-first`; preserve `zero-azure-spend`. Deployment requests/allowances are not spend approval. Local work needs no Azure login. Respect host permissions; obtain scoped setup/sign-in/terms, cloud-write/spend/access and destructive approvals.
-- Keep host/API in `deployment.json`; target/costs/approvals/operator steps/results in one `deployment.md`, linked from the decision-only brief. Preserve approved topology/SQL free-limit AutoPause; allowances/budget alerts are not caps. Verify whole-topology settings.
-- Preserve adopted `sqlapps-version`/customer metadata for new in-scope tag-capable resources; suffix optional. Record opt-outs in deployment.md. No unapproved existing-resource renaming/reattribution, sensitive names/tags or attribution telemetry.
-- No speculative Rayfin manifest/SDK/provider/private CLI. Preserve existing manifests; migration requires explicit scope and released tooling.
+- Preserve existing app code, data, decisions and unrelated work. Build with React/TypeScript and the explicitly selected API; add no plugin runtime or duplicate CRUD service.
+- Use DAB by default or explicitly selected Static Web Apps/Functions. Follow that profile's prerequisites and tests.
+- Use Azure SQL Database locally or in Azure (`EngineEdition = 5`). Use the application database, never `master` or on-premises SQL Server. If the selected SQL/API is unavailable, state that persistence is unverified; do not substitute a mock.
+- Validate real user identity on the server. Keep secrets server-side. Enforce ownership and concurrent business rules in SQL with least-privilege permissions and no table-write bypass.
+- Preserve databases, credentials and volumes. Use forward-only, checksummed migrations; never edit an applied migration or reset data to pass a check.
+- Obtain approval for identity, host changes, software terms, cloud writes, spending, access changes and destructive work. Local development needs no Azure sign-in.
+- Separate readiness, allowed/denied API checks, browser save/reload, SQL concurrency, restart and cloud evidence. State which checks did not run; a build or deployment is not acceptance or proof of zero cost.
+- Use anonymous public submissions only when explicitly selected. Require enrolled authenticated readers and approved abuse, privacy, retention, cost and ingress controls before publication.
 <!-- sql-apps:constitution:end -->
 ```

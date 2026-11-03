@@ -1,6 +1,6 @@
 import type { HttpRequest } from '@azure/functions';
 import { HttpError } from './auth.js';
-import { publicConfiguration } from './config.js';
+import { applicationOrigin, optionalAuthenticationConfiguration, publicConfiguration } from './config.js';
 
 type HttpResponse = {
   status: number;
@@ -11,6 +11,8 @@ type HttpResponse = {
 type Database = {
   list: (oid: string, label?: string) => Promise<unknown>;
   create: (oid: string, label: string) => Promise<unknown>;
+  submit?: (label: string) => Promise<unknown>;
+  submissions?: (tenant: string, oid: string) => Promise<unknown>;
 };
 
 type HandlerOptions = {
@@ -18,6 +20,7 @@ type HandlerOptions = {
   authenticate: (request: HttpRequest) => Promise<string>;
   database: () => Database;
   bodyTimeoutMs?: number;
+  access?: string;
 };
 
 function response(status: number, jsonBody: unknown): HttpResponse {
@@ -98,12 +101,14 @@ function databaseErrorNumbers(error: unknown): number[] {
   return numbers;
 }
 
-export function createHandlers({ env, authenticate, database, bodyTimeoutMs = 10000 }: HandlerOptions) {
+export function createHandlers({ env, authenticate, database, bodyTimeoutMs = 10000, access = 'protected' }: HandlerOptions) {
+  const publicInbox = access === 'public-submissions';
   const wrap = (handler: (request: HttpRequest) => Promise<HttpResponse>) => async (request: HttpRequest): Promise<HttpResponse> => {
     try { return await handler(request); }
     catch (error: unknown) {
       if (error instanceof HttpError) return response(error.status, { error: error.message });
       const numbers = databaseErrorNumbers(error);
+      if (numbers.includes(51029)) return response(429, { error: 'Submissions are temporarily closed. Retry later.' });
       if (numbers.some(number => [2601, 2627].includes(number))) {
         return response(409, { error: 'An item with that label already exists.' });
       }
@@ -127,21 +132,49 @@ export function createHandlers({ env, authenticate, database, bodyTimeoutMs = 10
     config: wrap(async request => {
       if (request.method !== 'GET') throw new HttpError(405, 'Method not allowed.');
       if (new URL(request.url).search) throw new HttpError(400, 'Unsupported query.');
-      return response(200, publicConfiguration(env));
+      return response(200, publicConfiguration(env, access));
     }),
     items: wrap(async request => {
+      if (publicInbox) throw new HttpError(404, 'Not found.');
       if (request.method !== 'GET') throw new HttpError(405, 'Method not allowed.');
       const oid = await authenticate(request);
       return response(200, { value: await database().list(oid, labelFilter(request)) });
     }),
     createItem: wrap(async request => {
+      if (publicInbox) throw new HttpError(404, 'Not found.');
       if (request.method !== 'POST') throw new HttpError(405, 'Method not allowed.');
       const oid = await authenticate(request);
       if (new URL(request.url).search) throw new HttpError(400, 'Unsupported query.');
       const origin = request.headers.get('origin');
-      if (origin && origin !== new URL(publicConfiguration(env).redirectUri).origin) throw new HttpError(403, 'Origin not allowed.');
+      if (origin && origin !== applicationOrigin(env)) throw new HttpError(403, 'Origin not allowed.');
       const label = await readLabel(request, bodyTimeoutMs);
       return response(200, { value: await database().create(oid, label) });
+    }),
+    submit: wrap(async request => {
+      if (!publicInbox) throw new HttpError(404, 'Not found.');
+      // Partial identity setup is an operator error, never a fallback to anonymous ownership.
+      optionalAuthenticationConfiguration(env);
+      const allowedOrigin = applicationOrigin(env);
+      if (request.method !== 'POST') throw new HttpError(405, 'Method not allowed.');
+      if (new URL(request.url).search) throw new HttpError(400, 'Unsupported query.');
+      const origin = request.headers.get('origin');
+      if (origin && origin !== allowedOrigin) throw new HttpError(403, 'Origin not allowed.');
+      const label = await readLabel(request, bodyTimeoutMs);
+      const data = database();
+      if (!data.submit) throw new Error('Public submission database is unavailable.');
+      await data.submit(label);
+      return response(202, { accepted: true });
+    }),
+    submissions: wrap(async request => {
+      if (!publicInbox) throw new HttpError(404, 'Not found.');
+      if (request.method !== 'GET') throw new HttpError(405, 'Method not allowed.');
+      if (new URL(request.url).search) throw new HttpError(400, 'Unsupported query.');
+      const config = optionalAuthenticationConfiguration(env);
+      if (!config) throw new HttpError(503, 'Owner access is not configured.');
+      const oid = await authenticate(request);
+      const data = database();
+      if (!data.submissions) throw new Error('Private inbox database is unavailable.');
+      return response(200, { value: await data.submissions(config.tenant, oid) });
     }),
   };
 }

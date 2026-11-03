@@ -1,11 +1,15 @@
 import { UserManager, WebStorageStateStore } from 'oidc-client-ts';
-import { isPublicConfig } from '@app/shared';
+import { isPublicConfig, type PublicConfig } from '@app/shared';
 
-export async function loadIdentity() {
+export async function loadPublicConfiguration(): Promise<unknown> {
   let response = await fetch('/config.json');
   if (response.status === 404) response = await fetch('/api/config');
   if (!response.ok) throw new Error('Public identity configuration is unavailable.');
-  const config: unknown = await response.json();
+  return response.json();
+}
+
+export async function loadIdentity(configuration?: PublicConfig) {
+  const config: unknown = configuration ?? await loadPublicConfiguration();
   if (!isPublicConfig(config)) throw new Error('Public identity configuration has an unexpected shape.');
   return new UserManager({
     authority: config.authority,

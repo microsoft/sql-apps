@@ -33,6 +33,12 @@ selected F1/DAB or Static Web Apps/Functions. Apply the overlay before adapting 
 sample; Functions removes verified-unmodified DAB-only files and retains shared SQL.
 Existing out-of-profile apps need a scoped migration decision.
 
+Only when the user explicitly selects anonymous submission with private owner
+reading, use the [public-submissions profile](./references/public-submissions.md)
+and `static-web-apps-public` installer selector. It reuses Functions, starts with
+no owner access, and requires operator-only verified enrollment for reads.
+Never infer public access from missing auth or use this as a deployment approval.
+
 Read [app design](./references/app-design.md) before UI work. Replace the sample
 with the first useful save/reload workflow through the selected API and real SQL.
 Invoke installed SQL guidance for the actual task, such as

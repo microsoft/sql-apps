@@ -1,4 +1,4 @@
-# Deployment record and operator runbook
+# Container Apps / DAB deployment record
 
 **Cloud deployment not requested/approved; end-to-end acceptance unverified.**
 This is the application's single deployment record. Fill in the selected target,
@@ -18,11 +18,11 @@ another runbook policy copy.
 | Operator/recovery | <selected steps below, temporary-rule/credential cleanup, rollback and data retention> |
 | Results/open gates | <actual settings, commands/results, failed/unrun acceptance and next safe action> |
 
-For F1/DAB or Static Web Apps/Functions, adapt this record using the
-[profile differences](./hosting.md) and the operator sections below. Container Apps
-steps are DAB-only; Functions reuses only the shared migration/history procedure,
-then its own bootstrap/publication, without DAB or web/DAB Dockerfiles.
-No profile is certified by local builds or template rendering.
+Explain external identity registration/consent and its owner before timing the
+protected save/reload journey. Local build/start is not real-user acceptance.
+
+This runbook is for the default Container Apps/DAB profile. F1 and Functions
+installers replace it with a short guide for the selected profile.
 
 ## Prepare the selected deployment
 
@@ -35,121 +35,15 @@ npm test
 npm run deployment:prepare
 ```
 
-DAB validates selection and Docker inputs without a `.deployment` receipt.
-Functions stages compiled frontend and standalone API under
-`.deployment/static-web-apps`; its API entry point is `dist/index.js`.
-Reruns automatically replace only verified-inventory generated paths. Unknown
-filenames anywhere, including nested app/API directories, invalid markers or
-symlinks reject re-stage rather than being deleted. `api/node_modules` is the
-explicit npm-owned exception: re-stage discards it, and the separate production
-`npm ci` below must run again before publication. No manual remove/move/reset flag.
+DAB validates the selected profile and Docker inputs; it does not create a
+`.deployment` receipt. The Functions overlay has its own staging procedure.
 
-## App Service F1 operator steps
+## Container Apps/DAB cloud acceptance
 
-Use approved existing SQL, immutable **publicly pullable** web/DAB images and
-identity values in `infra/app-service-f1.bicepparam`, including adopted guidance
-version/customer tags. Build/publish images using the DAB commands below.
-The F1 overlay removes `main.bicep`/`main.bicepparam`, preserving `bootstrap.sql`.
-Compile locally, then preview and apply only separately approved changes:
-
-```powershell
-$group = '<approved-existing-isolated-group>'
-bicep build infra\app-service-f1.bicep --stdout
-az deployment group what-if --resource-group $group --template-file infra\app-service-f1.bicep --parameters infra\app-service-f1.bicepparam
-# After recorded target/resource/spend/access approval:
-az deployment group create --name sqlapps-reviewed --resource-group $group --template-file infra\app-service-f1.bicep --parameters infra\app-service-f1.bicepparam
-$outputs = az deployment group show --name sqlapps-reviewed --resource-group $group --query properties.outputs --output json | ConvertFrom-Json
-if ($LASTEXITCODE -ne 0) { throw 'Read F1 outputs failed.' }
-```
-
-Set `$group` to the approved isolated group; preserve existing names. Resolve
-user-controlled Azure sign-in/context and check native exit codes before proceeding.
-Outputs include `dabClientId`, `dabPrincipalObjectId`, `appUrl`, `redirectUri` and
-`dabUrl`. Use the encrypted operator migration/bootstrap sequence below with the
-approved **existing** SQL host/catalog and `dabClientId`, not object ID.
-Register exact redirect/logout URIs. Bootstrap refuses a differently bound
-`app_runtime`; review an identity migration or separate database rather than
-overwriting it. Deployment grants no SQL connectivity.
-
-Use selected-profile acceptance below: F1 needs direct public-DAB and same-origin
-positive/negative controls plus idle wake-up, quota and restart checks.
-Private image pulls need a separately reviewed integration; never publish private
-code or create registry-admin access to bypass missing permissions.
-
-## Static Web Apps operator steps
-
-Use the existing approved SQL target and separate rotated Entra service principal.
-Apply the unchanged forward-only migrations using the operator/checksum sequence
-below, then run from the app root against the application database:
-
-```powershell
-$clientId = '<approved-functions-application-client-id>'
-sqlcmd -S "tcp:$sqlHost,1433" -d $database -G -N -b -v "FunctionsClientId=$clientId" -i infra\functions-bootstrap.sql
-if ($LASTEXITCODE -ne 0) { throw 'Functions SQL bootstrap failed.' }
-```
-
-Here `$clientId` is the approved Functions service-principal application client ID.
-Bootstrap creates only known `app_functions` SID and includes
-`packages/data/functions-permissions.sql`; mismatched users are refused.
-Grants protect the read view/create procedure and deny base-table access, never
-`db_owner`. Preserve existing DAB users; check both permission contracts only for
-an explicitly shared database serving both APIs.
-
-Populate `infra/static-web-apps.bicepparam`. Supply `SQL_CLIENT_SECRET` through an
-approved process secret channel to its secure parameter; protect compiled
-parameters/artifacts containing resolved values. No secret literals in files,
-commands, reports or logs. Compile, preview and deploy using the F1 command pattern
-with `infra\static-web-apps.bicep` / `infra\static-web-apps.bicepparam`.
-Record outputs and exact redirect/logout URI. The template creates a site, not
-content/pipeline, consent, credentials or network access.
-
-Server settings: `APP_ORIGIN`, `AUTH_AUTHORITY`, `AUTH_ISSUER`, `AUTH_AUDIENCE`,
-`AUTH_CLIENT_ID`, `AUTH_SCOPE`, `SQL_SERVER`, `SQL_DATABASE`, `SQL_TENANT_ID`,
-`SQL_CLIENT_ID`, secret `SQL_CLIENT_SECRET`. Secrets never enter frontend build
-settings or public configuration.
-
-### Static Web Apps publication
-
-After each preparation (including re-stage), reinstall standalone API dependencies:
-
-```powershell
-npm ci --omit=dev --ignore-scripts --prefix .deployment\static-web-apps\api
-```
-
-Publish staged `app` and `api` together using Node 22 and no second frontend build.
-Include production `node_modules`, `host.json` and compiled entry point; root
-workspace dependencies are not deployed implicitly. With approved installed SWA
-CLI and credential supplied through `SWA_CLI_DEPLOYMENT_TOKEN`:
-
-```powershell
-swa deploy .deployment\static-web-apps\app --api-location .deployment\static-web-apps\api --api-language node --api-version 22 --env production
-```
-
-This is a separately approved cloud write; explicit production avoids preview-only
-publication. Never print/commit the token or install deployment tools/create
-workflow credentials without permission. Test real Functions-to-SQL ownership,
-concurrent pooling, direct/proxied controls, browser sign-in, idle/quota errors and
-persisted reload after deployment; DAB checks do not substitute for handler checks.
-
-## Selected-profile cloud acceptance
-
-Record actual SKUs/allocations, ingress/routing, SQL free-limit AutoPause,
-firewalls/permissions, resource tags/names and supporting meters against the
-approved record. Mismatches fail validation; they do not authorize cost/access fixes.
-
-Use two real users for browser sign-in/save/reload, owner isolation, direct and
-same-origin anonymous/forged-token/forged-role denials **with allowed controls**,
-SQL invalid/concurrent mutation rejection, exact-row persistence after an approved
-restart/redeployment, and a new write. Exercise cold-start/quota-unavailable and
-narrow/desktop UI states. Keep synthetic/unit/readiness evidence separate.
-
-DAB checks apply only to DAB; Functions needs direct handler/real-SQL controls.
-Container Apps direct DAB checks need an approved internal test path, not public
-exposure; F1 tests its existing public DAB endpoint. The maintainer shared API
-gate's CLI restart adapter is Container Apps/DAB-specific; other hosts need
-`runCloudAcceptance` with an explicitly approved host-specific restart callback.
-Those helpers are not shipped with apps; an operator browser session or denial-only
-run does not establish API/browser acceptance.
+Follow the shared [cloud acceptance requirements](../../references/deployment.md)
+and record actual settings against the approved target. Test direct DAB access only
+over an internal path; do not expose it publicly. The maintainer API gate is not
+shipped with the app.
 
 ## Container Apps Consumption + Azure SQL recipe
 
@@ -252,16 +146,22 @@ From the copied app directory, with approved dependency access and cached/approv
 base images:
 
 ```powershell
-docker build --platform linux/amd64 -f Dockerfile.web -t app-web:review .
-docker build --platform linux/amd64 -f Dockerfile.dab -t app-dab:review .
+npm run images:build -- --web-image app-web:review --dab-image app-dab:review
 az bicep build --file infra\main.bicep --outfile .local\main.json
 ```
 
 Create `.local` first if absent. Compilation needs no Azure sign-in. Installing a
 missing compiler or pulling images changes the host and requires applicable
-permission. The web build defaults to npm's public registry; where a trusted mirror
-is required use `--build-arg NPM_CONFIG_REGISTRY=https://approved-mirror/`.
-Never pass registry credentials as build arguments or disable TLS verification.
+permission. Choose approved image names for `--web-image` and `--dab-image`.
+The helper discovers only the host's effective `npm config get registry`, not
+other npm settings ([npm configuration](https://docs.npmjs.com/cli/v11/commands/npm-config)).
+Its registry URL must be HTTPS without credentials, query or fragment; it copies
+no `.npmrc` or tokens. The advanced manual Docker build path still accepts
+`--build-arg NPM_CONFIG_REGISTRY=https://approved-mirror/`.
+Mirror credentials/custom trust need a separately reviewed mechanism, not build
+arguments. Never use `strict-ssl=false` or `NODE_TLS_REJECT_UNAUTHORIZED=0`.
+An npm "Exit handler never called" wrapper error is not the root cause: inspect
+sanitized underlying failures and use approved connectivity/TLS diagnosis.
 
 The web image builds from the committed lockfile and runs as the non-root Node
 user without build dependencies. It requires `APP_HOST=0.0.0.0` / `APP_PORT=5180`.
@@ -299,6 +199,14 @@ Pin actual published image digests. The sample location is not proof of availabi
 Keep `deployApplications = false` for the first stage: create SQL, identity and the
 environment without trying to start DAB before schema/permissions are ready.
 
+Regional SQL SKU listings do not prove subscription-region provisioning eligibility.
+Read available restrictions and disclose unknowns before partial writes; see
+[SQL quota/region guidance](https://learn.microsoft.com/azure/azure-sql/database/quota-increase-request).
+For new resources, `sqlLocation` defaults to hosting `location`. A separately
+approved SQL region uses a distinct region-sensitive SQL name while preserving
+hosting names. Existing deployments need explicit adoption review: never
+automatically rename, migrate or delete them to apply new naming.
+
 Only for an explicitly selected cloud task, let the user complete any necessary
 `az login`, verify `az account show`, and select the approved subscription. The
 following commands require the recorded cloud/read-access approvals:
@@ -326,35 +234,27 @@ Check each native command's exit code before proceeding. No applications are cre
 in this first stage; the outputs provide SQL and identity values for bootstrap.
 If provisioning times out, reconcile resources before any retry.
 
+On `ProvisioningDisabled`, retain failed deployment operations and partial-resource
+inventory before proposing a scoped alternative for approval. Do not sweep regions
+or substitute paid resources. A failed SQL name can remain region-bound even when
+generic inventory is empty: when permitted, inspect deployment failures,
+SQL-specific server existence and
+[name availability](https://learn.microsoft.com/rest/api/sql/servers/check-name-availability).
+An empty list does not establish that the name is unreserved; preserve existing
+hosting/resource names and use a distinct approved SQL name for a new SQL region.
+
 ## 4. SQL operator migrations and DAB bootstrap
 
-Use the approved SQL Entra administrator/operator, not the DAB identity. Connect to
-the **application database**, not `master`, using the installed SQL tool's supported
-Entra authentication. Do not paste tokens/passwords into commands or source.
-The examples assume ODBC `sqlcmd` with `-G` already usable by that operator;
-resolve interactive sign-in through SQL guidance if it is not. Keep encryption and
-certificate verification on (`-N`, never `-C`).
-
-The migration/history procedure is shared. For Container Apps use SQL host/catalog
-outputs; for F1/Functions use the approved existing target. Run from the app root:
+Use the [shared SQL migration procedure](./deployment-migrations.md) with the
+approved Entra SQL operator. It applies and verifies every migration in order.
+Use SQL host/catalog outputs from this deployment:
 
 ```powershell
-$sqlHost = '<approved-sql-hostname>'
-$database = '<approved-application-database>'
-$hash = node -e "const fs=require('node:fs'),c=require('node:crypto');console.log(c.createHash('sha256').update(fs.readFileSync('packages/data/migrations/001-initial.sql','utf8').replace(/\r\n/g,'\n')).digest('hex'))"
-if ($LASTEXITCODE -ne 0) { throw 'Migration checksum failed.' }
-$existing = sqlcmd -S "tcp:$sqlHost,1433" -d $database -G -N -b -h -1 -W -Q "SET NOCOUNT ON; IF OBJECT_ID('dbo.SchemaVersions') IS NOT NULL SELECT Checksum FROM dbo.SchemaVersions WHERE Version=1;"
-if ($LASTEXITCODE -ne 0) { throw 'Migration history read failed.' }
-if (-not $existing) {
-  sqlcmd -S "tcp:$sqlHost,1433" -d $database -G -N -b -v "MigrationHash=$hash" -i packages\data\migrations\001-initial.sql
-  if ($LASTEXITCODE -ne 0) { throw 'Migration failed; do not start DAB or reset the database.' }
-} elseif (($existing | Out-String).Trim() -ne $hash.Trim()) {
-  throw 'Applied migration changed. Review a forward migration; never reset data.'
-}
+$sqlHost = $outputs.sqlHost.value
+$database = $outputs.sqlDatabaseName.value
 ```
 
-**DAB only**, continue with its deployed client ID. Functions instead uses its
-bootstrap in the SWA operator section; it never needs this DAB user:
+Then bootstrap the DAB identity using its application client ID:
 
 ```powershell
 $clientId = $outputs.dabClientId.value
@@ -364,33 +264,10 @@ sqlcmd -S "tcp:$sqlHost,1433" -d $database -G -N -b -v "DabClientId=$clientId" -
 if ($LASTEXITCODE -ne 0) { throw 'SQL identity bootstrap failed.' }
 ```
 
-`infra/bootstrap.sql` binds `app_runtime` to the known DAB identity's **application
-client ID** using `SID`/`TYPE=E`, then reuses `packages/data/permissions.sql`. The
-principal object ID is used for Azure role assignments, not this SQL SID. The
-cloud review confirmed this by comparing a directory-resolved user with both IDs.
-It avoids
-Graph directory lookup, refuses to replace a different existing principal, and grants
-only the read view/create procedure while denying direct `dbo` data access. This
-syntax does not validate the object with Entra: read the actual deployed identity
-and test the real connection. See [CREATE USER](https://learn.microsoft.com/sql/t-sql/statements/create-user-transact-sql?view=azuresqldb-current).
-The local preview rejected this cloud `TYPE` syntax; local refusal guards do not
-prove external-user creation or managed-identity authentication. Confirm the real
-Azure connection, not just SQL substitution. Consult current
-[container limitations](https://microsoft.github.io/azure-sql-database-container/known-limitations.html);
-never replace managed identity with SQL administrator access to pass.
-
-Create the tenant service principal (enterprise application) for each newly approved
-app registration before sign-in. An application registration alone is insufficient:
-the review encountered `AADSTS650052` when the custom API lacked its service
-principal. API-owner preauthorization may trust the approved SPA for the API's own
-scope only; it is not permission to change tenant consent policy. If tenant policy
-still requires administrator approval, stop the authenticated acceptance gate and
-provide the exact app/scope for an authorized administrator. Do not weaken JWT
-validation or switch to test identities to claim deployed user acceptance.
-
-Adapt numbered forward migrations and narrowly scoped grants to the actual app using
-SQL guidance. Never rerun an already applied migration, use `db_owner` as runtime,
-or grant generic write access alongside invariant-enforcing procedures.
+The bootstrap binds `app_runtime` to the DAB identity's **application client ID**,
+not its role-assignment object ID. It refuses to overwrite a different identity and
+grants only the selected procedures/views. Verify the deployed identity and a real
+SQL connection; successful SQL substitution alone is not proof.
 
 Remove the approved temporary operator firewall rule using its exact server/group:
 

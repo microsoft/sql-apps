@@ -1,6 +1,7 @@
 .git
 .env
 .env.*
+**/.npmrc
 .local
 .deployment
 **/node_modules

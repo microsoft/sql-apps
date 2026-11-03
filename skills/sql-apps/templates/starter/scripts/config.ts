@@ -19,6 +19,12 @@ export interface AppConfiguration {
   publicConfig: PublicConfiguration;
 }
 
+export interface ProfileConfiguration extends Omit<AppConfiguration, 'publicConfig'> {
+  publicConfig: PublicConfiguration | {
+    access: 'public-submissions'; redirectUri: string; ownerAuth: PublicConfiguration | null;
+  };
+}
+
 export type LocalApi = 'dab' | 'functions';
 
 export function deploymentProfile(value: unknown) {
@@ -28,17 +34,23 @@ export function deploymentProfile(value: unknown) {
     'static-web-apps': { api: 'functions', template: 'infra/static-web-apps.bicep' },
   };
   if (!value || typeof value !== 'object' || Array.isArray(value) ||
-      Object.keys(value).some(key => !['hosting', 'api'].includes(key)) ||
+      Object.keys(value).some(key => !['hosting', 'api', 'access'].includes(key)) ||
       !('hosting' in value) || typeof value.hosting !== 'string' ||
       !Object.hasOwn(profiles, value.hosting) || !('api' in value) ||
-      value.api !== profiles[value.hosting].api) {
+      value.api !== profiles[value.hosting].api ||
+      ('access' in value && (value.access !== 'public-submissions' || value.hosting !== 'static-web-apps'))) {
     throw new Error('deployment.json must select container-apps/dab, app-service-f1/dab, or static-web-apps/functions.');
   }
-  return { hosting: value.hosting, ...profiles[value.hosting] };
+  return { hosting: value.hosting, ...profiles[value.hosting],
+    ...('access' in value ? { access: value.access as 'public-submissions' } : {}) };
 }
 
 export function localApi(): LocalApi {
   return deploymentProfile(JSON.parse(readFileSync(resolve(root, 'deployment.json'), 'utf8'))).api;
+}
+
+export function localAccess(): string {
+  return deploymentProfile(JSON.parse(readFileSync(resolve(root, 'deployment.json'), 'utf8'))).access || 'protected';
 }
 
 export function readEnvironment() {
@@ -91,9 +103,10 @@ export function localEndpoints(env: NodeJS.ProcessEnv, api: LocalApi = 'dab') {
   return { app: new URL(app).origin, api: new URL(upstream).origin };
 }
 
-export function localConfiguration(env: NodeJS.ProcessEnv, api: LocalApi = 'dab'): AppConfiguration {
+export function localConfiguration(env: NodeJS.ProcessEnv, api: LocalApi = 'dab'): ProfileConfiguration {
   const endpoints = localEndpoints(env, api);
-  const config = configuration(api === 'functions' ? { ...env, DAB_URL: endpoints.api } : env);
+  const config = configuration(api === 'functions' ? { ...env, DAB_URL: endpoints.api } : env,
+    api === 'functions' ? localAccess() : 'protected');
   composeArguments(env, api);
   if (env.ACCEPT_EULA !== 'Y') throw new Error('Review the SQL terms and explicitly set ACCEPT_EULA=Y before startup.');
   if (new URL(config.dab).hostname !== '127.0.0.1') {
@@ -118,7 +131,9 @@ export function localConfiguration(env: NodeJS.ProcessEnv, api: LocalApi = 'dab'
   return config;
 }
 
-export function configuration(env: NodeJS.ProcessEnv): AppConfiguration {
+export function configuration(env: NodeJS.ProcessEnv): AppConfiguration;
+export function configuration(env: NodeJS.ProcessEnv, access: string): ProfileConfiguration;
+export function configuration(env: NodeJS.ProcessEnv, access = 'protected'): ProfileConfiguration {
   const required = (name: string) => {
     const value = env[name]?.trim();
     if (!value || value.includes('REPLACE_')) throw new Error(`Configure ${name} in .env before startup.`);
@@ -138,25 +153,37 @@ export function configuration(env: NodeJS.ProcessEnv): AppConfiguration {
   if ([origin, dab].some(url => url.pathname !== '/' || url.search || url.hash)) {
     throw new Error('APP_ORIGIN and DAB_URL must be origins, without paths, queries, or fragments.');
   }
-  secureUrl('AUTH_ISSUER');
-  const authority = secureUrl('AUTH_AUTHORITY').href.replace(/\/$/, '');
   const port = Number(env.APP_PORT || 5180);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('APP_PORT must be an integer from 1 to 65535.');
+  const base = { host: env.APP_HOST || '127.0.0.1', port, dab: dab.origin };
+  const publicInbox = access === 'public-submissions';
+  if (publicInbox && !['AUTH_AUTHORITY', 'AUTH_ISSUER', 'AUTH_AUDIENCE', 'AUTH_CLIENT_ID', 'AUTH_SCOPE']
+    .some(name => env[name] !== undefined)) {
+    return { ...base, publicConfig: { access: 'public-submissions', redirectUri: `${origin.origin}/`, ownerAuth: null } };
+  }
+  secureUrl('AUTH_ISSUER');
+  const authority = secureUrl('AUTH_AUTHORITY').href.replace(/\/$/, '');
+  if (publicInbox) {
+    const match = /^(?:https:\/\/login\.microsoftonline\.com\/([0-9a-f-]{36})\/v2\.0|https:\/\/sts\.windows\.net\/([0-9a-f-]{36})\/)$/i.exec(required('AUTH_ISSUER'));
+    const tenant = match?.[1] || match?.[2];
+    if (!tenant || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(tenant) ||
+        tenant === '00000000-0000-0000-0000-000000000000' ||
+        authority.toLowerCase() !== `https://login.microsoftonline.com/${tenant.toLowerCase()}/v2.0`) {
+      throw new Error('Owner authentication requires a matching tenant-bound Microsoft Entra issuer and authority.');
+    }
+  }
   const scope = required('AUTH_SCOPE');
   if (!scope.split(/\s+/).includes('openid') ||
       !scope.split(/\s+/).some(value => !['openid', 'profile', 'email', 'offline_access'].includes(value))) {
     throw new Error('AUTH_SCOPE must include openid and an API access scope.');
   }
   required('AUTH_AUDIENCE');
-  return {
-    host: env.APP_HOST || '127.0.0.1',
-    port,
-    dab: dab.origin,
-    publicConfig: {
+  const identity = {
       authority,
       clientId: required('AUTH_CLIENT_ID'),
       scope,
       redirectUri: `${origin.origin}/`,
-    },
-  };
+    };
+  return { ...base, publicConfig: publicInbox ?
+    { access: 'public-submissions', redirectUri: `${origin.origin}/`, ownerAuth: identity } : identity };
 }

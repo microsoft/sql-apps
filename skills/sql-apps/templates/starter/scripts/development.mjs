@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { composeArguments, localApi, localConfiguration, localEndpoints, readEnvironment, root } from './config.ts';
+import { composeArguments, localAccess, localApi, localConfiguration, localEndpoints, readEnvironment, root } from './config.ts';
 
 function execute(args, env) {
   const result = spawnSync('docker', args, { cwd: root, env, encoding: 'utf8', timeout: 15_000 });
@@ -54,6 +54,10 @@ export async function inspectDevelopment(command, env, { api = 'dab', run = exec
       if (!response.ok) return false;
       if (!publicConfig) return true;
       const config = await response.json();
+      if (api === 'functions' && localAccess() === 'public-submissions') {
+        return config.access === 'public-submissions' && config.redirectUri === `${endpoints.app}/` &&
+          (config.ownerAuth === null || config.ownerAuth?.clientId === env.AUTH_CLIENT_ID);
+      }
       return config.clientId === env.AUTH_CLIENT_ID && config.redirectUri === `${endpoints.app}/`;
     }
     catch (error) {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -7,12 +7,13 @@ import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 import { parseEnv } from 'node:util';
 import { installAlternative } from '../skills/sql-apps/templates/alternatives/install.mjs';
+import { copyStarter } from './fixtures/starter-copy.mjs';
 
 for (const api of ['dab', 'functions']) {
 test(`${api} operational commands still work when compilation fails and no build output exists`, async t => {
   const app = await mkdtemp(join(tmpdir(), 'sqlapps-operations-'));
   t.after(() => rm(app, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
-  await cp(new URL('../skills/sql-apps/templates/starter/', import.meta.url), app, { recursive: true });
+  await copyStarter(app);
   if (api === 'functions') await installAlternative('static-web-apps', app);
   const manifest = JSON.parse(await readFile(join(app, 'package.json'), 'utf8'));
   manifest.scripts['build:backend'] = 'node -e "process.exit(23)"';

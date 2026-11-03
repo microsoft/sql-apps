@@ -4,7 +4,9 @@ import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createServer } from 'node:net';
-import { authenticationConfiguration, required } from '../packages/functions/src/config.ts';
+import { authenticationConfiguration, publicConfiguration, required } from '../packages/functions/src/config.ts';
+import { accessProfile } from '../packages/functions/src/profile.ts';
+import { isDeepStrictEqual } from 'node:util';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 
@@ -13,7 +15,8 @@ export function functionsEnvironment(env) {
       (env.SQL_SERVER && env.SQL_SERVER !== '127.0.0.1')) {
     throw new Error('Local Functions uses the local database; remove cloud SQL settings from this local environment.');
   }
-  authenticationConfiguration(env);
+  if (accessProfile === 'public-submissions') publicConfiguration(env, accessProfile);
+  else authenticationConfiguration(env);
   return {
     ...env, SQL_SERVER: '127.0.0.1', SQL_DATABASE: 'appdb', SQL_USER: 'app_api',
     SQL_PASSWORD: required(env, 'APP_SQL_PASSWORD'), SQL_PORT: required(env, 'SQL_PORT'),
@@ -119,7 +122,8 @@ export async function startFunctions(env, { launch = launchTool, request = fetch
       }
       if (response?.ok) {
         const config = await response.json();
-        if (config.clientId !== env.AUTH_CLIENT_ID || config.redirectUri !== `${app}/`) {
+        if (accessProfile === 'public-submissions' ? !isDeepStrictEqual(config, publicConfiguration(env, accessProfile)) :
+          config.clientId !== env.AUTH_CLIENT_ID || config.redirectUri !== `${app}/`) {
           throw new Error('The local API returned unexpected public configuration; check origins and port ownership.');
         }
         return;

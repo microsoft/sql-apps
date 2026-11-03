@@ -36,6 +36,12 @@ Validate against the selected API's permissions and SQL-enforced rules, not an a
 
 Exercise the primary workflow through the selected API backed by SQL; inspect desktop and narrow widths, keyboard interaction, both themes, empty/error states, and dense repeated elements. Build/type-check without suppressing TypeScript errors. Keep the app's design direction and relevant checks in the brief/run documentation, not another design-management system.
 
+A screenshot/canvas timeout is not evidence that the app is unready. After a
+bounded retry, mark screenshot capture unavailable separately from app readiness.
+DOM, navigation and save/reload checks remain useful behavioral evidence, not
+screenshot-based visual review. Do not bypass iframe restrictions or CSP to obtain
+an image; leave visual checks unverified when capture is unavailable.
+
 ## Upstream reference
 
 Reviewed Rayfin revision `0979439a7a0806abd0ee48c2619b37f297ae1324` on 2026-10-21:

@@ -34,6 +34,9 @@ test('loads, saves through the API client, and reads back the persisted item', a
   vi.mocked(requestItems).mockResolvedValueOnce([]).mockResolvedValueOnce([])
     .mockResolvedValue([{ Id: 'saved-id', Label: 'Saved item', CreatedAt: '2026-10-27T00:00:00Z' }]);
   render(<App/>);
+  expect(screen.getByRole('heading', { name: 'My items' })).toBeTruthy();
+  expect(document.title).toBe('My items | SQL Apps');
+  expect(screen.queryByText(/vertical slice|acceptance/i)).toBeNull();
   await screen.findByText('Loaded from SQL.');
   fireEvent.change(screen.getByLabelText('New item label'), { target: { value: 'Saved item' } });
   fireEvent.click(screen.getByText('Save item'));

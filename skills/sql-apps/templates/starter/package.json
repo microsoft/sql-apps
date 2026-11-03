@@ -19,6 +19,8 @@
     "local:stop": "node scripts/local.mjs stop",
     "acceptance": "node scripts/acceptance.mjs",
     "deployment:prepare": "node scripts/deployment.mjs",
+    "images:build": "node scripts/build-images.mjs",
+    "local:adopt-sql": "node scripts/adopt-sql.mjs",
     "start": "npm run local:start",
     "serve:web": "node dist/packages/server/server.js"
   },

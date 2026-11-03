@@ -69,8 +69,13 @@ test('compiled infrastructure enforces the PoC resource contract', () => {
   const server = byType('Microsoft.Sql/servers')[0];
   assert.equal(server.properties.administrators.azureADOnlyAuthentication, true);
   assert.equal(server.properties.minimalTlsVersion, '1.2');
+  assert.equal(template.parameters.sqlLocation.defaultValue, "[parameters('location')]");
+  assert.equal(server.location, "[parameters('sqlLocation')]");
+  assert.match(template.variables.sqlUnique, /equals\(parameters\('sqlLocation'\), parameters\('location'\)\)/);
+  assert.match(template.variables.sqlUnique, /uniqueString\(resourceGroup\(\).id, parameters\('workload'\), parameters\('sqlLocation'\)\)/);
   assert.ok(!Object.hasOwn(server.properties, 'administratorLoginPassword'));
   const sql = byType('Microsoft.Sql/servers/databases')[0];
+  assert.equal(sql.location, "[parameters('sqlLocation')]");
   assert.equal(sql.properties.useFreeLimit, true);
   assert.equal(sql.properties.freeLimitExhaustionBehavior, 'AutoPause');
   assert.equal(sql.sku.tier, 'GeneralPurpose');
@@ -99,4 +104,16 @@ test('SQL bootstrap uses an external contained user and restricted grants', () =
   assert.match(bootstrap, /TYPE = E/);
   assert.match(bootstrap, /:r .*permissions\.sql/);
   assert.doesNotMatch(bootstrap, /db_owner|db_datawriter|db_datareader/);
+});
+
+test('public inbox Bicep compiles with optional owner identity without relaxing SQL credentials', () => {
+  const installed = join(homedir(), '.azure', 'bin', process.platform === 'win32' ? 'bicep.exe' : 'bicep');
+  const template = JSON.parse(execFileSync(process.env.BICEP_CLI_PATH || (existsSync(installed) ? installed : 'bicep'),
+    ['build', join(root, 'skills', 'sql-apps', 'templates', 'alternatives', 'public-submissions', 'infra', 'static-web-apps.bicep'), '--stdout'],
+    { encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 }));
+  assert.equal(template.parameters.ownerAuth.nullable, true);
+  assert.equal(template.parameters.ownerAuth.defaultValue, undefined);
+  assert.equal(template.parameters.sqlClientSecret.type, 'securestring');
+  assert.equal(template.parameters.sqlClientSecret.defaultValue, undefined);
+  assert.match(JSON.stringify(template.variables.ownerSettings), /equals\(parameters\('ownerAuth'\), null\(\)\)/);
 });

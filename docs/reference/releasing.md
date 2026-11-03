@@ -16,7 +16,19 @@ reads the plugin version. Published versions are **immutable**: changed shipped
 bytes need a new version, not a replaced package or retagged release. Record the
 reviewed revision and skill-payload fingerprint; it is not an archive signature.
 
-## Verification status
+## Current verification — 2026-11-03
+
+| Check | Result | Boundary |
+| --- | --- | --- |
+| Repository suite, `node --test tests\*.test.mjs` | 260 passed, 2 skipped, 0 failed | The skipped checks require approved live/disposable SQL |
+| Starter build, `npm run build` | Passed | Local compilation only |
+| Starter tests, `npm test` | 19 Node and 15 frontend tests passed | No live SQL or real-provider sign-in |
+| Migration-guide PowerShell syntax | Passed | Parsed only; no cloud SQL was changed |
+| `git diff --check` | Passed | Git reported line-ending conversion notices only |
+
+These are local checks. They do not prove cloud deployment, live SQL integration,
+real-user sign-in, screenshot capture or zero cost. No cloud writes or registry
+publishes were performed in this verification.
 
 The current candidate separates the default DAB starter from explicit F1/DAB and
 Static Web Apps/Functions overlays. No default Rayfin manifest or private CLI is
@@ -29,9 +41,10 @@ before Start, compiled-code tests and acceptance; none hides a compiler hook.
 `npm start` aliases `local:start` for the selected profile; internal DAB web hosting
 uses `serve:web`. Status checks SQL engine/catalog; Ready aliases Status.
 
+## Historical evidence
+
 The following observations predate the latest Start/Test/staging consolidation;
 they identify historical revisions, **not verification of the current commands**.
-Rerun affected copied-app and repository checks before claiming current results.
 
 | Historical evidence | Result and boundary |
 | --- | --- |
@@ -142,6 +155,8 @@ node scripts\verify-release.mjs --source-root C:\git\sql-apps-v3 --installed-roo
 It compares manifests/catalogs and the exact skill file set with byte-exact
 content, rejects extra host components, links and hard links, and reports version,
 file count and SHA-256 fingerprint. Exit codes: 0 match, 1 mismatch, 2 usage error.
+Known source-local build/cache/secret artifacts are skipped without reading them,
+but rejected in installed payloads; legitimate payload byte, identity and link checks remain.
 Package canonical LF bytes under [Git attributes](../../.gitattributes); do not
 normalize verifier differences away or discard dirty files to repair an old copy.
 
@@ -194,10 +209,29 @@ packaged assets. Do not generate speculative Rayfin configuration; migrations
 require explicit scope and released/version-matched tooling. Preserve existing
 app manifests. Compare equivalent measured runs before claiming productivity gains.
 
+For operator SQL concurrency checks, legacy `SqlServer` 21.1.18228 SMO imports
+can conflict across parallel runspaces. Run each contender and the final observer
+in separate fresh `pwsh`/`powershell` processes, not shared runspaces. Return
+winner/stale outcomes from SQL `TRY/CATCH`, then prove the exact persisted row and
+version from the observer. After long subprocess waits, open a fresh connection
+rather than reuse a possibly stale one. Use the installed
+[`Invoke-Sqlcmd` parameter set](https://learn.microsoft.com/powershell/module/sqlserver/invoke-sqlcmd)
+or SQL tool's supported equivalent; do not combine unsupported
+`ConnectionString` and `AccessToken` parameters. Record import, parameter-binding
+and connection failures as toolchain failures, not SQL invariant results.
+Do not install drivers, bypass TLS, log credentials or reset data to pass a gate.
+
+Screenshot/canvas timeout gets one bounded retry, then a separate
+**screenshot unavailable** result. DOM/navigation/save-reload observations do not
+become visual screenshot evidence, nor does capture failure prove app unreadiness.
+Never bypass iframe/CSP restrictions. Resolve external identity/consent before
+timing a protected journey; synthetic sign-in does not satisfy that dependency.
+
 The maintainer-only synthetic [runtime fixture](../../scripts/test-starter-runtime.mjs)
 and [browser checker](../../scripts/test-starter-browser.mjs) require approval for
 cached images, terms, ports, synthetic users/data and cleanup. They are not shipped
-with apps. Trust/certificate bypass is test-scoped, never OS-wide or deployed.
+with apps. Historical fixture trust exceptions are not permission to bypass TLS
+in operator validation, alter system trust or weaken deployed verification.
 The fixture stops owned containers and retains its volume/ignored credentials:
 
 ```powershell

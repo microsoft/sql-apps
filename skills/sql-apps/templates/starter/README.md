@@ -9,23 +9,39 @@ Select an explicit F1/DAB or Static Web Apps/Functions overlay before adapting
 the sample; see [profile differences](./hosting.md). Unused Functions/Rayfin
 integrations are not generated. Selection is not migration or deployment.
 
+An expressly selected public-submission/private-owner alternative uses
+`static-web-apps-public` before customization. Read the installed SQL Apps
+public-submissions reference before selection; that installer includes an app-owned
+`public-submissions.md` guide. Anonymous visitors submit to
+one bounded inbox; no reads are possible without real owner authentication and
+operator SQL enrollment. Its public local phase needs no identity. The protected
+default and identity-first workflow below are unchanged; public cloud publication
+requires a separate approved abuse/privacy/cost/retention and ingress review.
+
 The sample signs in, creates an owned uniquely labelled item and reloads from SQL;
 a unique constraint rejects concurrent duplicates. Replace it with the first useful
 business workflow. DAB's static web server has no SQL driver or CRUD authority.
 Both selected APIs enforce validated ownership and expose the protected read/create
 contract rather than unrestricted table writes.
 
-## Identity decision comes first
+## Identity setup
 
-Confirm the tenant-bound issuer, API audience, public SPA client, delegated scope,
-consent, exact redirect/logout URI and immutable GUID `oid` access-token claim
-through the identity owner. Entra v2 access tokens are the initial contract; an
-ID token is not an API access token. Browser OIDC authorization-code/PKCE uses no
-client secret. Never substitute fake sign-in.
+The protected app needs an identity administrator to register the SPA and API,
+approve consent, and return these values. Send them the exact local redirect and
+logout URI:
+`${APP_ORIGIN}/` (for example, `http://127.0.0.1:5180/`).
 
-Common/multitenant issuers do not fit this single-tenant ownership model.
-Changing tenant/issuer needs an identity/data migration decision; other providers
-need reviewed claim mapping and renewed authorization checks.
+| Setting | Ask the identity owner for |
+| --- | --- |
+| `AUTH_AUTHORITY` | Tenant-specific Entra v2 authority |
+| `AUTH_ISSUER` | Matching tenant-bound access-token issuer |
+| `AUTH_AUDIENCE` | API application ID URI or audience |
+| `AUTH_CLIENT_ID` | Public SPA application ID |
+| `AUTH_SCOPE` | `openid` and the approved delegated API scope |
+
+Use the real API access token, not an ID token. The app uses browser
+authorization-code/PKCE and needs no browser secret. Do not replace real sign-in
+with a test identity for acceptance.
 
 ## First local run
 
@@ -67,10 +83,8 @@ Build first, and rebuild changed source before compiled-code checks.
 `serve:web` is internal compiled DAB web hosting, not the public Start path.
 Generated output stays out of source control.
 
-Open `APP_ORIGIN`, sign in, save and reload. The same label must fail for the same
-owner but succeed for another. The sample shows the latest 100 records; add
-pagination for larger workflows. Rejected/expired sessions return to Sign in;
-callback errors allow retry, not silent token renewal.
+Open `APP_ORIGIN`, sign in, save and reload. A duplicate label for one owner must
+fail; another owner may use that label. The sample shows the latest 100 records.
 
 ## Daily lifecycle and Stop
 
@@ -132,10 +146,8 @@ input, one concurrent duplicate winner, exact-row restart persistence and a new
 write. Do not run against real user data. Unit mocks, synthetic issuers and
 readiness do not prove real-provider SQL integration.
 
-Record Build/unit results, selected-API/SQL acceptance and browser
-sign-in/save/reload (narrow/desktop, keyboard, themes/error states) separately.
-DAB-specific inspection applies only to DAB. Historical preview shutdown/recovery
-observations do not certify current commands or cloud recovery.
+Record build/unit, selected API/SQL and browser sign-in/save/reload results
+separately. DAB-specific checks apply only to DAB.
 
 ## Deployment
 

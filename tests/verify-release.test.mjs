@@ -14,8 +14,14 @@ const metadata = [
   'plugin.json', 'gemini-extension.json',
   '.claude-plugin', '.codex-plugin', '.cursor-plugin', '.agents',
 ];
+const sourceOnly = source => {
+  const name = path.basename(source);
+  return !['node_modules', 'dist', 'coverage', '.local', '.deployment', '.npmrc'].includes(name) &&
+    (!name.startsWith('.env') || name === '.env.example') && !/\.(log|pem|key)$/i.test(name);
+};
 function countPayload(directory = path.join(root, 'skills')) {
   return readdirSync(directory, { withFileTypes: true })
+    .filter(entry => sourceOnly(path.join(directory, entry.name)))
     .reduce((count, entry) => count + (entry.isDirectory() ? countPayload(path.join(directory, entry.name)) : 1), 0);
 }
 const payloadCount = countPayload();
@@ -27,11 +33,25 @@ function fixture(t) {
   mkdirSync(sourceRoot, { recursive: true });
   t.after(() => rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
   for (const entry of [...metadata, 'skills']) {
-    cpSync(path.join(root, entry), path.join(sourceRoot, entry), { recursive: true });
+    cpSync(path.join(root, entry), path.join(sourceRoot, entry), { recursive: true, filter: sourceOnly });
   }
   cpSync(sourceRoot, installedRoot, { recursive: true });
   return { sourceRoot, installedRoot };
 }
+
+test('local source build artifacts are not release inputs, while an installed artifact is refused', t => {
+  const roots = fixture(t);
+  const generated = path.join(roots.sourceRoot, 'skills', 'sql-apps', 'templates', 'starter', 'node_modules');
+  mkdirSync(generated);
+  writeFileSync(path.join(generated, 'generated.js'), 'not shipped');
+  const sourceEnv = path.join(roots.sourceRoot, 'skills', 'sql-apps', 'templates', 'starter', '.env');
+  writeFileSync(sourceEnv, 'SECRET=not-release-input');
+  assert.equal(verifyRelease(roots).skillFiles, payloadCount);
+  const installedArtifacts = path.join(roots.installedRoot, 'skills', 'sql-apps', 'templates', 'starter', 'node_modules');
+  mkdirSync(installedArtifacts);
+  writeFileSync(path.join(installedArtifacts, 'generated.js'), 'not shipped');
+  assert.throws(() => verifyRelease(roots), /installed.*local|installed.*artifact/i);
+});
 
 function editJSON(root, relative, change) {
   const file = path.join(root, relative);
@@ -275,6 +295,9 @@ test('relative links in the installed skill and its references resolve in the co
   const { installedRoot } = fixture(t);
   const skillsRoot = path.join(installedRoot, 'skills');
   for (const relative of readdirSync(skillsRoot, { recursive: true }).filter((file) => file.endsWith('.md'))) {
+    const appOwnedDocument = relative.startsWith(path.join('sql-apps', 'templates', 'alternatives') + path.sep) &&
+      ['README.md', 'deployment.md'].includes(path.basename(relative));
+    if (appOwnedDocument) continue;
     const document = path.join(skillsRoot, relative);
     for (const match of readFileSync(document, 'utf8').matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
       const target = match[1];
