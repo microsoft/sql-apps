@@ -106,6 +106,3 @@ Existing files to extend:skills/sql-apps/SKILL.md: select/reuse a shape and invo
 ## Release gate and rollout
 
 Ship the default shape first; integrate alternatives through the same contract without making them blockers for default-shape improvement. Do not advertise all three as verified until each has its own live evidence.Release requires zero per-app deployment-script authoring on the unchanged default path, one reviewable scope plan, safe repeat application, preserved customer data, real cloud acceptance evidence and recorded limitations.This plan does not authorize implementation, cloud provisioning, spend, sign-in, public publication or cleanup. It is a handoff for implementation in the SQL Apps plugin repository.
-
-
-
