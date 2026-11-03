@@ -53,8 +53,12 @@ export async function runCloudAcceptance({ origin, tokens, restart }) {
   assert.deepEqual(await rows(tokens[0]), saved, 'A second owner must not change the first owner row.');
   const invalid = await create(tokens[0], ' ');
   const invalidResult = await invalid.json();
-  assert.ok([400, 500].includes(invalid.status) && invalidResult.error?.code === 'DatabaseOperationFailed',
-    'Invalid input must be rejected by SQL, not by an outage.');
+  const dabValidation = [400, 500].includes(invalid.status) &&
+    invalidResult.error?.code === 'DatabaseOperationFailed';
+  const functionsValidation = invalid.status === 400 &&
+    invalidResult.error === 'Label must contain 1 to 120 characters.';
+  assert.ok(dabValidation || functionsValidation,
+    'Invalid input must be rejected, not reported as an outage.');
   const bypass = await request('/api/Items', tokens[0], { Label: label });
   assert.ok([400, 403, 405].includes(bypass.status), 'The read entity must not permit direct writes.');
   const durations = [];

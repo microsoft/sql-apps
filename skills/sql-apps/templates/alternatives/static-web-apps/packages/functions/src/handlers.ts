@@ -84,9 +84,18 @@ async function readLabel(request: HttpRequest, timeoutMs: number): Promise<strin
   return body.Label.trim();
 }
 
-function databaseErrorNumber(error: unknown): number | undefined {
-  if (typeof error !== 'object' || error === null || !('number' in error)) return undefined;
-  return typeof error.number === 'number' ? error.number : undefined;
+function databaseErrorNumbers(error: unknown): number[] {
+  const numbers: number[] = [];
+  const visited = new Set<object>();
+  const visit = (value: unknown) => {
+    if (typeof value !== 'object' || value === null || visited.has(value)) return;
+    visited.add(value);
+    if ('number' in value && typeof value.number === 'number') numbers.push(value.number);
+    if (value instanceof AggregateError) for (const nested of value.errors) visit(nested);
+    if ('cause' in value) visit(value.cause);
+  };
+  visit(error);
+  return numbers;
 }
 
 export function createHandlers({ env, authenticate, database, bodyTimeoutMs = 10000 }: HandlerOptions) {
@@ -94,10 +103,23 @@ export function createHandlers({ env, authenticate, database, bodyTimeoutMs = 10
     try { return await handler(request); }
     catch (error: unknown) {
       if (error instanceof HttpError) return response(error.status, { error: error.message });
-      const number = databaseErrorNumber(error);
-      if ([2601, 2627].includes(number ?? 0)) return response(409, { error: 'An item with that label already exists.' });
-      if ([229, 230, 51000].includes(number ?? 0)) return response(403, { error: 'This identity is not permitted.' });
-      if ([51001, 547, 8152, 2628].includes(number ?? 0)) return response(400, { error: 'Invalid Label.' });
+      const numbers = databaseErrorNumbers(error);
+      if (numbers.some(number => [2601, 2627].includes(number))) {
+        return response(409, { error: 'An item with that label already exists.' });
+      }
+      if (numbers.some(number => [229, 230, 51000].includes(number))) {
+        return response(403, { error: 'This identity is not permitted.' });
+      }
+      if (numbers.some(number => [51001, 547, 8152, 2628].includes(number))) {
+        return response(400, { error: 'Invalid Label.' });
+      }
+      const code = typeof error === 'object' && error !== null && 'code' in error &&
+        typeof error.code === 'string' && /^[A-Z0-9_-]{1,64}$/i.test(error.code) ? error.code : undefined;
+      console.error('Functions request failed:', {
+        name: error instanceof Error ? error.name : typeof error,
+        code,
+        databaseErrorNumbers: numbers,
+      });
       return response(503, { error: 'The data service is unavailable. Retry later.' });
     }
   };

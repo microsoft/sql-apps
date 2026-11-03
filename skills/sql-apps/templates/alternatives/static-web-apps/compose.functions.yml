@@ -1,0 +1,7 @@
+services:
+  sql:
+    extends:
+      file: compose.sql.yml
+      service: sql
+volumes:
+  sql-data:

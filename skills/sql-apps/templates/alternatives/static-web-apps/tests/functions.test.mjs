@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose';
+import { createLocalJWKSet, errors, exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { createAuthenticator } from '../packages/functions/dist/auth.js';
 import { createDatabase, execute, sqlConfiguration } from '../packages/functions/dist/database.js';
 import { createHandlers } from '../packages/functions/dist/handlers.js';
@@ -9,7 +9,9 @@ import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { EventEmitter } from 'node:events';
 
-const { TYPES } = createRequire(new URL('../packages/functions/package.json', import.meta.url))('tedious');
+const tedious = createRequire(new URL('../packages/functions/package.json', import.meta.url))('tedious');
+const { TYPES } = tedious;
+const { RequestTokenHandler } = createRequire(new URL('../packages/functions/package.json', import.meta.url))('tedious/lib/token/handler');
 
 const tenant = '11111111-1111-1111-1111-111111111111';
 const ownerA = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -56,6 +58,38 @@ test('JWT signature, issuer, audience, tenant, expiration and delegated identity
     }))).status, 401);
   }
   assert.throws(() => createAuthenticator({ ...env, AUTH_ISSUER: 'https://login.microsoftonline.com/common/v2.0' }));
+});
+
+test('signing-key service failures return unavailable without rejecting a valid session', async t => {
+  t.mock.method(console, 'error', () => {});
+  const bearer = await token();
+  for (const failure of [
+    new errors.JWKSTimeout(), new errors.JOSEError('Expected 200 OK from the JSON Web Key Set HTTP response'),
+    new errors.JWKSInvalid('Invalid signing-key response'), new TypeError('fetch failed'),
+  ]) {
+    const verify = createAuthenticator(env, async () => { throw failure; });
+    const h = createHandlers({
+      env, authenticate: verify, database: () => { throw new Error('Authentication must precede SQL.'); },
+    });
+    const result = await h.items(request(undefined, bearer));
+    assert.equal(result.status, 503);
+    assert.equal(result.headers['WWW-Authenticate'], undefined);
+    assert.equal(result.jsonBody.error, 'The data service is unavailable. Retry later.');
+    assert.ok(!JSON.stringify(result).includes(failure.message));
+  }
+});
+
+test('an unknown signing key remains an authentication rejection', async () => {
+  const verify = createAuthenticator(env, createLocalJWKSet({ keys: [] }));
+  await assert.rejects(verify(request(undefined, await token())), { status: 401 });
+});
+
+test('unsupported critical token headers remain an authentication rejection', async () => {
+  const parts = (await token()).split('.');
+  parts[0] = Buffer.from(JSON.stringify({
+    alg: 'RS256', kid: 'test', crit: ['unsupported'], unsupported: true,
+  })).toString('base64url');
+  await assert.rejects(authenticate(request(undefined, parts.join('.'))), { status: 401 });
 });
 
 test('routes preserve the contract, exact escaped Label filters, ordering and public config', async () => {
@@ -122,8 +156,65 @@ test('cloud SQL uses explicit service principal and verified encryption; passwor
   assert.throws(() => sqlConfiguration({ ...env, SQL_USER: 'app_api', SQL_PASSWORD: 'local-secret' }));
   const local = { SQL_SERVER: 'localhost', SQL_DATABASE: 'appdb', SQL_USER: 'app_api', SQL_PASSWORD: 'local-secret' };
   assert.equal(sqlConfiguration(local).authentication.type, 'default');
+  const coreTools = { ...local, WEBSITE_HOSTNAME: 'localhost:7071', AZURE_FUNCTIONS_ENVIRONMENT: 'Development' };
+  assert.equal(sqlConfiguration(coreTools).authentication.type, 'default');
+  for (const extra of [{ WEBSITE_INSTANCE_ID: 'cloud' }, { WEBSITE_HOSTNAME: 'app.azurewebsites.net' },
+    { AZURE_FUNCTIONS_ENVIRONMENT: 'Production' }]) {
+    assert.throws(() => sqlConfiguration({ ...coreTools, ...extra }), /local-only/);
+  }
   assert.throws(() => sqlConfiguration({ ...local, WEBSITE_HOSTNAME: 'cloud' }));
   assert.throws(() => sqlConfiguration({ ...local, SQL_USER: 'sa' }));
+});
+
+test('database errors wrapped by Tedious retain their SQL error classification', async () => {
+  const connection = new EventEmitter();
+  connection.execSql = request => {
+    const handler = new RequestTokenHandler(connection, request);
+    for (const [number, message] of [
+      [2627, 'Violation of UNIQUE KEY constraint.'],
+      [3621, 'The statement has been terminated.'],
+    ]) {
+      handler.onErrorMessage({
+        number, message, state: 1, class: 16, serverName: 'test',
+        procName: 'api.CreateItem', lineNumber: 1,
+      });
+    }
+    request.callback(request.error, 0, []);
+  };
+  const h = handlers({
+    create: async () => execute(connection, 'EXEC api.CreateItem @Label=@Label;'),
+  });
+  const response = await h.createItem(request('/api/CreateItem', await token(), {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"Label":"duplicate"}',
+  }));
+  assert.equal(response.status, 409);
+});
+
+test('unexpected handler errors are logged without exposing details in the response', async t => {
+  const logged = [];
+  t.mock.method(console, 'error', (...args) => logged.push(args));
+  const h = handlers({
+    list: async () => { throw new Error('database connection detail'); },
+  });
+  const response = await h.items(request(undefined, await token()));
+  assert.equal(response.status, 503);
+  assert.equal(JSON.stringify(response).includes('database connection detail'), false);
+  assert.equal(logged.length, 1);
+  assert.match(String(logged[0][0]), /Functions request failed/);
+  assert.equal(logged.flat().map(String).join(' ').includes('database connection detail'), false);
+});
+
+test('classified database rejections are not logged as unexpected failures', async t => {
+  const logged = [];
+  t.mock.method(console, 'error', (...args) => logged.push(args));
+  const h = handlers({
+    create: async () => { throw Object.assign(new Error('duplicate'), { number: 2627 }); },
+  });
+  const response = await h.createItem(request('/api/CreateItem', await token(), {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"Label":"duplicate"}',
+  }));
+  assert.equal(response.status, 409);
+  assert.equal(logged.length, 0);
 });
 
 test('slow or oversized streamed bodies cancel promptly without acquiring a database connection', async () => {

@@ -1,0 +1,5 @@
+# Explicit opt-in only: local.mjs includes this file when SQL_PORT is configured.
+services:
+  sql:
+    ports:
+      - "127.0.0.1:${SQL_PORT:?Set an unused SQL_PORT to enable native MSSQL access}:1433"

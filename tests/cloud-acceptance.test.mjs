@@ -17,6 +17,10 @@ async function run(t, fault) {
     if (options.method === 'POST') {
       const { Label } = JSON.parse(options.body);
       if (url.pathname === '/api/Items') return Response.json({}, { status: 405 });
+      if (!Label.trim() && fault === 'functions-validation') {
+        return Response.json({ error: 'Label must contain 1 to 120 characters.' }, { status: 400 });
+      }
+      if (!Label.trim() && fault === 'invalid-input-outage') return Response.json({}, { status: 503 });
       if (!Label.trim()) return Response.json({ error: { code: 'DatabaseOperationFailed' } }, { status: 400 });
       if (rows.some(row => row.owner === owner && row.Label === Label)) {
         return Response.json({}, { status: fault === 'race-outage' ? 503 : 409 });
@@ -61,4 +65,16 @@ test('cloud acceptance requires explicit restart and preserves the exact saved r
   assert.equal(result.authenticatedRead.count, 10);
   assert.ok(result.authenticatedRead.medianMs >= 0);
   assert.equal(result.restartPersistence, 'passed');
+});
+
+test('cloud acceptance accepts Functions validation responses without accepting outages', async t => {
+  const result = await run(t, 'functions-validation');
+  assert.equal(result.status, 'passed');
+});
+
+test('cloud acceptance rejects service outages for invalid input', async t => {
+  await assert.rejects(run(t, 'invalid-input-outage'), {
+    name: 'AssertionError',
+    message: 'Invalid input must be rejected, not reported as an outage.',
+  });
 });

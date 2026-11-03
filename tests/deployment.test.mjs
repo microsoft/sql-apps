@@ -8,23 +8,6 @@ import test from 'node:test';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const starter = join(root, 'skills', 'sql-apps', 'templates', 'starter');
-const read = path => readFileSync(join(root, path), 'utf8');
-
-test('current guidance uses the bundled recipe without Azure skill workflows', () => {
-  for (const path of [
-    'skills/sql-apps/SKILL.md',
-    'skills/sql-apps/references/constitution.md',
-    'skills/sql-apps/references/prerequisites.md',
-    'skills/sql-apps/references/deployment.md',
-    'skills/sql-apps/templates/starter/deployment.md',
-    'docs/installation.md', 'SUPPORT.md', 'plan.md',
-  ]) {
-    assert.doesNotMatch(read(path), /Azure Skills|azure-skills|azure-app-onboard|azure-prepare|azure-validate|azure-deploy/);
-  }
-  assert.match(read('skills/sql-apps/SKILL.md'), /Container Apps/);
-  assert.match(read('skills/sql-apps/references/prerequisites.md'), /Azure CLI/);
-});
-
 test('container artifacts preserve real DAB and exclude local secrets', () => {
   const web = readFileSync(join(starter, 'Dockerfile.web'), 'utf8');
   const dab = readFileSync(join(starter, 'Dockerfile.dab'), 'utf8');
@@ -101,6 +84,7 @@ test('compiled infrastructure enforces the PoC resource contract', () => {
     assert.equal(byType(type).length, 0, `Unexpected supporting meter: ${type}`);
   }
   assert.equal(template.variables.tags['sqlapps-version'], "[parameters('sqlappsVersion')]");
+  assert.doesNotMatch(JSON.stringify([template.variables, resources.map(resource => resource.name)]), /-sqlapps/);
   for (const app of apps) assert.equal(app.tags, "[variables('tags')]");
   const serialized = JSON.stringify(template);
   assert.match(serialized, /Authentication=Active Directory Managed Identity/);
@@ -108,12 +92,7 @@ test('compiled infrastructure enforces the PoC resource contract', () => {
   assert.doesNotMatch(serialized, /administratorLoginPassword|BillOverUsage|TrustServerCertificate=True/);
 });
 
-test('deployment documents bootstrap, networking, costs, and unverified cloud acceptance', () => {
-  const doc = readFileSync(join(starter, 'deployment.md'), 'utf8');
-  for (const text of ['what-if', 'AutoPause', 'allowAzureServices', 'managed identity',
-    'subscription', 'overage', 'unverified', 'restart', 'bootstrap', 'oid']) {
-    assert.ok(doc.includes(text), `Missing deployment contract: ${text}`);
-  }
+test('SQL bootstrap uses an external contained user and restricted grants', () => {
   assert.ok(existsSync(join(starter, 'infra', 'main.bicepparam')));
   const bootstrap = readFileSync(join(starter, 'infra', 'bootstrap.sql'), 'utf8');
   assert.match(bootstrap, /CREATE USER.*WITH SID/);

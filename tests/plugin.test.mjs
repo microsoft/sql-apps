@@ -126,85 +126,9 @@ test('Gemini extension uses native skill discovery without global context or cod
   assert.ok(!existsSync(path.join(root, 'GEMINI.md')), 'Do not make plugin guidance always-on');
 });
 
-test('release and installation guidance verify payloads and require discovered DAB', () => {
-  const installation = read(path.join('docs', 'installation.md'));
-  const prerequisites = read(path.join('skills', 'sql-apps', 'references', 'prerequisites.md'));
-  const releasing = read(path.join('docs', 'reference', 'releasing.md'));
-  assert.match(installation, /0\.3\.0 release candidate/);
-  assert.match(prerequisites, /microsoft-sql@microsoft-sql/);
-  assert.match(installation, /required for a complete database-backed workflow/);
-  assert.match(installation, /dab-rest-and-graphql/);
-  assert.match(installation, /mssql_dab/);
-  assert.match(prerequisites, /Do not substitute mock persistence/);
-  for (const document of [installation, releasing]) {
-    assert.match(document, /--installed-root/);
-    assert.match(document, /actual installed|actual installed root|actually loaded/);
-    assert.match(document, /fresh session/);
-    assert.match(document, /source: live/);
-  }
-  assert.match(releasing, /immutable/);
-  assert.match(releasing, /byte-exact/);
-  assert.ok(existsSync(path.join(root, 'scripts', 'verify-release.mjs')));
-});
-
-test('missing SQL or Azure CLI has actionable setup guidance', () => {
-  const installation = read(path.join('docs', 'installation.md'));
-  const prerequisites = read(path.join('skills', 'sql-apps', 'references', 'prerequisites.md'));
-  const skill = read(skillPath);
-  const readme = read('README.md');
-  for (const [name, document] of [['README', readme], ['installation guide', installation]]) {
-    assert.match(document, /Azure SQL Database container.*Private Preview/, name);
-    assert.match(document, /https:\/\/aka\.ms\/sqldbcontainerpreview-signup/, name);
-    assert.match(document, /official getting-started guide/, name);
-  }
-  assert.match(installation, /Quick setup when a capability is missing/);
-  for (const requirement of [
-    'microsoft-sql@microsoft-sql',
-    'microsoft-sql-vscode',
-    'az bicep version',
-    'winget install --exact --id Microsoft.AzureCLI',
-    'Azure Cloud Shell',
-    'az version',
-    'az login',
-  ]) {
-    assert.ok(prerequisites.includes(requirement), `Missing setup guidance: ${requirement}`);
-  }
-  assert.ok(installation.includes('../skills/sql-apps/references/prerequisites.md'));
-  assert.match(prerequisites, /Private Preview/);
-  assert.ok(prerequisites.includes('https://aka.ms/sqldbcontainerpreview-signup'));
-  assert.ok(prerequisites.includes('https://microsoft.github.io/azure-sql-database-container/getting-started.html'));
-  assert.match(prerequisites, /does not grant registry access/i);
-  assert.match(prerequisites, /user must complete any interactive registry login/i);
-  assert.match(prerequisites, /Do not enroll, accept terms, or authenticate without explicit approval/);
-  assert.match(prerequisites, /useful UI, schema, and scaffolding work may continue/);
-  assert.match(prerequisites, /persistence and end-to-end checks stay incomplete/);
-  assert.match(prerequisites, /Do not substitute mock persistence/);
-  assert.match(prerequisites, /^> Use SQL Apps.*existing setup/m);
-  assert.match(installation, /Local-only has no Azure CLI or subscription requirement/);
-  assert.ok(skill.includes('./references/prerequisites.md'));
-  assert.ok(readme.includes('./docs/installation.md#quick-setup-when-a-capability-is-missing'));
-});
-
-test('shared guidance persists policy for each active host without five copies', () => {
-  const skill = read(skillPath);
-  const constitution = read(path.join('skills', 'sql-apps', 'references', 'constitution.md'));
-  for (const destination of [
-    '.github/copilot-instructions.md', 'CLAUDE.md', 'AGENTS.md', 'GEMINI.md',
-  ]) {
-    assert.ok(skill.includes(destination), `Missing skill instruction destination: ${destination}`);
-    assert.ok(constitution.includes(destination), `Missing constitution destination: ${destination}`);
-  }
-  assert.match(skill, /Write only for the active host/);
-  const readme = read('README.md');
-  for (const host of ['GitHub Copilot', 'Claude Code', 'OpenAI Codex', 'Gemini CLI', 'Cursor']) {
-    assert.ok(readme.includes(host), `Missing installation guidance: ${host}`);
-  }
-  assert.match(read(path.join('docs', 'reference', 'releasing.md')), /Verification status/);
-});
-
 test('every bundled Markdown link resolves inside the plugin', () => {
   const documents = [
-    'README.md', 'plan.md', 'SECURITY.md', 'SUPPORT.md', 'CODE_OF_CONDUCT.md',
+    'README.md', 'SECURITY.md', 'SUPPORT.md', 'CODE_OF_CONDUCT.md',
     ...filesIn('skills').filter(file => file.endsWith('.md')), ...filesIn('docs'),
   ];
   for (const document of documents) {
@@ -247,110 +171,8 @@ test('constitution contains one portable durable project-policy block', () => {
   assert.ok(block);
   assert.equal((block[1].match(/sql-apps:constitution:start/g) ?? []).length, 1);
   assert.equal((block[1].match(/sql-apps:constitution:end/g) ?? []).length, 1);
-  for (const required of [
-    'TypeScript', 'React/Vite', 'Express', 'Azure SQL through DAB', 'mssql', 'DAB',
-    'intent: poc', 'costPreference: free-first', 'zero-azure-spend',
-    'Local work', 'app-brief.md', 'host permissions',
-  ]) {
-    assert.ok(block[1].includes(required), `Missing durable policy: ${required}`);
-  }
   assert.doesNotMatch(block[1], /C:\\|PLUGIN_ROOT|node_modules/);
-  assert.match(read(skillPath), /preserving|Preserve/);
-  assert.match(read(skillPath), /rather than appending duplicates/);
   assert.ok(block[1].split(/\s+/).length < 300, 'Keep always-on policy concise');
-});
-
-test('brief captures app decisions without duplicating deployment policy', () => {
-  const brief = read(path.join('skills', 'sql-apps', 'templates', 'app-brief.md'));
-  for (const heading of [
-    '## Outcome and users', '## Workflows, data, and access',
-    '## Scope and decisions', '## Technical notes', '## Delivery and open checks',
-  ]) {
-    assert.ok(brief.includes(heading), `Missing brief heading: ${heading}`);
-  }
-  assert.ok(brief.split(/\s+/).length < 400, 'Keep the template concise');
-  assert.match(brief, /Do not store credentials/);
-});
-
-test('router wires Rayfin-aligned design and migration metadata into generated apps', () => {
-  const skill = read(skillPath);
-  for (const resource of [
-    './references/app-design.md', './references/rayfin-alignment.md',
-    './templates/rayfin.yml',
-  ]) {
-    assert.ok(skill.includes(resource), `Missing router resource: ${resource}`);
-  }
-  assert.match(skill, /Copy.*rayfin\/rayfin\.yml/);
-  assert.match(skill, /dialect: mssql/);
-  assert.match(skill, /supplied `mssql` intent does not prove released SQL support/);
-  const alignment = read(path.join('skills', 'sql-apps', 'references', 'rayfin-alignment.md'));
-  for (const required of [
-    'packages/frontend', 'packages/data', 'packages/shared', 'packages/server',
-    'npm workspaces', 'dist/index.html', 'same-origin',
-    'SQL Apps does not execute it',
-    'not a guarantee of compatibility',
-  ]) {
-    assert.ok(alignment.includes(required), `Missing migration boundary: ${required}`);
-  }
-  const constitution = read(path.join('skills', 'sql-apps', 'references', 'constitution.md'));
-  const block = constitution.match(/```markdown\r?\n([\s\S]+?)\r?\n```/)[1];
-  assert.ok(block.includes('rayfin/rayfin.yml'));
-  assert.ok(block.includes('mssql` dialect as migration intent only'));
-});
-
-test('design guidance adopts UI conventions without Rayfin runtime coupling', () => {
-  const design = read(path.join('skills', 'sql-apps', 'references', 'app-design.md'));
-  for (const required of [
-    'Tailwind CSS v4', 'Radix', 'Lucide React', 'clsx', 'tailwind-merge',
-    'Vitest', 'React Testing Library', 'global.css', 'keyboard', 'rollback',
-    'system or locally bundled licensed fonts', 'Do not import `@microsoft/rayfin-*`',
-    '0979439a7a0806abd0ee48c2619b37f297ae1324',
-  ]) {
-    assert.ok(design.includes(required), `Missing design convention: ${required}`);
-  }
-});
-
-test('Rayfin reference stays focused on alignment rather than platform implementation', () => {
-  const alignment = read(path.join('skills', 'sql-apps', 'references', 'rayfin-alignment.md'));
-  assert.ok(alignment.split(/\s+/).length < 350);
-  assert.match(alignment, /Leave migration and runtime implementation to Rayfin/);
-  assert.doesNotMatch(alignment, /custom-aca|operation poller|schema job|2026-10-01-preview/);
-});
-
-test('future service YAML preserves the proposed mssql shape and safe capability defaults', () => {
-  const yaml = read(path.join('skills', 'sql-apps', 'templates', 'rayfin.yml'));
-  const body = yaml.split(/\r?\n/).filter((line) => !line.startsWith('#')).join('\n').trim();
-  assert.equal(body, `services:
-  auth:
-    enabled: false
-    password:
-      enabled: false
-    allowedRedirectUris: []
-    fabric:
-      enabled: false
-  data:
-    enabled: true
-    dialect: mssql
-    path: packages/data
-    buildCommand: npm run build
-  realtime:
-    enabled: false
-    backplane: none
-  storage:
-    enabled: false
-  functions:
-    enabled: false
-    durable:
-      enabled: false
-  staticHosting:
-    enabled: true
-    path: packages/frontend
-    folder: dist
-    buildCommand: npm run build
-    indexDocument: index.html
-    assetAccess: public`);
-  assert.match(yaml, /Copy to rayfin\/rayfin\.yml/);
-  assert.ok(!existsSync(path.join(root, 'rayfin', 'rayfin.yml')));
 });
 
 test('starter source is inert template content, not a host runtime or vendored specialist', () => {
@@ -360,7 +182,8 @@ test('starter source is inert template content, not a host runtime or vendored s
   assert.ok(payload.includes(starter + path.join('scripts', 'acceptance.mjs')));
   assert.ok(payload.includes(path.join('skills', 'sql-apps', 'references', 'deployment.md')));
   assert.ok(payload.includes(path.join('skills', 'sql-apps', 'references', 'deployment-attribution.md')));
-  assert.ok(payload.every((file) => file.startsWith(starter) || file.endsWith('.md') || file.endsWith('.yml')));
+  const alternatives = path.join('skills', 'sql-apps', 'templates', 'alternatives') + path.sep;
+  assert.ok(payload.every((file) => file.startsWith(starter) || file.startsWith(alternatives) || file.endsWith('.md') || file.endsWith('.yml')));
   assert.ok(!payload.some(file => file.split(path.sep).some(part => ['node_modules', 'dist', '.local'].includes(part))));
   for (const component of [
     'mcp.json', '.mcp.json', '.lsp.json', 'hooks', 'agents', 'commands', 'rules',

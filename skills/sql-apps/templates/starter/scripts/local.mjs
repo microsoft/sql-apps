@@ -3,14 +3,16 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 
 import { resolve } from 'node:path';
 import { spawnSync, fork } from 'node:child_process';
 import { once } from 'node:events';
-import { configuration, readEnvironment, root } from '../dist/scripts/config.js';
+import { composeArguments, localApi, localConfiguration, readEnvironment, root } from './config.ts';
+import { listenForStop, requestLocalStop } from './runtime-control.mjs';
 
 process.chdir(root);
 const command = process.argv[2];
+const api = localApi();
 const secret = () => `Aa1!${randomBytes(24).toString('hex')}`;
 let env;
 function compose(args, options = {}) {
-  const result = spawnSync('docker', ['compose', '--project-name', env.COMPOSE_PROJECT_NAME, ...args], {
+  const result = spawnSync('docker', [...composeArguments(env, api), ...args], {
     cwd: root, env, encoding: 'utf8', ...options,
   });
   if (result.error) throw result.error;
@@ -44,57 +46,74 @@ if (command === 'init') {
   if (!existsSync('.env')) throw new Error('Copy .env.example to .env and configure identity first.');
   const current = readFileSync('.env', 'utf8');
   if (current.includes('COMPOSE_PROJECT_NAME=')) {
-    if (!current.includes('MSSQL_SA_PASSWORD=') || !current.includes('SQL_CONNECTION_STRING=')) {
+    if (!['MSSQL_SA_PASSWORD', 'APP_SQL_PASSWORD', ...(api === 'dab' ? ['SQL_CONNECTION_STRING'] : [])]
+      .every(name => current.includes(`${name}=`))) {
       throw new Error('Incomplete existing local secrets. Restore .env for this persisted database; do not generate replacements.');
     }
     console.log('Existing project identity and secrets preserved.');
   } else {
     const name = `sqlapps-${randomBytes(6).toString('hex')}`;
     writeFileSync('.env', `${current}\nCOMPOSE_PROJECT_NAME=${name}\nMSSQL_SA_PASSWORD=${secret()}\nAPP_SQL_PASSWORD=${secret()}\n`, { mode: 0o600 });
-    const settings = readEnvironment();
-    writeFileSync('.env', `SQL_CONNECTION_STRING="Server=sql,1433;Database=appdb;User ID=app_api;Password=${settings.APP_SQL_PASSWORD};Encrypt=True;TrustServerCertificate=True;"\n`, { flag: 'a', mode: 0o600 });
+    if (api === 'dab') {
+      const settings = readEnvironment();
+      writeFileSync('.env', `SQL_CONNECTION_STRING="Server=sql,1433;Database=appdb;User ID=app_api;Password=${settings.APP_SQL_PASSWORD};Encrypt=True;TrustServerCertificate=True;"\n`, { flag: 'a', mode: 0o600 });
+    }
     console.log('Generated project-owned local credentials. No containers started.');
   }
 } else if (command === 'start' || command === 'stop') {
   env = readEnvironment();
   if (!/^sqlapps-[a-f0-9]{12}$/.test(env.COMPOSE_PROJECT_NAME || '')) throw new Error('Run local:init; an isolated Compose project is required.');
   if (command === 'stop') {
-    compose(['stop'], { stdio: 'inherit' });
+    if (!await requestLocalStop(env)) compose(['stop'], { stdio: 'inherit' });
   } else {
-    const config = configuration(env);
-    if (env.ACCEPT_EULA !== 'Y') throw new Error('Review the SQL terms and explicitly set ACCEPT_EULA=Y before startup.');
-    if (new URL(config.dab).protocol !== 'http:' || new URL(config.dab).port !== (env.DAB_PORT || '5081') || new URL(config.dab).hostname !== '127.0.0.1') {
-      throw new Error('local:start requires DAB_URL=http://127.0.0.1:DAB_PORT. Use the deployment recipe for remote services.');
+    const config = localConfiguration(env, api);
+    for (const file of ['packages/frontend/dist/index.html', 'dist/scripts/config.js',
+      api === 'functions' ? 'packages/functions/dist/index.js' : 'dist/packages/server/server.js']) {
+      if (!existsSync(file)) throw new Error(`Missing ${file}. Run npm run build before Start or acceptance.`);
     }
-    const appOrigin = new URL(config.publicConfig.redirectUri);
-    if (appOrigin.protocol !== 'http:' || !['localhost', '127.0.0.1'].includes(appOrigin.hostname) || Number(appOrigin.port || 80) !== config.port) {
-      throw new Error('local:start requires a loopback APP_ORIGIN with the same port as APP_PORT.');
+    const functions = api === 'functions' ? await import('./functions-local.mjs') : undefined;
+    if (functions) {
+      functions.checkFunctionsTools(functions.functionsEnvironment(env));
     }
+    compose(['config', '--quiet']);
     await import('./check-config.mjs');
     let web;
+    let runtime;
+    let closeControl;
+    const abort = new AbortController();
+    let stopped;
+    const stopRequest = new Promise(resolve => { stopped = resolve; });
     let stopping = false;
     let stopRequested = false;
     const requestStop = () => {
       stopRequested = true;
+      abort.abort();
+      stopped();
       if (web?.connected) web.send('stop');
     };
     const shutdown = async () => {
       if (stopping) return;
       stopping = true;
+      const failures = [];
       try {
-        if (web && web.exitCode === null) {
+        if (runtime) await runtime.stop();
+        if (web && web.exitCode === null && web.signalCode === null) {
           const exited = once(web, 'exit');
           if (!stopRequested && web.connected) web.send('stop');
           await exited;
         }
-      } finally {
-        compose(['stop'], { stdio: 'inherit' });
-      }
+      } catch (error) { failures.push(error); }
+      try { compose(['stop'], { stdio: 'inherit' }); }
+      catch (error) { failures.push(error); }
+      await closeControl?.(failures.length === 0);
+      if (failures.length) throw new AggregateError(failures, 'Local shutdown failed; inspect the owned services.');
     };
     process.on('SIGINT', requestStop);
     process.on('SIGTERM', requestStop);
     process.on('message', message => { if (message === 'stop') requestStop(); });
+    closeControl = await listenForStop(env, requestStop);
     try {
+      if (stopRequested) throw new Error('Startup interrupted by a stop request.');
       compose(['up', '-d', '--wait', '--wait-timeout', '180', 'sql'], { stdio: 'inherit' });
       const engine = sql('master', ['-Q', "SET NOCOUNT ON; SELECT CONVERT(int,SERVERPROPERTY('EngineEdition'));"]);
       if (engine.trim() !== '5') throw new Error('Expected Azure SQL Database EngineEdition 5.');
@@ -123,22 +142,31 @@ if (command === 'init') {
           if (recorded !== '1') throw new Error(`Migration ${file} did not commit its version/checksum.`);
         }
       }
-      if (!/^Aa1![a-f0-9]{48}$/.test(env.APP_SQL_PASSWORD || '')) throw new Error('Missing generated app SQL password; restore the original .env.');
       sql('master', [], `IF NOT EXISTS(SELECT 1 FROM sys.sql_logins WHERE name=N'app_api') CREATE LOGIN app_api WITH PASSWORD='${env.APP_SQL_PASSWORD}';\nGO\n`);
       sql('appdb', ['-i', '/schema/permissions.sql']);
-      compose(['up', '-d', 'dab'], { stdio: 'inherit' });
-      await healthy(`${config.dab}/`, () => stopRequested);
-      if (stopRequested) throw new Error('Startup interrupted by a stop request.');
-      web = fork(resolve(root, 'dist/packages/server/server.js'), [], { env, stdio: ['inherit', 'inherit', 'inherit', 'ipc'] });
-      await Promise.race([
-        once(web, 'message'),
-        once(web, 'exit').then(() => { throw new Error('Packaged web server exited before readiness.'); }),
-      ]);
-      await healthy(`${config.publicConfig.redirectUri}health`, () => stopRequested);
-      console.log('SQL, DAB, and packaged web app ready. Ctrl+C stops services and preserves the volume.');
-      process.send?.('ready');
-      await once(web, 'exit');
-      if (!stopRequested) throw new Error('Web process exited unexpectedly.');
+      if (functions) {
+        runtime = await functions.startFunctions(env, {
+          signal: abort.signal, onRuntime: value => { runtime = value; },
+        });
+        console.log('SQL, Functions and Static Web Apps ready. Stop preserves the database volume.');
+        process.send?.('ready');
+        const exit = await Promise.race([runtime.exited, stopRequest]);
+        if (!stopRequested) throw new Error(`${exit.tool} exited unexpectedly.`);
+      } else {
+        compose(['up', '-d', 'dab'], { stdio: 'inherit' });
+        await healthy(`${config.dab}/`, () => stopRequested);
+        if (stopRequested) throw new Error('Startup interrupted by a stop request.');
+        web = fork(resolve(root, 'dist/packages/server/server.js'), [], { env, stdio: ['inherit', 'inherit', 'inherit', 'ipc'] });
+        await Promise.race([
+          once(web, 'message'),
+          once(web, 'exit').then(() => { throw new Error('Packaged web server exited before readiness.'); }),
+        ]);
+        await healthy(`${config.publicConfig.redirectUri}health`, () => stopRequested);
+        console.log('SQL, DAB, and packaged web app ready. Stop preserves the database volume.');
+        process.send?.('ready');
+        await once(web, 'exit');
+        if (!stopRequested) throw new Error('Web process exited unexpectedly.');
+      }
     } catch (error) {
       if (!stopRequested) throw error;
       console.log('Local stop requested.');

@@ -1,553 +1,258 @@
 # Packaging, verification, and releases
 
-[Back to SQL Apps](../../README.md) · [Installation](../installation.md)
+[Back to SQL Apps](../../README.md) | [Installation](../installation.md)
 
-## Package layout
+## Package and release identity
 
-The repository is both a marketplace and a plugin. All catalog sources resolve to the root plugin; all hosts use the same skill payload.
+This checkout is the **0.3.0 release candidate**, with starter baseline 0.1.0,
+not a published release or updated installation. The coordinate remains
+`sql-apps@sql-apps-skills`. All hosts share [one skill payload](../../skills/sql-apps/SKILL.md);
+the starter and optional overlays are inert source to copy into applications.
+There are no plugin hooks, MCP servers, runtime dependencies or plugin build step.
 
-| File | Purpose |
-| --- | --- |
-| [plugin.json](../../plugin.json) | Portable Agent Plugins 1.0 manifest |
-| [Shared marketplace](../../.claude-plugin/marketplace.json) | Copilot/Claude catalog: `sql-apps@sql-apps-skills` |
-| [Claude manifest](../../.claude-plugin/plugin.json) | Claude compatibility metadata |
-| [Codex catalog](../../.agents/plugins/marketplace.json) | Repository-relative local plugin source |
-| [Codex manifest](../../.codex-plugin/plugin.json) | Compatibility and display metadata |
-| [Cursor catalog](../../.cursor-plugin/marketplace.json) | Team marketplace |
-| [Cursor manifest](../../.cursor-plugin/plugin.json) | Native compatibility metadata |
-| [Gemini manifest](../../gemini-extension.json) | Extension metadata and conventional skill discovery |
-| [Routing skill](../../skills/sql-apps/SKILL.md) | Shared workflow and bundled references/templates |
-
-There are no executable hooks, MCP servers, automatic companion dependencies, or plugin build step. The bundled starter contains inert application source/scripts and its own dependency lockfile: copy it into an application before installing or running it. Installing SQL Apps does not install or execute those dependencies. There is no duplicate host-specific application implementation. The release verifier is a maintainer-run Node.js check, not a plugin runtime.
-
-## Release identity
-
-This checkout is the **0.3.0 release candidate**, adding application starter baseline 0.1.0. That identifies source metadata, not a published release or an updated user installation. The marketplace identity remains `sql-apps-skills`, the plugin/extension identity remains `sql-apps`, and the install coordinate remains `sql-apps@sql-apps-skills`.
-
-`plugin.json` is the canonical version. Keep the Claude, Codex, Cursor, and Gemini manifests and the shared/Cursor catalog versions aligned with it. The Codex catalog in `.agents/plugins/marketplace.json` intentionally reads the plugin version rather than duplicating it.
-
-Published release versions are **immutable**: never change shipped guidance or templates under an already published version, replace a versioned package in place, or retag a release. Any shipped payload change requires a new version in all versioned metadata. Freeze the reviewed source and package bytes together; record the source revision and verifier's skill-payload fingerprint. The fingerprint covers the skill payload, not a signed archive or a whole-repository digest.
+[plugin.json](../../plugin.json) owns the version. Keep Claude, Codex, Cursor and
+Gemini manifests and the shared/Cursor catalog versions aligned; the Codex catalog
+reads the plugin version. Published versions are **immutable**: changed shipped
+bytes need a new version, not a replaced package or retagged release. Record the
+reviewed revision and skill-payload fingerprint; it is not an archive signature.
 
 ## Verification status
 
-| Host | Packaging | Native validation / loader |
-| --- | --- | --- |
-| Copilot CLI | Root manifest + shared catalog | 0.2.0 isolated local marketplace registration/install/list passed with one skill on CLI 1.0.102, but it reports `source: live`: no cached package was copied; 0.3.0 loading not exercised |
-| VS Code | Root manifest + shared catalog | Isolated VS Code 1.143.0 loaded the earlier 0.2.1 candidate and exercised one local application workflow; those bytes do not match 0.3.0. Current native loading and published copied installation/update remain unverified |
-| Claude Code | Native manifest + shared catalog | Manifest/catalog validation passed; interactive loading not exercised |
-| OpenAI Codex | Compatibility manifest + Codex catalog | Static checks only; CLI unavailable in the validation environment |
-| Gemini CLI | Extension manifest + shared skills | Static checks only; CLI unavailable in the validation environment |
-| Cursor | Portable/native manifests + Cursor catalog | Static checks only; host unavailable in the validation environment |
+The current candidate separates the default DAB starter from explicit F1/DAB and
+Static Web Apps/Functions overlays. No default Rayfin manifest or private CLI is
+required. SQL is private unless an unused loopback `SQL_PORT` is selected.
+Both APIs use the same local commands. Functions runs installed Core Tools/SWA CLI
+against loopback SQL, without DAB. Build/unit results do not prove sign-in,
+persistence or hosting.
+Inspection/cleanup commands need no compiled output or compiler. Build is explicit
+before Start, compiled-code tests and acceptance; none hides a compiler hook.
+`npm start` aliases `local:start` for the selected profile; internal DAB web hosting
+uses `serve:web`. Status checks SQL engine/catalog; Ready aliases Status.
 
-One approved VS Code 0.2.1 candidate evaluation passed the historical scoped local application checks below. Starter validation is recorded separately. Neither is broad host certification, an unattended-generation claim, copied installation/update proof, or Azure deployment acceptance. Package checks alone prove none of those runtime behaviors or compatibility with an unreleased Rayfin schema.
+The following observations predate the latest Start/Test/staging consolidation;
+they identify historical revisions, **not verification of the current commands**.
+Rerun affected copied-app and repository checks before claiming current results.
 
-### Open runtime acceptance gate
+| Historical evidence | Result and boundary |
+| --- | --- |
+| Offline repository suite after local-workflow changes | 229 passed; one opt-in live SQL bootstrap test skipped |
+| Independent DAB copy | Build, 19 Node tests and 10 frontend tests passed |
+| Explicit Functions copy | Build, 35 Node tests, 10 frontend tests, artifact staging and standalone production-dependency loading passed |
+| Historical operational-command regression | Inspection/cleanup paths passed without build output despite a deliberately failing build; external Docker/HTTP boundaries stubbed. Start now requires a separate Build; rerun current checks before release |
+| Functions orchestration | Actual owned HTTP child processes; normal/separate Stop, duplicate Start, occupied ports, partial failure, child exit and malformed/idle control callers covered; Docker/CLI boundaries stubbed |
+| Actual Functions/SWA hosts | Core Tools 4.16.0/SWA CLI 2.0.10 passed static/public config, direct/proxied denial controls, restricted SQL configuration and owned listener cleanup; no SQL connection or real-user sign-in tested |
+| Prior actual Compose merges | Certificate overlay retained; SQL private by default, loopback-only when opted in; no services started |
+| Package fidelity | Independent copied skill payload matched; not native install/update evidence |
+| Authenticated local SQL journey | Not rerun: required cached image unavailable; no pull, sign-in or terms acceptance performed |
 
-The initial 2026-10-26 preflight lacked a disposable target and execution authorization and performed no application or database changes. A later, separately approved local evaluation completed the application checkpoints before the maintainer ended the remaining evaluation. Its documentation was retained in a separate worktree and had not been incorporated here.
+The HTTP-only host smoke logged an unconfigured Storage health warning; Storage
+connectivity was not tested. Core Tools sets a local `WEBSITE_HOSTNAME`; SQL password
+configuration permits only Development/loopback there, never a cloud instance.
 
-On 2026-10-27, remediation rechecked the evaluated candidate against the then-current 0.2.1 checkout, verified the retained archive hashes and structured results, and incorporated the scoped observations below. That reconciliation needed no new services, license acceptance, sign-in, or runtime evaluation. The subsequent 0.3.0 starter changes alter the payload; do not reuse the historical fingerprint or native-run claim for this candidate.
+The recorded Functions dependency review found three moderate npm advisories through
+`@azure/identity` -> `@azure/msal-node` -> `uuid`
+([advisory](https://github.com/advisories/GHSA-w5hq-g745-h8pq)).
+A previous bounded update check found no safe fix; do not force an upgrade or
+promote Functions without resolving the dependency chain and rerunning its tests.
 
-Further evaluations require an approved isolated workspace, host usage, database target, setup and cleanup scope. Cloud evaluation requires its own Azure SQL Database approval. Do not reuse shared/demo services, count wording tests as runtime evidence, or remove unverified labels for unrun cases. On-premises installation is not an acceptance requirement.
-
-Keep agent execution plans and session-specific preflight records local, not in public reference documentation. The repository [ignore rules](../../.gitignore) exclude Superpowers planning directories, the local runtime-proof record, dependencies, generated test output, logs, and local environment files. Publish only sanitized, reproducible acceptance evidence; local plans and package checks do not change the verification statuses above.
+| Host | Recorded native evidence |
+| --- | --- |
+| Copilot CLI | 0.2.0 local registration/install/list on CLI 1.0.102 reported `source: live`; nothing copied. Current loading unverified. |
+| VS Code | 1.143.0 loaded a 0.2.1 candidate and exercised one local workflow. Current loading/copied update unverified. |
+| Claude Code | Manifest/catalog validation only; interactive loading unverified. |
+| Codex, Gemini CLI, Cursor | Static packaging only; native hosts unavailable during validation. |
 
 ### Recorded local candidate proof
 
-The retained run `20261026T205653Z` used an isolated native VS Code 1.143.0 session, SQL Apps candidate 0.2.1, Node.js 22.22.2, DAB 2.1.5 on .NET 10.0.13, and the Azure SQL Database preview engine (`EngineEdition=5`, `Edition=SQL Azure`, version `12.0.2000.8`). The maintainer approved the dedicated container, persisted volume, synthetic identities/data, loopback-only ports, and applicable container terms. No shared service or Azure deployment was used.
+Historical supervised VS Code/0.2.1 reservation-app checks passed SQL overlap and
+member-limit enforcement, owner isolation, direct/proxied authorization controls,
+concurrent races, browser save/reload and packaged restart. Six frontend tests and
+18 live/browser results passed. DAB moved from failing 2.0.12 Custom-JWT setup to
+2.1.5; HTTP handling and test observers needed repairs. This was not one-shot.
+Two Express/body-parser advisories remained in that generated app.
 
-| Check | Recorded result | Evidence boundary |
-| --- | --- | --- |
-| UI save and persisted reload | Passed; the same reservation ID, owner and interval matched the browser, a fresh DAB read, and independent SQL observations | Real compiled UI and SQL; not mock persistence |
-| Direct DAB authorization | Passed allowed/denied controls for ownership, forged roles/identities and all exposed write paths | Signed synthetic identities; no broad table-write grant |
-| Concurrent overlap | 20/20 trials produced exactly one successful write and one persisted reservation | Rejection was the SQL overlap rule, not a network or authentication failure |
-| Fresh-conversation rule change | Added a maximum-three-future-reservations rule after observing failing tests; all original 131 equipment and 192 reservation rows remained unchanged | A new native conversation preserved the project policy and existing authorization |
-| Concurrent member limit | 20/20 last-slot trials produced exactly one success and a final active-future count of three | Different equipment and intervals; independent SQL observations |
-| Packaged restart | Passed; a saved reservation survived compiled-web/DAB restart on the same SQL volume, and another save succeeded afterward | Clean production artifacts and restored package dependencies, not development servers |
-| Final package regression | 6 frontend unit tests plus 18 live/browser results passed; no failures or skipped tests | Includes both race sets; controlled quota/sleep responses test UI handling only |
-
-The final runtime command was `npm run test:runtime-proof` from the generated application's clean package build source. Its app-specific tests, structured SQL/HTTP results, generated source, and detailed observations remain in the retained local run, not the plugin payload. They do not form a portable public deployment recipe.
-
-Retained SHA-256 identities, rechecked against the artifacts:
-
-- Historical 0.2.1 SQL Apps skill payload: `db13865f8111581b4bcde23b40eba5733686f88155db74b19eb92c2bc3891c29`; nine evaluated skill/reference/template files, not the current 0.3.0 payload.
-- Verified generated source archive: `6cb44e7d2e7eb9ed30291450b4464d12d0ab74d965c6a8b3e8fe9fa9e3c372d4`.
-- Verified compiled package: `194919ab0f4b942ab03bb37e02dd9edd8c63d82c4cd9e0dcc3cd72e9dd1bf277`.
-
-This was supervised validation, not a clean one-shot result. The run replaced a failing DAB 2.0.12 Custom-JWT setup with 2.1.5, repaired generated-app HTTP error handling, and corrected test-only pagination/SQL observers; original failures were retained. Two known Express/body-parser advisories remain in that generated app; tested compressed-body mitigation is not an upstream patch or production approval.
-
-The local application checkpoints passed; the broader evaluation was intentionally stopped. Most onboarding cases, the matched baseline, copied installation/update, Azure deployment and the original full-plan final review remain incomplete. Native transcript coverage is incomplete, so no comparative quality/speed/cost claim is made. Run-owned containers remain stopped; the final SQL stop returned exit 137 with `OOMKilled=false`, and recovery after that final stop was not tested. No production or general cloud support is implied.
-
-## Validation commands
-
-Run packaging tests with Node.js 22 or later, Git, and a locally installed Bicep
-compiler (standalone or `az bicep install`, with host approval). No Azure sign-in
-is required. Set `BICEP_CLI_PATH` if the compiler is outside PATH/the Azure CLI
-default install directory.
-
-```powershell
-node --test tests\*.test.mjs
-copilot --plugin-dir C:\git\sql-apps-v3 plugin list --json
-claude plugin validate C:\git\sql-apps-v3
-claude plugin validate C:\git\sql-apps-v3\.claude-plugin\plugin.json
-```
-
-Replace the checkout path as needed. Tests cover manifest/version consistency, catalogs, shared skill paths, documentation links, host instruction destinations, design/alignment and attribution guidance, starter packaging/pins, the service template, the absence of host runtime components, and verifier positive/negative cases. The regressions exercise linked-directory CLI launches, unexpected host components, and real Git checkouts with Windows/Unix newline settings in temporary repositories; no commits are created. `--plugin-dir` checks development discovery only.
+Retained SHA-256 identities: historical skill payload
+`db13865f8111581b4bcde23b40eba5733686f88155db74b19eb92c2bc3891c29`,
+source archive `6cb44e7d2e7eb9ed30291450b4464d12d0ab74d965c6a8b3e8fe9fa9e3c372d4`,
+compiled package `194919ab0f4b942ab03bb37e02dd9edd8c63d82c4cd9e0dcc3cd72e9dd1bf277`.
+These identify historical artifacts, not current source. Broader onboarding,
+matched-baseline and copied-install/cloud evaluation were stopped or incomplete;
+transcript coverage was incomplete. No speed, cost or unattended-quality claim.
 
 ### Starter baseline 0.1.0
 
-The [copyable starter](../../skills/sql-apps/templates/starter/README.md) was validated
-in an independent application copy on 2026-10-27 using Node 22.22.2/npm 10.9.7,
-DAB 2.1.5 and the immutable SQL/DAB image digests in its
-[baseline](../../skills/sql-apps/templates/starter/baseline.json). It is not a
-native assistant-generation evaluation or cloud deployment.
+On 2026-10-27, an independent starter on Node 22.22.2/npm 10.9.7 with pinned DAB
+2.1.5/SQL images passed real local SQL/API ownership, denials, concurrent duplicate
+conflict, restricted-login checks, exact-row restart persistence and a new write.
+Browser checks used synthetic OIDC/PKCE: save/reload, duplicate/input retention,
+themes, narrow layout and keyboard focus passed. Simulated outage UI was not a
+cloud quota event. SQL stopped with exit 137, `OOMKilled=false`; recovery passed,
+but clean engine shutdown is not established.
 
-### Container Apps recipe local validation
+Later local image checks used 0.25 CPU/512 MiB without observed OOM. F1/SWA
+infrastructure compiled; actual Functions Core Tools 4.16.0 and SWA CLI 2.0.10
+passed public-config/routing and denial smoke checks. Compiled web/Functions
+artifacts loaded without a compiler. No positive Functions-to-SQL workflow or
+real-provider sign-in was established by those checks.
 
-The changed 0.3.0 working-tree candidate adds the concrete Bicep/container recipe;
-it is not a published release or a cloud-exercised immutable recipe. Local checks
-on 2026-10-27 used Bicep 0.48.1, Node 22.22.2, Docker Linux containers and the
-starter's pinned SQL/DAB images:
+### Cloud evidence and remaining gates
 
-- All 205 repository tests passed, including compiled ARM assertions for Consumption
-  profiles, internal/public ingress, scale-to-zero, one replica per app, 0.25 vCPU /
-  0.5 GiB, staged application creation, managed identity, default-off SQL firewall
-  exceptions, SQL free-limit AutoPause, and absence of paid supporting resources.
-- Both actual deployment images built. The public npm endpoint was unavailable in
-  the validation environment; the approved environment mirror succeeded through
-  `NPM_CONFIG_REGISTRY`, without TLS bypass or credential build arguments.
-- The independent starter production build and four server/config plus eight
-  frontend unit tests passed.
-- Authentication regressions cover token expiry, API authentication rejection
-  during initial load/reload/save, and retry after a denied sign-in callback.
-  The unused class-merging helper and its two dependencies were removed; a clean
-  install and the rebuilt web image passed without them.
-- Four image-checker regressions exercise the real checker with controlled service
-  responses: outages cannot count as invalid-input, direct-write, or duplicate
-  rejection, and exact-label reads work beyond a full first page.
-- The actual images passed missing-config refusal, packaged UI/public configuration,
-  direct and proxied anonymous/forged-token denial, allowed controls, invalid-input
-  and direct-write denial, owner isolation, one concurrent duplicate winner with
-  an explicit conflict rejection, exact-label saved
-  row identity across DAB/web container restart, and a new post-restart write.
-  Both containers used 0.25 CPU / 512 MiB limits without observed OOM.
-- SQL bootstrap refusal controls rejected a zero object ID and a mismatched existing
-  principal. Positive external-user creation/idempotency and managed-identity
-  authentication remain unverified: the pinned preview rejected cloud `TYPE` syntax.
-  No runtime SQL-auth fallback was added to the cloud recipe.
-- Local image routing used shared-network loopback HTTP and synthetic signed test
-  identities; it does not prove Azure internal HTTPS, real-provider sign-in, free
-  offer eligibility, quotas, cloud firewall behavior, or deployed acceptance.
+The separately approved 2026-10-27 West US 3 Container Apps review provisioned
+resources, verified actual scale/ingress/free-limit settings, bootstrapped the
+least-privilege managed identity and passed denial smoke checks. SQL SID binding
+was corrected from object ID to application client ID; a separately authorized
+live regression later passed. The temporary operator firewall rule was removed.
+Registry pulls used an approved repository-scoped token after `AcrPull` assignment
+failed; this is not managed-identity pull evidence. That exception had seven-day
+credential expiry and registry standing charges, not guaranteed-zero cost.
 
-To reproduce the maintainer-only image checks, first build/tag
-`sqlapps-recipe-web:validation` and `sqlapps-recipe-dab:validation` from the copied
-starter's Dockerfiles. Build/unit-test an isolated copied starter, then run:
+Real-user two-owner API/restart and browser acceptance remain **unverified**:
+tenant consent initially blocked sign-in; later operator-reported normal-browser
+sign-in did not complete those gates. Warm denial timings were not authenticated
+latency, cold-start or load tests. F1 and SWA have no live cloud acceptance;
+Functions also lacks real SQL ownership/pooling/bootstrap acceptance.
+
+## Validation procedure
+
+Use Node 22.22.2+, Git and a local Bicep compiler (`BICEP_CLI_PATH` if needed).
+Offline checks need no Azure sign-in. Never install dependencies in the plugin
+payload: copy the starter to a disposable app, then use its documented build/test
+commands. Install an overlay only for its separate validation.
 
 ```powershell
-node scripts\test-starter-runtime.mjs C:\isolated\starter "C:\Program Files\Git\usr\bin\openssl.exe" --image-check
+node --test tests\*.test.mjs
 ```
 
-The [image checker](../../scripts/test-deployment-images.mjs) uses only the isolated
-synthetic fixture and locally built images. It removes its image-test containers
-and stops the SQL/DAB fixture, retaining the fixture volume/ignored credentials.
-It is not shipped in the skill payload or a generated application. Cloud operations,
-registry publication and real-provider changes were not performed.
+Tests check discovery/metadata, links, packaging, lockfiles, compiled infrastructure
+and executable behavior. Wording checks are not assistant acceptance. Run
+[starter tests](../../skills/sql-apps/templates/starter/README.md) and
+[overlay tests/staging](../../skills/sql-apps/templates/alternatives/README.md)
+from independent copies. Record commands, versions, failures and skipped checks.
 
-### Governed-tenant cloud review (2026-10-27)
+### Package and installed-copy verification
 
-With explicit cost, network, identity and registry approval, the candidate was
-provisioned in West US 3. This is **partial cloud evidence, not completed application
-acceptance**:
-
-- The foundation deployment completed in about 160 seconds; application deployment
-  completed in about 81 seconds. These are command wall times, not total delivery
-  time or cold-start benchmarks.
-- Actual readback confirmed Consumption profiles, 0.25 vCPU/0.5 GiB per app,
-  min 0/max 1 replicas, public HTTPS web, internal HTTPS DAB, no log storage, SQL
-  `useFreeLimit: true` / `freeLimitExhaustionBehavior: AutoPause`, and version tags.
-  The operator firewall exception was removed after bootstrap and repair.
-- Live preflight rejected the literal log destination `'none'`; an empty
-  `appLogsConfiguration` succeeded. The compiled-template regression now catches it.
-- Initial DAB SQL startup failed with 18456 because bootstrap used the managed
-  identity's object ID. A directory-resolved user demonstrated that its SQL SID
-  maps to the application client ID. Bootstrap, outputs and runbook were corrected;
-  repeated bootstrap and least-privilege checks passed and DAB initialized.
-- Private image pulls used an explicitly approved repository-scoped read-only token
-  after ARM rejected the operator's `AcrPull` assignment. No registry admin account,
-  anonymous pulls or SQL-password fallback was enabled. This exception has a
-  seven-day credential expiry and registry standing charges; it is not proof of
-  managed-identity registry pulls.
-- Live controls returned 403 for anonymous and forged-identity-header API calls,
-  401 for a forged bearer token, and 404 for public access to internal DAB.
-- Ten sequential warm requests per route from the operator host, using fresh
-  connections, measured median/max 715/749 ms for web health and 725/748 ms for
-  anonymous API denial. These include client/network overhead and are neither a
-  load test nor authenticated data-path latency.
-- Both app registrations and tenant service principals were created. The new SPA
-  was preauthorized only for the new API's own delegated scope with explicit
-  approval. Tenant admin consent still blocked real-user sign-in. UI save/reload,
-  positive DAB requests, deployed ownership/conflict tests, and persisted-row
-  restart acceptance therefore remain unverified. No synthetic token was substituted.
-- All 205 repository tests passed after these cloud-discovered fixes.
-
-### Repeatable cloud acceptance gates
-
-These are maintainer-only checks from the repository root, not scripts installed
-into an application. They operate only on an explicitly approved review deployment;
-do not point them at a customer database. They retain uniquely labeled test rows.
-Compilation, denial smoke checks and successful provisioning do not satisfy these gates.
-
-**SQL identity regression.** Requires Python, the existing `pyodbc`/ODBC Driver 18
-tooling used for bootstrap, an authorized Azure CLI sign-in and temporary approved
-operator SQL connectivity. It does not create firewall rules, apply schema migrations
-or repair mismatched principals. Set the exact existing target:
+Run the [verifier](../../scripts/verify-release.mjs) against both an independent
+unpacked package and the actual installed root reported by the host:
 
 ```powershell
-$env:CLOUD_SUBSCRIPTION = '<approved-subscription-id>'
-$env:CLOUD_SQL_SERVER = '<approved-server>.database.windows.net'
-$env:CLOUD_SQL_DATABASE = '<approved-review-database>'
-$env:CLOUD_IDENTITY_ID = '<approved-managed-identity-resource-id>'
-$env:SQLAPPS_CLOUD_BOOTSTRAP_TEST = '1'
-try {
-  node --test tests\cloud-bootstrap.test.mjs
-  if ($LASTEXITCODE -ne 0) { throw 'Live SQL bootstrap acceptance failed.' }
-} finally {
-  Remove-Item Env:\SQLAPPS_CLOUD_BOOTSTRAP_TEST
-}
+node scripts\verify-release.mjs --source-root C:\git\sql-apps-v3 --installed-root C:\approved\unpacked-package
+node scripts\verify-release.mjs --source-root C:\git\sql-apps-v3 --installed-root C:\actual\installed-plugin
 ```
 
-The [live regression](../../tests/cloud-bootstrap.test.mjs) runs the shipped
-bootstrap twice, checks the stored SID against Azure's independently read client
-ID and checks least privilege. It then substitutes the principal object ID in a
-temporary copy, requires SQL refusal and verifies the correct bootstrap still
-passes. This opt-in test passed against the isolated review database on 2026-10-27;
-the temporary single-IP rule was removed and its absence read back. The default
-offline suite explicitly skips it, rather than reporting cloud coverage.
+It compares manifests/catalogs and the exact skill file set with byte-exact
+content, rejects extra host components, links and hard links, and reports version,
+file count and SHA-256 fingerprint. Exit codes: 0 match, 1 mismatch, 2 usage error.
+Package canonical LF bytes under [Git attributes](../../.gitattributes); do not
+normalize verifier differences away or discard dirty files to repair an old copy.
 
-**Authenticated API and restart gate.** Obtain short-lived delegated access tokens
-for two distinct approved test users through the real provider. If the integrated
-browser cannot authenticate, use the authorized normal-browser flow; do not copy
-browser profiles, spoof identity, or replace these tokens with synthetic ones.
-Never paste tokens into chat, files, shell history or evidence. Enter them through
-masked prompts in the operator's PowerShell process:
+An unpacked package proves fidelity, not host activation. `--plugin-dir`, a
+checkout, marketplace root or `source: live` is not a copied installation.
+Use [installed-path discovery](#verify-the-actual-installed-root),
+open a fresh session, confirm the loaded path/version and verify that root again.
+Test initial installation and update from the previous release using isolated
+host configuration; never modify live caches to make verification pass.
+
+### Verify the actual installed root
+
+This is maintainer/troubleshooting work, not normal installation. Use Node 22 or
+later and the [release verifier](../../scripts/verify-release.mjs) from an approved
+release checkout. Find the root the host **actually loaded**, containing
+`plugin.json` and `skills`, through plugin diagnostics or the loaded skill path.
+Do not substitute a repository, `--plugin-dir`, development link or marketplace
+registration root.
+
+For VS Code, enumerate candidates without modifying caches:
 
 ```powershell
-$env:ACCEPTANCE_TOKEN_A = [System.Net.NetworkCredential]::new('', (Read-Host 'User A access token' -AsSecureString)).Password
-$env:ACCEPTANCE_TOKEN_B = [System.Net.NetworkCredential]::new('', (Read-Host 'User B access token' -AsSecureString)).Password
-try {
-  node scripts\test-cloud-acceptance.mjs --origin https://<approved-web-host> --subscription $env:CLOUD_SUBSCRIPTION --resource-group <approved-group> --web-app <approved-web-app> --dab-app <approved-dab-app> --approve-restart
-  if ($LASTEXITCODE -ne 0) { throw 'Authenticated cloud acceptance failed.' }
-} finally {
-  Remove-Item Env:\ACCEPTANCE_TOKEN_A, Env:\ACCEPTANCE_TOKEN_B
-}
+Get-ChildItem "$env:APPDATA\Code\agentPlugins" -Directory -Filter '*sql-apps*' |
+  ForEach-Object { Get-ChildItem $_.FullName -Directory } |
+  Select-Object -ExpandProperty FullName
+$installedRoot = Read-Host 'Actual installed SQL Apps package root'
+node C:\git\sql-apps-v3\scripts\verify-release.mjs --source-root C:\git\sql-apps-v3 --installed-root "$installedRoot"
 ```
 
-Use `--approve-restart` only after approval to restart both named apps. The
-[API gate](../../scripts/test-cloud-acceptance.mjs) requires successful reads and
-writes, owner isolation, independent denial controls, a SQL conflict under concurrent
-writes, SQL validation, exact-row persistence and a new persisted write after restart.
-It reports ten sequential authenticated read timings, not load or cold-start results.
-Missing users or restart approval and any failed check produce a nonzero exit.
+Match the current session's loaded path, not merely the newest hash directory.
+Success reports `PASS sql-apps 0.3.0`, compared roots, file count and a SHA-256
+fingerprint. A stale version, same-version changed payload, missing/extra file,
+linked payload or unexpected host component fails with paths. Canonical LF comes
+from Git attributes; never erase dirty work or normalize a package mismatch away.
+Open a fresh session after install/update and verify the actual loaded root again.
+Byte fidelity and a `source: live` listing do not prove copied-host activation or
+application execution. Discover the selected API tools before runtime validation.
 
-Complete real browser save/reload and desktop/narrow UI checks separately. Direct
-internal DAB checks still need the approved inside-environment path described in the
-[deployment runbook](../../skills/sql-apps/templates/starter/deployment.md); the API
-gate does not expose internal DAB or claim to cover its direct endpoint.
+### Runtime and cloud acceptance
 
-Follow-up status: the operator reports sign-in/consent completed in normal Edge,
-but the integrated browser cannot complete certificate authentication. The two-user
-API/restart gate and browser save/reload are still **unverified**, not passed.
-The session-specific denial/timing helper now exits 2 to prevent its smoke results
-from being mistaken for full acceptance. The private deployment helper requires an
-existing password through an environment variable and never rotates registry credentials.
-Follow-up verification: 213 repository tests passed, with the live SQL test explicitly
-skipped in that offline run; the separately authorized live SQL regression passed.
-An independent copied plugin payload passed the release verifier. The operator will
-run the two-user API/restart gate in their own PowerShell; its result is pending.
+Use an approved disposable workspace and the [reservation scenario](../../README.md#2-build-your-first-workflow).
+Verify UI/API/SQL save/reload, denied and allowed direct requests, ownership, SQL
+concurrency, exact-row persistence/restart and a post-restart write. Change a rule
+in a fresh conversation and confirm existing policy/behavior survives. Exercise
+missing prerequisites and out-of-profile requests: useful scaffolding may proceed,
+but no mock persistence, automatic cloud switch or silent migration.
 
-### Deployment profile integration (2026-10-28)
+Default local delivery needs no cloud login. Check themes, keyboard behavior and
+packaged assets. Do not generate speculative Rayfin configuration; migrations
+require explicit scope and released/version-matched tooling. Preserve existing
+app manifests. Compare equivalent measured runs before claiming productivity gains.
 
-This checkout now includes candidate `container-apps/dab`, `app-service-f1/dab`
-and `static-web-apps/functions` selections in app-owned `deployment.json`.
-The [hosting guide](../../skills/sql-apps/templates/starter/hosting.md) is the
-publication/bootstrap runbook. The Rayfin intent variants are still proposed,
-non-executing migration metadata, not a new Rayfin configuration interpreter.
-No new Azure deployment, sign-in, identity/access change or resource write occurred
-during these integration checks.
-
-Verified locally:
-
-- The offline repository regression run passed 218 tests, with the opt-in live SQL
-  regression explicitly skipped (219 total). The host/bootstrap checks added after
-  that run are verified separately; do not sum overlapping runs.
-- An isolated copied starter passed `npm ci --ignore-scripts`, TypeScript/Vite
-  production build, 14 Node tests (10 Functions and 4 existing server/config tests)
-  and 10 React tests. The Functions tests use real synthetic JWT signatures and
-  simulated database-driver connections, not a real SQL persistence claim.
-- F1 and SWA Bicep plus their parameter examples compiled locally. SWA secret
-  parameters were checked using a non-credential placeholder without writing
-  resolved parameter artifacts. F1 uses two apps on one Free plan without Always On;
-  SWA uses Free with managed Functions and server-only service-principal settings.
-- `deployment:prepare` staged compiled static assets and a self-contained Functions
-  package; its standalone production lock installed successfully. Staging excludes
-  local settings, environment files, private keys and workspace `node_modules`.
-- The staged API ran in actual Functions Core Tools 4.16.0, not just SDK test mode.
-  Public config returned 200; anonymous, forged-bearer and forged-identity-header
-  reads independently returned 401; an unknown API returned 404.
-- SWA CLI 2.0.10 served the compiled frontend/assets and proxied to that Functions
-  host. `/config.json` followed the configured redirect to `/api/config`, returned
-  the correct frontend redirect origin and no SQL secrets. All three denial
-  controls also passed through SWA routing. No browser sign-in or positive SQL
-  operation was performed in this smoke check.
-- Both DAB and web images built from the pinned cached bases. The public-registry
-  web build failed with npm's `Exit handler never called`; one retry using the
-  configured HTTPS registry via the documented build argument succeeded. Do not
-  disable TLS or pass registry credentials as build arguments.
-- The new web image served health, compiled assets and runtime public config at
-  0.25 CPU/512 MiB. The final image contained no `node_modules`, including none of the
-  optional Functions dependencies. No SQL or identity provider was contacted.
-- The SWA launcher initially stalled during a version/help check. Direct invocation
-  of the installed CLI entry point with telemetry/update checks disabled succeeded.
-  All temporary HTTP hosts and the verification container were stopped afterward.
-
-Remaining blockers and next actions:
-
-| Area | Known boundary | Next safe action |
-| --- | --- | --- |
-| Functions production dependencies | `npm audit --omit=dev` reports three moderate package findings in the `@azure/identity` -> `@azure/msal-node` -> `uuid` chain for [GHSA-w5hq-g745-h8pq](https://github.com/advisories/GHSA-w5hq-g745-h8pq). A bounded compatible-update check found no safe fix; the newer identity candidate introduces a high-severity advisory. No forced major upgrade or speculative override was applied. | Resolve the identity dependency chain and rerun production audit/API tests before promoting Functions beyond candidate status. |
-| Functions SQL integration | JWT, parameters, connection reuse/reset/discard and failure cases passed driver-level tests. No real Functions-to-SQL save/reload or simultaneous pooled queries were run. | With the approved SQL target and dedicated Entra service principal, run `infra/functions-bootstrap.sql`, verify restricted permissions, then positive two-owner reads/writes, conflicts, failed-request isolation and persisted reload. |
-| Static Web Apps cloud | Local static/API routing passed. Free deployment, secret settings, external-provider sign-in and SQL/network access remain unverified. | Approve the exact site, existing SQL target, application identity/secret, deployment credential, connectivity and costs; publish the staged artifact and repeat allowed/denied controls. |
-| App Service F1 | Infrastructure/images passed local checks. Region/subscription container availability, combined memory/CPU headroom, public DAB trust, SQL managed identity and sleep/restart are not live-tested. | Approve an isolated F1 target and existing SQL access; deploy without paid fallback, bootstrap the new DAB identity and exercise direct/proxied authorization plus idle recovery. |
-| Container Apps | The earlier real-user API/restart and browser acceptance gates remain pending. | Resume those existing gates without treating this local integration work as deployed acceptance. |
-| SQL bootstrap | The new Functions bootstrap has static identity/grant refusal checks only; it creates a separate `app_functions` user and does not replace DAB's `app_runtime`. | Verify actual client-ID SID binding and repeat/refusal behavior on approved Azure SQL; the local preview's unsupported `TYPE` syntax is not a cloud certification. |
-
-These are engineering/evidence blockers, not permission to broaden access, spend,
-replace identities, relax SQL free limits or use a test issuer in deployment.
-
-### Backend TypeScript migration (2026-10-28)
-
-The starter web server, shared environment configuration, and Functions API now
-use strict TypeScript with compilation errors blocking output. Root
-`npm run build` compiles the backend before workspace builds. The container runs
-`dist/packages/server/server.js`; managed Functions runs `dist/index.js`.
-Setup/release scripts and Node tests remain JavaScript in this migration.
-
-Verification used fresh isolated copies, not dependencies or compiled output in
-the installed plugin payload:
-
-- The final workspace lock passed `npm ci --ignore-scripts`, a complete
-  TypeScript/Vite build, all 15 Node backend tests and all 10 frontend tests.
-  The server tests include compiled application-root resolution and occupied-port
-  shutdown; existing Functions behavior tests execute compiled JavaScript.
-- All 54 focused repository packaging, hosting, policy and deployment tests passed.
-  Staging rejects an unbuilt Functions API before creating output and includes
-  only compiled API code, host settings and package manifests.
-- The staged API passed standalone `npm ci --omit=dev --ignore-scripts` without a
-  TypeScript compiler. Actual Functions Core Tools loaded the emitted entry point:
-  public config returned 200, and anonymous, forged bearer and forged identity
-  header requests each returned 401.
-- The production web image built successfully using the configured HTTPS package
-  mirror. Its compiled server served health, public config and frontend at
-  0.25 CPU/512 MiB without runtime `node_modules`.
-
-No Azure resources, real SQL connections or real-provider sign-in were exercised.
-The three existing moderate dependency findings and the cloud/SQL acceptance
-gates above remain open; this language migration does not resolve or certify them.
-
-### Earlier starter baseline evidence
-
-- Clean `npm ci --ignore-scripts`, TypeScript/production build, four server/config and
-  three React behavior tests passed. Dependency audit reported zero advisories.
-- Approved isolated API acceptance passed direct/proxied anonymous and forged
-  identity/signature denials, positive controls, cross-owner isolation, one
-  concurrent-duplicate winner, read-entity write denial and SQL invalid-input rejection.
-- Independent API-login SQL checks confirmed base-table read/write denial and
-  procedure execution permission. The same saved row identity/content survived a full
-  SQL/DAB/web stop/start; a post-restart write succeeded.
-- The first API run exposed a missing proxy `Content-Encoding` response header;
-  that was fixed with a compressed-response regression. A test initially assumed
-  SQL `THROW` maps to HTTP 4xx; the pinned DAB returns a database-operation error
-  with HTTP 500. Acceptance now checks that explicit error contract rather than
-  treating any outage as a valid business-rule rejection.
-- Browser acceptance passed synthetic OIDC authorization-code/PKCE, real DAB/SQL
-  save and full page reload, duplicate rejection with input retention, light/dark
-  controls, narrow-width overflow and keyboard focus. Unavailable-state handling
-  used a browser-route simulation, not an actual cloud quota event.
-
-The maintainer-only [test fixture](../../scripts/test-starter-runtime.mjs) supplies
-synthetic OIDC/JWT identities and a short-lived certificate trusted only in that
-test DAB container. It is not bundled under the skill or shipped in generated apps.
-It does not register Entra applications, sign in to Azure, pull images, change OS
-certificate trust, or delete data. Test containers are stopped after API acceptance;
-the isolated volume and ignored credentials are retained.
-
-The pinned SQL preview exited 137 with `OOMKilled=false` after Docker stop.
-Restart recovery and persisted data passed, but clean engine shutdown is not
-established. Registry tarball URLs are omitted from the integrity-pinned starter
-lockfile to avoid binding generated apps to a maintainer-specific package feed.
-
-To reproduce, first obtain approval for an isolated copied starter, cached images,
-container terms, synthetic identities/data, local ports and cleanup scope. Build/test
-the copy, then run:
+The maintainer-only synthetic [runtime fixture](../../scripts/test-starter-runtime.mjs)
+and [browser checker](../../scripts/test-starter-browser.mjs) require approval for
+cached images, terms, ports, synthetic users/data and cleanup. They are not shipped
+with apps. Trust/certificate bypass is test-scoped, never OS-wide or deployed.
+The fixture stops owned containers and retains its volume/ignored credentials:
 
 ```powershell
 node scripts\test-starter-runtime.mjs C:\approved\starter-copy "C:\Program Files\Git\usr\bin\openssl.exe"
 ```
 
-`--resume` reuses only an existing fixture-owned copy without replacing its database
-credentials. `--browser` keeps the fixture/stack running for browser checks; stop
-with Ctrl+C afterward. Test certificate bypass must be scoped to the test browser,
-not the OS trust store. Real-provider sign-in, deployed identity, hosting/SKU/free
-offer eligibility, and Azure acceptance remain **unverified**. No measured speedup
-is claimed.
+Use `--resume` only with its existing fixture-owned copy; `--browser-check` takes
+an already installed Playwright module. `--image-check` requires locally built
+`sqlapps-recipe-web:validation` and `sqlapps-recipe-dab:validation` images.
 
-With the browser fixture running, the optional maintainer
-[browser check](../../scripts/test-starter-browser.mjs) can use an already installed
-Playwright module and system Edge (no browser download):
+For an approved review deployment only, follow the [deployment runbook](../../skills/sql-apps/templates/starter/deployment.md)
+and [attribution contract](../../skills/sql-apps/references/deployment-attribution.md).
+Check actual SKUs, free-limit AutoPause, networking, every supporting meter,
+identity, tags/names and approved exceptions. Preserve shared resources and customer
+metadata. Local compilation or a successful deploy does not satisfy this gate.
 
-```powershell
-node scripts\test-starter-browser.mjs C:\approved\starter-copy C:\approved\tools\node_modules\playwright\index.mjs
-```
+The opt-in [live bootstrap test](../../tests/cloud-bootstrap.test.mjs) uses
+`SQLAPPS_CLOUD_BOOTSTRAP_TEST=1` plus `CLOUD_SUBSCRIPTION`, `CLOUD_SQL_SERVER`,
+`CLOUD_SQL_DATABASE` and `CLOUD_IDENTITY_ID`; it needs approved operator connectivity
+and pyodbc/ODBC 18. It verifies repeated bootstrap, client-ID SID binding and refusal
+of a mismatched principal; it does not create firewall rules or migrate schemas.
 
-Its DNS mapping and certificate bypass apply only to that test browser. They are
-not production settings or OS trust/DNS changes.
-Alternatively, pass `--browser-check C:\approved\tools\node_modules\playwright\index.mjs`
-to the runtime fixture command to run this check and automatically stop the stack.
-
-## Package and installed-copy verification
-
-Use the [portable verifier](../../scripts/verify-release.mjs) against an **explicitly supplied independent root**. It defaults the source to the checkout containing the script, not the current working directory. It reads both roots without modifying either, compares all manifest/catalog metadata, validates release names/versions, and compares the exact file set and bytes under `skills`, including bundled references and templates.
-
-The instruction-only package contract also rejects known host-loaded component roots in both source and installed copies: hook/MCP/LSP configuration, agents, commands, rules, settings, Gemini's global context, Copilot's client namespace, and other host components such as automations and workflows. Manifest and catalog fields are restricted to the supported metadata and skill-discovery fields; inline component declarations, dependencies, experimental extensions, redirected skill paths, and non-root catalog sources fail even when source and installed metadata match. Directory links, broken links, and case variants do not bypass this check. Ordinary documentation and maintainer scripts remain allowed outside the skill payload; this is not a whole-archive signature check.
+The [cloud API gate](../../scripts/test-cloud-acceptance.mjs) needs real-provider
+delegated tokens for two approved users, never synthetic tokens. Enter them using
+masked prompts in the operator shell, not chat, files, arguments or shell history:
 
 ```powershell
-$packageRoot = Read-Host 'Independent unpacked SQL Apps release package root'
-node scripts\verify-release.mjs --source-root C:\git\sql-apps-v3 --installed-root "$packageRoot"
-$installedRoot = Read-Host 'Actual host-installed SQL Apps root'
-node scripts\verify-release.mjs --source-root C:\git\sql-apps-v3 --installed-root "$installedRoot"
-```
-
-Each success prints the version, number of skill files, compared paths, and a SHA-256 skill-payload fingerprint. Exit codes: `0` match, `1` missing/stale/mismatched package, `2` invalid command usage. Same-version content drift, missing or extra files, inconsistent compatibility metadata, malformed JSON, and linked skill payloads fail. Metadata and skill files sharing filesystem identity with any checked source file also fail, including hard links whose contents change with the source. Comparison is byte-exact, including line endings: package the reviewed bytes rather than ignoring normalization differences.
-
-The repository's [Git attributes](../../.gitattributes) enforce LF newlines for every shipped skill/reference/template file, including Windows checkouts with `core.autocrlf=true`. Build packages from those canonical bytes; the verifier deliberately does not normalize mismatches away. An older working copy can retain CRLF until refreshed: use a fresh approved release checkout rather than discarding uncommitted changes. Launching the verifier through a directory link still performs validation and returns the same exit codes.
-
-Do not substitute a repository root, marketplace catalog, `--plugin-dir`, or development link for the actual installed root. An unpacked-package pass establishes package fidelity only. An installed-root pass establishes that copy's fidelity, not which copy a running host activated. After install/update, start a **fresh session**, inspect the loaded skill/plugin path and version, and verify that exact root again. See [installed-path discovery](../installation.md#verify-the-actual-installed-root). A version-only plugin list is not payload verification.
-
-For isolated Copilot checks, use a new configuration directory inside your checkout, never the live user settings or VS Code cache:
-
-```powershell
-$savedHome = $env:COPILOT_HOME
-$savedAutoUpdate = $env:COPILOT_AUTO_UPDATE
+$env:ACCEPTANCE_TOKEN_A = [System.Net.NetworkCredential]::new('', (Read-Host 'User A token' -AsSecureString)).Password
+$env:ACCEPTANCE_TOKEN_B = [System.Net.NetworkCredential]::new('', (Read-Host 'User B token' -AsSecureString)).Password
 try {
-  $env:COPILOT_HOME = Join-Path (Get-Location).Path '.release-check-copilot-0.3.0'
-  $env:COPILOT_AUTO_UPDATE = 'false'
-  copilot plugin marketplace add C:\git\sql-apps-v3
-  copilot plugin install sql-apps@sql-apps-skills
-  copilot plugin list --json
+  node scripts\test-cloud-acceptance.mjs --origin https://<approved-web-host> --subscription <approved-subscription> --resource-group <approved-group> --web-app <approved-web-app> --dab-app <approved-dab-app> --approve-restart
+  if ($LASTEXITCODE -ne 0) { throw 'Cloud acceptance failed.' }
 } finally {
-  $env:COPILOT_HOME = $savedHome
-  $env:COPILOT_AUTO_UPDATE = $savedAutoUpdate
+  Remove-Item Env:\ACCEPTANCE_TOKEN_A, Env:\ACCEPTANCE_TOKEN_B
 }
 ```
 
-Use a previously nonexistent directory; retain diagnostics only as needed, then remove that isolated directory. The repository ignores `.release-check-copilot-*` directories so local host settings and session records are not included in public source. CLI 1.0.102 reports local marketplace installs as `source: live` / `installedFrom: <checkout>` and explicitly says nothing was copied. This is useful discovery evidence, **not installed-package verification**; pointing the verifier at that checkout correctly fails. A published immutable artifact or a host's copied-install route is still needed to test real install/update propagation. Do not edit live caches to make a failed check pass.
-
-### Runtime acceptance remains separate
-
-Before claiming end-to-end support for a host, test it with the required specialists:
-
-1. Generate a reservation app with a real UI-to-SQL save/reload and documented restart.
-2. In a new conversation, change an invariant without losing policy or existing behavior.
-3. Exercise missing SQL/DAB prerequisites and an out-of-profile request. Missing runtime capability should produce a useful setup path and allow safe UI/schema/scaffolding work; database persistence stays incomplete until real SQL/DAB is available. No mock persistence or direct Express-to-SQL substitution.
-4. Complete default `poc` / `free-first` local delivery with reproducible deployment-shaped artifacts, without cloud onboarding or resource creation. Explicit strict-zero choices remain strict. In a requested cloud review, distinguish confirmed incompatibility, missing evidence and recoverable tool failure; exercise bounded fallback and preserve scoped approvals rather than silently upgrading.
-5. In an authorized environment, follow one Azure deployment workflow and verify the deployed primary workflow, including the attribution acceptance below.
-6. Check workspace builds, real paths, `dist/index.html`, themes, keyboard behavior, and `rayfin/rayfin.yml` with `mssql`. Confirm no unintended Rayfin SDK/runtime installation or workflow handoff.
-
-Record actual commands/results and host/plugin versions. A static test or installed skill does not count as a passed application scenario.
-
-#### Onboarding routing acceptance (unverified)
-
-Exercise these cases with the same installed payload, recording questions asked, chosen path, actual setup/check results, and gaps. Static tests verify guidance and packaging, not assistant behavior or Azure SQL integration.
-
-| Starting state | Expected behavior |
-| --- | --- |
-| Working Azure SQL/DAB and recorded target | Discover/reuse capabilities; no repeat setup questionnaire or target switch |
-| Azure subscription exists, delivery undecided | Offer local or cloud; no automatic sign-in, cloud onboarding, or resource creation |
-| Cloud selected, subscription unknown/absent | Ask only the missing account question and use the bundled recipe; no account creation or spend without approval |
-| Local selected, preview container unavailable | Offer signup or explicit Azure SQL Database cloud choice; no automatic cloud switch or on-premises fallback |
-| Cloud selected | Use the approved Azure SQL target and keep DAB/least privilege; verify persistence, direct authorization, SQL concurrency, and restart |
-| No ready Azure SQL target or missing DAB | Give actionable setup guidance; continue safe scaffolding with persistence incomplete, not mocks or direct-SQL CRUD |
-| Existing on-premises project | Explain the profile conflict; do not install/extend the fallback or migrate without explicit scope |
-| Resume or move from container to cloud | Preserve supported target decisions on resume; check feature compatibility and retest actual cloud Azure SQL before claiming completion |
-
-Do not install software, change shared services/network settings, or reuse another demo's database just for this evaluation. Local and cloud integration remain unverified until exercised in separately approved environments.
-
-#### Reservation-app prompt and acceptance checks
-
-Use the [README's reservation scenario](../../README.md#2-build-your-first-workflow) as a realistic user request, not a maintained demo codebase or a scripted acceptance checklist. Run it in a new disposable workspace outside the plugin repository. Confirm [prerequisites](../installation.md#prerequisites) and the loaded plugin version/path first. Do not reuse credentials or modify another running demo.
-
-**User prompt**
-
-> Use SQL Apps to build an equipment reservation app. Staff manage equipment; members reserve it; overlapping reservations must be rejected. Ask about important missing rules, then build and verify one complete workflow locally.
-
-**Acceptance checks (separate from the prompt)**
-
-- Record host/plugin versions, prerequisites, prompt, actual commands, observed results, and unresolved checks. Compare with the same user prompt without SQL Apps and equivalent specialist setup before claiming the plugin adds value.
-- When real SQL/DAB is available, check UI save/reload, allowed and denied direct DAB requests, SQL rejection of overlapping concurrent reservations, reproducible packaging, restart, and persistence.
-- If SQL/DAB is unavailable, allow useful UI/schema/scaffolding work. Record persistence and end-to-end acceptance as incomplete, give the user supported setup steps, and do not substitute mock data or direct SQL.
-- Do not provision Azure resources, initiate cloud authentication, or disrupt existing services for this local evaluation. Report missing prerequisites and checks that were not run.
-
-**2. Change a rule in a fresh conversation**
-
-Open a new conversation in the generated application's workspace, then use:
-
-> Use SQL Apps to continue this reservation app. Read its project instructions and existing implementation first. Add a maximum of three active future reservations per member. Clarify what "active" and "future" mean, then update the app and its run instructions without changing existing behavior. Keep this work local.
-
-For this change, separately check the agreed rule below, at the limit, and for concurrent requests competing for the last available reservation. Confirm the durable policy and existing authorization remain intact; report unrun checks rather than claiming they passed.
-
-**3. Review deployment of the same app**
-
-> Use SQL Apps, its bundled deployment recipe, and SQL guidance to review deployment of this existing app, not scaffold a replacement. Inspect its production artifacts and the recorded architecture, cost choices and exceptions. Present one concise review covering subscription, region, isolated resource scope, complete topology, pinned runtimes, identity and access changes, routing, process lifecycle, estimated costs, cleanup scope and remaining uncertainties. Distinguish confirmed incompatibility, missing evidence and recoverable tool failure; give each an actionable next step. Preserve explicit strict-zero choices and any already approved component-specific exceptions. Do not provision, enable paid services, change access or clean up resources until the exact actions are explicitly approved. After approval, verify the deployed workflow, direct DAB authorization, SQL overlap and member-limit concurrency rules, restart and actual resource settings under the deployment and attribution acceptance below. Record failures and unrun checks honestly.
-
-Retain sanitized run evidence with the actual source/package and runtime versions, commands, observed outcomes and unresolved checks. Do not commit credentials, tokens or customer data. Completing this prompt sequence does not replace the other runtime acceptance cases above, prove every supported host, or promote a deployment recipe without the evidence below.
-
-### Deployment experience and recipe acceptance (unverified)
-
-A concrete [Container Apps/SQL Bicep and container recipe](../../skills/sql-apps/templates/starter/deployment.md) is bundled; no exercised cloud recipe is bundled. Follow the [deployment readiness and recovery contract](../../skills/sql-apps/references/deployment.md); the missing cloud evidence is a maintainer release gap, not evidence that a customer architecture is unsupported. To promote one immutable, versioned core recipe:
-
-1. Record exact DAB/runtime versions, hosting tier/OS, identity trust, SQL permissions, process lifecycle, routing, build/publication and limitations. Run packaged UI/custom server/DAB/SQL migration checks locally; no Azure login required.
-2. Exercise local/CI precompilation before assessing hosting runtime compatibility; a TypeScript source label must not reject F1. Do not assume F1 or B1 is proven without runtime evidence.
-3. Produce one concise deployment review including costs/security/uncertainties and scopes. Simulate a tool timeout with one safe retry/alternative and a quota-evidence contradiction. Each must end with a concrete engineering action or precise approval, not repeated discovery.
-4. Check resume preserves an approved B1 hosting exception and SQL-free constraint without reopening unchanged decisions or permitting SQL overages. Routine local checks do not request new product approval; host permissions and cloud resource/access/spend gates remain in force.
-5. Only in a separately authorized environment, deploy the core recipe and verify the real workflow, direct DAB authorization controls, SQL invariant/concurrency enforcement, restart and actual resource settings. Retain source revision, commands/results and sanitized evidence; failed/unrun checks stay unverified. Do not provision just to satisfy documentation tests.
-
-### Deployment attribution acceptance (unverified)
-
-Exercise the [attribution contract](../../skills/sql-apps/references/deployment-attribution.md) within the separately authorized Azure scenario above. Static checks do not prove a consuming assistant generates or deploys the required metadata. No attribution deployment scenario has been exercised yet.
-
-| Case | Required evidence |
-| --- | --- |
-| New group and supported resources | Inspect rendered infrastructure for the sole attribution tag `sqlapps-version` using the brief's verified adopted version; check each new tag-capable resource, not just the group. Preserve an unrelated customer tag. |
-| Existing/shared resources | Keep their names and tags unchanged without explicit reattribution scope; never replace them for metadata. |
-| Tag conflicts and limits | A differently cased existing key is not duplicated; conflicting values or exhausted tag capacity are surfaced without overwriting customer tags. Record unsupported tagging and approved opt-outs. |
-| Naming constraints and overrides | Check the final `sqlapps` suffix on new configurable names, with environment and stable uniqueness tokens before it; verify `-sqlapps` when hyphens are allowed and `sqlapps` appended directly for alphanumeric-only names. Check constrained storage naming, fixed child names such as `default`, and an approved customer naming override. Render/validate optional-service examples without provisioning services the app does not need. |
-| Resume with newer guidance | Preserve the recorded attribution version and existing names unless an intentional guidance/infrastructure update is approved. |
-| Local-only delivery | No Azure sign-in, provisioning, metadata readback, or telemetry resources are required. |
-
-For an approved deployment, read back actual resource tags and names through authorized CLI/API tools and compare them with the brief and rendered infrastructure. Report mismatches as failed attribution validation, approved overrides/unsupported cases as exceptions, and unrun checks as unverified. Do not query app data or metrics, add collectors or diagnostic settings, broaden permissions, or rename/delete resources for this check. Resource metadata is not evidence of active usage or Microsoft-wide reporting access.
+`--approve-restart` requires approval for both named apps. This CLI restart adapter
+is Container Apps-specific; other hosts need an approved callback. Direct internal
+DAB and browser save/reload need separate checks; Functions needs direct handler
+and real SQL evidence. Never point maintainer gates at customer data.
 
 ## Publish a release
 
-1. Review license, notices, payload, release identity, and validation results; do not reuse an existing release version for changed bytes.
-2. Run all three test files above. Prepare an independent package from the reviewed candidate and run the verifier against its unpacked root. Record the exact source revision, version, commands/results, and payload fingerprint.
-3. With maintainer authorization, publish reviewed commits to [microsoft/sql-apps](https://github.com/microsoft/sql-apps) and create the matching immutable version tag/release. A local 0.3.0 manifest change alone does not publish anything. Do not claim app/cloud acceptance based on a package check.
-4. Keep installation examples pointed at this repository. For a pinned release, check the host's actual pinning syntax rather than guessing a tag parameter.
-5. Test initial installation **and** marketplace refresh/plugin update from the previously released version, using isolated host configuration where supported. Locate the actual copied package, run the verifier, start a fresh session, confirm its loaded path/version, and rerun the verifier. Record host/plugin versions and distinguish copied installs from live development sources.
-6. Verify each advertised installation route before broadening its status. Public marketplace listing may require separate submission, review, or account permissions. Keep unexercised hosts/runtime scenarios explicit.
+1. Review license/notices, payload, immutable version and all recorded boundaries.
+2. Run the full repository suite, copied-app builds/tests and independent verifier.
+   Record source revision, exact results and fingerprint; keep secrets out of evidence.
+3. With maintainer authorization, publish reviewed commits and the matching immutable
+   version tag/release to [microsoft/sql-apps](https://github.com/microsoft/sql-apps).
+4. Verify each advertised install/update route and fresh-session payload. Check host
+   pinning syntax instead of inventing tag parameters. Marketplace listing can need
+   separate submission/permissions.
+5. Keep untested host and app/cloud scenarios explicit. A manifest edit, package
+   match or publication does not certify application acceptance.
 
-The previous SQL Apps implementation used the same marketplace name. Existing installations need a marketplace refresh and plugin update after publication; a fresh session must still be checked. Actual publication is blocked until an authorized maintainer publishes the reviewed candidate and release identity. Real remote install/update propagation and runtime app/cloud acceptance remain separate unverified gates; no commit, push, tag, or publication is implied by these instructions.
-
-## Maintenance boundary
-
-The [constitution](../../skills/sql-apps/references/constitution.md) owns stack policy, the [router](../../skills/sql-apps/SKILL.md) chooses specialists, and the [plan](../../plan.md) explains architectural decisions. Keep decision history out of the product introduction.
-
-Route to host/upstream capabilities instead of copying their implementation. Do not add a workflow engine, provider abstraction, or Rayfin-compatible runtime merely to grow the package.
+The [constitution](../../skills/sql-apps/references/constitution.md) owns stack
+policy; the [router](../../skills/sql-apps/SKILL.md) selects focused guidance.
+Do not add another specification, workflow engine or provider runtime.

@@ -33,7 +33,7 @@ param authScope string
 var unique = take(uniqueString(resourceGroup().id, workload), 6)
 
 resource site 'Microsoft.Web/staticSites@2024-11-01' = {
-  name: 'swa-${workload}-${unique}-sqlapps'
+  name: 'swa-${workload}-${unique}'
   location: location
   tags: {
     'sqlapps-version': sqlappsVersion

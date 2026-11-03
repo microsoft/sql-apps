@@ -1,144 +1,144 @@
 # SQL Apps application starter
 
-Baseline **0.1.0**. Copy this directory into an empty application directory, including
-dotfiles and the lockfile. Do not execute it inside the installed plugin. This is
-ordinary app-owned source, not a SQL Apps runtime or a complete business application.
+Baseline **0.1.0**. Copy this directory, including dotfiles and lockfile, into an
+empty application directory. Never execute it inside the installed plugin or
+overlay existing source. It is editable app-owned source, not a plugin runtime.
 
-The default remains Container Apps/DAB. [Hosting profiles](./hosting.md) add explicit
-App Service F1/DAB and Static Web Apps Free/managed Functions integrations, selected
-in `deployment.json`. DAB is optional only for the Functions profile. Host selection
-does not deploy, migrate data, or grant access; live evidence is tracked separately.
+The default is React/Vite → same-origin web routing → DAB → Azure SQL.
+Select an explicit F1/DAB or Static Web Apps/Functions overlay before adapting
+the sample; see [profile differences](./hosting.md). Unused Functions/Rayfin
+integrations are not generated. Selection is not migration or deployment.
 
-The sample is deliberately small: sign in, create your own uniquely labelled item,
-and reload it from SQL. A SQL unique constraint rejects concurrent duplicates.
-Replace this sample with the first real vertical workflow before expanding scope.
-
-## What is already assembled
-
-- React/Vite/TypeScript workspaces, accessible UI states and theme tokens.
-- A production static server with same-origin DAB routing and runtime public configuration.
-- External OIDC authorization-code + PKCE sign-in; no client secret or custom issuer.
-- Pinned DAB and Azure SQL Database preview images, migration checksums, explicit
-  catalog collation, a separate least-privilege API login, and a persisted volume.
-- One foreground startup command with SQL/DAB/web readiness and supervised shutdown.
-- Unit checks and a real-API acceptance command, including a full stack restart.
-- Separate web/DAB container build recipes and [Container Apps/SQL Bicep](./infra/main.bicep) with an explicit operator bootstrap; cloud acceptance remains unverified.
-
-In DAB profiles, the server is only static hosting/routing: it has no SQL driver, CRUD implementation,
-or authority to grant roles. DAB validates tokens; SQL derives ownership from the
-validated `oid` session context. Only the read view and create procedure are exposed.
+The sample signs in, creates an owned uniquely labelled item and reloads from SQL;
+a unique constraint rejects concurrent duplicates. Replace it with the first useful
+business workflow. DAB's static web server has no SQL driver or CRUD authority.
+Both selected APIs enforce validated ownership and expose the protected read/create
+contract rather than unrestricted table writes.
 
 ## Identity decision comes first
 
-Use the identity owner to confirm a tenant-bound issuer, API audience, public SPA
-client, API scope, exact redirect/logout URI, and an immutable GUID `oid` access-token
-claim. Microsoft Entra with v2 access tokens is the intended initial contract, not
-an automatic account/app registration. Configure delegated API permission and consent
-through approved identity guidance. An ID token is not an API access token.
+Confirm the tenant-bound issuer, API audience, public SPA client, delegated scope,
+consent, exact redirect/logout URI and immutable GUID `oid` access-token claim
+through the identity owner. Entra v2 access tokens are the initial contract; an
+ID token is not an API access token. Browser OIDC authorization-code/PKCE uses no
+client secret. Never substitute fake sign-in.
 
-Do not use a common/multitenant issuer with this single-tenant `oid` ownership model.
-Changing the issuer/tenant requires an explicit identity/data migration decision.
-Other providers require a reviewed claim mapping and renewed authorization tests.
-There is no synthetic login fallback. Local real-provider sign-in and cloud sign-in
-require separate validation; a test issuer does not certify either.
+Common/multitenant issuers do not fit this single-tenant ownership model.
+Changing tenant/issuer needs an identity/data migration decision; other providers
+need reviewed claim mapping and renewed authorization checks.
 
 ## First local run
 
-Prerequisites: Node 22.22.2 or newer, npm 10, Docker with Linux containers, and
-authorized cached images matching [baseline.json](./baseline.json). The SQL image is
-Private Preview, not SQL Server. Preview signup, registry sign-in, pulls, software
-terms and identity/access changes require their own permissions. The starter never
-pulls images or registers accounts automatically.
+Prerequisites: Node 22.22.2+, npm 10, Docker Linux containers and authorized cached
+images matching [baseline.json](./baseline.json): SQL/DAB for DAB; SQL only for
+Functions. The SQL engine is Private Preview, not SQL Server. Preview access,
+registry login/pulls, software terms and identity changes need their permissions;
+the starter never installs tools, pulls images or registers accounts automatically.
 
-The lockfile pins dependency versions and integrity hashes but omits registry
-tarball URLs, so it uses the developer's configured npm registry rather than a
-maintainer-specific feed. Preserve this with
-`npm install --package-lock-only --ignore-scripts --omit-lockfile-registry-resolved`
-when intentionally updating dependencies, then repeat build and acceptance.
+Copy `.env.example` to `.env` only for a fresh copy; preserve existing credentials.
+Configure public identity and explicitly accept SQL terms, then select unused ports:
 
-The frontend, web server, and Functions API are TypeScript. `npm run build`
-checks types and compiles runnable JavaScript; `npm start` serves that compiled
-web app. The web server and shared configuration build into `dist/`, while
-Functions builds into `packages/functions/dist/`. Keep these generated files
-out of source control. Setup scripts and Node tests remain JavaScript.
+- **DAB:** `APP_PORT` / `DAB_PORT`, matching `APP_ORIGIN` / `DAB_URL`. Local DAB
+  uses `127.0.0.1`, not `localhost`. SQL is private unless `SQL_PORT` is opted in.
+- **Functions:** installed Core Tools 4 and SWA CLI 2, `APP_PORT`,
+  `FUNCTIONS_PORT` (7071 default) and required `SQL_PORT` (14330 sample).
+  Host-running Functions requires SQL bound only to `127.0.0.1`.
+  Optional `FUNCTIONS_URL` must match `http://127.0.0.1:FUNCTIONS_PORT`;
+  `DAB_URL` / `SQL_CONNECTION_STRING` are unused. It uses restricted local
+  `app_api`, rejecting cloud SQL credentials; SWA fake identities do not pass
+  this API's bearer validation.
 
-In PowerShell, from the copied app directory:
+Register the exact origin's `/` redirect URI. From the copied application:
 
 ```powershell
 Copy-Item .env.example .env
-# Configure public identity values, ports, and explicitly accept SQL terms in .env.
+# Configure identity, selected-profile ports and SQL terms before proceeding.
 npm ci
 npm run local:init
+npm run local:preflight
 npm run build
 npm test
 npm run local:start
 ```
 
-Open the configured `APP_ORIGIN`. Sign in, save an item, and reload. The same label
-must be rejected for the same owner but allowed for another owner. The UI shows the
-latest 100 records; extend pagination when the real workflow requires it.
-Expired or API-rejected sessions return to Sign in rather than retrying stale
-tokens. A denied sign-in callback reports the error and leaves Sign in available
-for another attempt. The starter does not silently renew tokens.
+**Build → Start is explicit.** `npm start` aliases `local:start`; both start the
+selected SQL/API/web stack. Start, Test and acceptance never compile implicitly:
+Build first, and rebuild changed source before compiled-code checks.
+`serve:web` is internal compiled DAB web hosting, not the public Start path.
+Generated output stays out of source control.
 
-Choose unused `APP_PORT`/`DAB_PORT` and matching `APP_ORIGIN`/`DAB_URL` before startup.
-Register the exact origin's `/` redirect URI. SQL has no host-published port. Each
-copy receives a random Compose project name; never share its `.env` with another app.
+Open `APP_ORIGIN`, sign in, save and reload. The same label must fail for the same
+owner but succeed for another. The sample shows the latest 100 records; add
+pagination for larger workflows. Rejected/expired sessions return to Sign in;
+callback errors allow retry, not silent token renewal.
 
-Ctrl+C stops the web process and containers, preserving data. If a terminal is
-abruptly killed, run `npm run local:stop` to stop this copy's containers. Restart with
-`npm run local:start`. Initialization preserves existing credentials and startup
-rejects changed applied migrations. Add forward migrations; do not edit migration
-001 after applying it. Each migration must use `XACT_ABORT`, a transaction spanning
-all batches, and insert its version/checksum before committing, as in
-[001-initial.sql](./packages/data/migrations/001-initial.sql).
+## Daily lifecycle and Stop
 
-Never run volume-deleting commands to pass acceptance. Preserve ignored `.env`
-credentials with the volume; replacing secrets without rotating SQL logins breaks
-access. Protect local secret files with host-appropriate permissions/ACLs; portable
-POSIX file modes alone do not secure Windows files. Do not commit `.env` or `.local`.
+| Command | Purpose |
+| --- | --- |
+| `npm run local:preflight` | Check tools, cached images/config; never install/pull/sign in/start |
+| `npm start` / `npm run local:start` | After Build, foreground selected SQL/API/web startup |
+| `npm run local:status` | Owned containers, HTTP and actual SQL engine/catalog readiness |
+| `npm run local:preview` | Checked preview URL |
+| `npm run local:connect` | Native MSSQL instructions for opted-in loopback SQL |
+| `npm run local:ready` | Compatibility alias for Status |
+| `npm run local:stop` | Stop owned supervisor/processes/containers; retain volumes |
 
-Observed limitation of the pinned SQL preview: Docker stop ended the engine with
-exit 137 and `OOMKilled=false`. Full restart recovery and persisted row identity
-passed, but this is not proof of a clean engine shutdown. Do not infer cloud
-recovery guarantees from this local preview result.
+Build changed source, Start, Status/Preview, then Ctrl+C or separate Stop.
+Init/preflight/inspection/Stop need no compiler or compiled output, so broken builds
+cannot prevent cleanup. Missing Start/acceptance output produces Build guidance.
+Readiness must confirm `EngineEdition = 5` and `appdb`, not `master`;
+it is not authenticated acceptance.
 
-## Repeatable acceptance
+Each copy gets a random Compose project name; never share `.env` between apps.
+Keep explicit `COMPOSE_FILE` selection consistent across lifecycle/acceptance.
+The loopback SQL overlay is appended when `SQL_PORT` is set.
+Use MSSQL's credential dialog/database node, not credentials in Chat/source.
 
-With the stack stopped, supply short-lived API tokens for two distinct synthetic
-users through `ACCEPTANCE_TOKEN_A` and `ACCEPTANCE_TOKEN_B` in the invoking process
-environment (not source, command-line arguments, logs, or the committed example).
+Ctrl+C/Stop preserve SQL data. After abrupt supervisor death, Stop still stops
+owned containers; inspect leftover host processes before restarting.
+Unexpected supervised-child exit stops containers and reports failure.
+Never delete volumes to pass checks. Preserve ignored credentials with their
+volume; secret replacement requires SQL-login rotation. Protect `.env` / `.local`
+with host-appropriate ACLs; POSIX modes alone do not secure Windows files.
+
+Startup rejects changed applied migration checksums. Add forward migrations:
+`XACT_ABORT`, a transaction spanning batches, and version/checksum insertion before
+commit, as in [001-initial.sql](./packages/data/migrations/001-initial.sql).
+The lockfile preserves pinned integrity without maintainer-registry tarball URLs.
+For intentional dependency updates retain that convention:
 
 ```powershell
+npm install --package-lock-only --ignore-scripts --omit-lockfile-registry-resolved
+```
+
+Repeat Build and affected checks afterward.
+
+## Authenticated local acceptance
+
+Stop the stack first. Supply short-lived real-provider API tokens for two distinct
+approved test users as process environment `ACCEPTANCE_TOKEN_A` /
+`ACCEPTANCE_TOKEN_B`, through secure prompts/secret channels; never chat, source,
+arguments, logs or shell history. Remove them afterward.
+
+```powershell
+npm run build
 npm run acceptance
 ```
 
-This command owns startup/shutdown. It checks direct and proxied anonymous/forged
-identity/signature denials, authenticated controls, ownership, direct-write bypass
-denial, invalid input, one winner in a concurrent duplicate race, exact persisted
-row identity across full SQL/DAB/web stop/start, and a new post-restart write. It
-retains synthetic evidence rows and the volume. It does not automate browser login
-or claim deployed acceptance. Do not run against real user data.
+Acceptance owns startup/shutdown and retains test rows/volume. Require direct and
+proxied denied/allowed controls, ownership, table-write-bypass denial, invalid
+input, one concurrent duplicate winner, exact-row restart persistence and a new
+write. Do not run against real user data. Unit mocks, synthetic issuers and
+readiness do not prove real-provider SQL integration.
 
-`npm test` uses mocks for frontend behavior and an HTTP stub for proxy tests; those
-checks do not prove DAB/SQL integration. Record separately:
+Record Build/unit results, selected-API/SQL acceptance and browser
+sign-in/save/reload (narrow/desktop, keyboard, themes/error states) separately.
+DAB-specific inspection applies only to DAB. Historical preview shutdown/recovery
+observations do not certify current commands or cloud recovery.
 
-1. Build and unit checks.
-2. Real DAB/SQL API acceptance.
-3. Browser sign-in/save/reload, desktop/narrow states, keyboard and error checks.
-4. Local app accepted after restart.
-5. Deployed app accepted, only after approved cloud validation.
+## Deployment
 
-Record phase start/end timestamps and observed waits separately from active work.
-Do not call phase wall time a labor measurement or claim speed gains without a
-second comparable measured build.
-
-## Cloud boundary
-
-Read [deployment.md](./deployment.md) before deployment. The concrete default is
-public web and internal HTTPS DAB on Container Apps Consumption plus Azure SQL
-free-offer AutoPause. Container Apps monthly grants are not a hard spending cap.
-No extra cloud skills plugin is needed. The local Compose path is not the cloud
-recipe. A public deployment requires explicit resource/spend/access approval,
-published immutable images, external identity configuration, SQL connectivity and
-operator bootstrap, and separate acceptance. No exercised cloud recipe is bundled.
+[deployment.md](./deployment.md) alone owns cloud target/cost/access approvals,
+operator commands, SQL bootstrap, publication, acceptance and recovery.
+The brief only links it. Local success is not cloud acceptance.
