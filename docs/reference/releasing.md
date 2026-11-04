@@ -16,7 +16,61 @@ reads the plugin version. Published versions are **immutable**: changed shipped
 bytes need a new version, not a replaced package or retagged release. Record the
 reviewed revision and skill-payload fingerprint; it is not an archive signature.
 
-## Current verification — 2026-11-03
+## Compatibility and preview boundaries
+
+This is the documentation authority for exact runtime compatibility; executable
+engine/image constraints remain in the manifests and
+[baseline pins](../../skills/sql-apps/templates/starter/baseline.json).
+The starter minimum remains **Node.js 22.22.2 or newer and npm**; no minimum was
+raised or dropped by the documentation clarification. npm 10.9.7 was used for
+the historical starter baseline, not certification of every newer npm/Node pair.
+Local Functions tooling is Core Tools 4 and SWA CLI 2; historical observed
+versions are recorded below rather than assumed to verify current output.
+
+The local Azure SQL Database container is **Private Preview**, separately licensed
+and acquired; SQL Apps does not bundle it or grant preview/registry access.
+Its service limitations and acquisition terms come from the
+[official quickstart](https://microsoft.github.io/azure-sql-database-container/getting-started.html).
+No preview access, unavailable cached pins or missing provider configuration
+leaves applicable integration gates unverified. Do not silently substitute SQL
+Server, cloud SQL, another image pin or a fake-user protected mode.
+
+## Profile status
+
+All current profiles remain **Experimental**, not **Verified (revision X)**.
+The following status reflects retained evidence, not a new live validation:
+
+| Profile/access mode | Available evidence | Still unverified for the current source/artifacts |
+| --- | --- | --- |
+| Container Apps / DAB protected | Historical local SQL checks and partial cloud provisioning/denials below | Matched immutable revision and complete real-provider two-owner API/browser/restart acceptance |
+| App Service F1 / DAB protected | Infrastructure compilation and shared DAB contract checks | Independent live F1 settings/headroom, provider/SQL/browser/restart acceptance |
+| Static Web Apps / Functions protected | Build/unit/staging and historical host denial smoke | Positive actual-SQL workflow, real-provider browser acceptance and deployed-profile verification |
+| Static Web Apps / Functions public submissions | Separate anonymous/owner phase tooling and local contract tests | Recorded revision-bound live anonymous SQL/budget checks, real-provider enrolled/unenrolled owner/browser/restart and publication controls |
+
+Each row must earn its own evidence; public is an access-mode variant, not another
+host topology. Keep status here and link from other guides rather than duplicating
+release badges. Passing local tests alone cannot promote a row.
+
+## Evidence record contract
+
+Use the [shared evidence gates](../../skills/sql-apps/references/deployment.md#evidence-gates).
+Record gate, date/operator, source/shape revision, dirty-state digest, profile/access
+mode, environment, tool/host versions, artifact hashes/digests, build command/time,
+exercised checks/results, skipped checks, limitations and sanitized evidence path.
+Deployment records also identify approval scope and observed settings/access/cost.
+Do not store secrets, tokens or sensitive authentication output.
+
+A record's revision never silently certifies later revisions. Old entries without
+source/artifact identity remain historical observations with incomplete provenance;
+do not backfill today's revision as if it had been tested. Static manifests do not
+prove installation/discovery; local SQL does not prove real-provider sign-in;
+historical cloud success does not prove current artifacts or a different profile.
+
+## Recorded verification snapshot — 2026-11-03
+
+The pre-existing snapshot below did not retain an immutable source revision or
+artifact identity. Treat it as a dated observation, not current-revision acceptance;
+the clarification work does not retroactively certify its counts.
 
 | Check | Result | Boundary |
 | --- | --- | --- |
@@ -26,7 +80,7 @@ reviewed revision and skill-payload fingerprint; it is not an archive signature.
 | Migration-guide PowerShell syntax | Passed | Parsed only; no cloud SQL was changed |
 | `git diff --check` | Passed | Git reported line-ending conversion notices only |
 
-These are local checks. They do not prove cloud deployment, live SQL integration,
+These were local checks. They do not prove cloud deployment, live SQL integration,
 real-user sign-in, screenshot capture or zero cost. No cloud writes or registry
 publishes were performed in this verification.
 
@@ -277,6 +331,11 @@ and real SQL evidence. Never point maintainer gates at customer data.
 ## Publish a release
 
 1. Review license/notices, payload, immutable version and all recorded boundaries.
+   Resolve maintainer questions here: which actual host installs/updates loaded
+   this payload, which profile/revision passed each gate, which preview/provider/
+   dependency/region limitations block promotion, and whether evidence matches
+   the bytes being released. User workflow/profile intake belongs in the skill,
+   not in the specification's open questions.
 2. Run the full repository suite, copied-app builds/tests and independent verifier.
    Record source revision, exact results and fingerprint; keep secrets out of evidence.
 3. With maintainer authorization, publish reviewed commits and the matching immutable

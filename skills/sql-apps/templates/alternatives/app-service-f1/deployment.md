@@ -11,7 +11,7 @@ Use this file as the app's single target, approval and result record.
 
 ## App Service F1 operator steps
 
-1. Build and test the copied DAB app, then build immutable web/DAB images with
+1. Build and test the copied DAB app, then build immutable web and DAB images with
    explicit approved image names and a credential-free HTTPS `--npm-registry`.
    Publish only to the separately approved registry.
 2. Use existing approved Azure SQL. Follow [shared SQL migration
@@ -24,8 +24,7 @@ Use this file as the app's single target, approval and result record.
 4. Register the exact output redirect URI and complete approved consent. Establish
    SQL connectivity separately; deploying the host does not provision it.
 5. Verify the public DAB endpoint and same-origin proxy with allowed and denied
-   controls, then test F1 sleep/wake, shared quotas and SQL persistence/restart.
+   controls, then test F1 sleep and wake, shared quotas, SQL persistence and app restart.
 
 This profile requires publicly pullable images; private pulls need a separately
-reviewed design. Read [hosting.md](./hosting.md#app-service-f1--dab) before cloud
-writes.
+reviewed design. Use the shared SQL Apps deployment policy before any cloud write.

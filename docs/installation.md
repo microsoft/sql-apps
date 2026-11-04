@@ -8,7 +8,7 @@ application dependencies, configure identity, create a database or deploy an app
 
 ## Before you install
 
-The marketplace is `sql-apps-skills`, and the plugin is `sql-apps`. The source repository is [microsoft/sql-apps](https://github.com/microsoft/sql-apps). This checkout is the **0.3.0 release candidate**, not evidence of publication. Remote commands install the published version. For an existing installation refresh/update through your host, then check its reported version and skill discovery in a fresh session.
+The marketplace is `sql-apps-skills`, and the plugin is `sql-apps`. The source repository is [microsoft/sql-apps](https://github.com/microsoft/sql-apps). See the [release record](./reference/releasing.md#package-and-release-identity) for current status; a checkout is not evidence of publication. Remote commands install the published version. For an existing installation refresh/update through your host, then check its reported version and skill discovery in a fresh session.
 
 Local examples use `C:\git\sql-apps-v3`; replace that with your downloaded checkout. Installation/registration changes host configuration, so review its prompts. Registration alone does not install a plugin.
 
@@ -122,7 +122,8 @@ preview access nor an existing subscription silently selects cloud deployment.
 If the local container is unavailable, ask before choosing cloud, and keep
 persistence unverified until real SQL and the selected API work.
 
-The local SQL container is in **Private Preview**. Access requires [preview
+The [compatibility record](./reference/releasing.md#compatibility-and-preview-boundaries)
+owns runtime and preview status. Initial local SQL access requires [preview
 signup](https://aka.ms/sqldbcontainerpreview-signup) and the [official
 quickstart](https://microsoft.github.io/azure-sql-database-container/getting-started.html).
 For tool setup and profile-specific identity, read the
@@ -142,7 +143,22 @@ For SQL/selected-API setup and private-preview local-engine access, use the [bun
 
 If the selected API or Azure SQL target is unavailable, give its supported setup path. Useful UI, schema, and scaffolding work can continue, but mark persistence and end-to-end checks incomplete. Do not substitute another database, mocked persistence, or direct Express-to-SQL CRUD.
 
-Local-only work needs no Azure CLI or subscription. Cloud work has separate
+### Four separate prerequisite boundaries
+
+| Boundary | What is required |
+| --- | --- |
+| Recurring local development | With tools, packages and authorized cached images available, no Azure CLI session or cloud deployment; do not run `az login` just for local startup |
+| Private image acquisition | Separate preview access, registry authentication, terms and an approved pull/cache setup; no preview access means SQL-backed checks remain unverified, not an automatic cloud switch |
+| Application-user authentication | Protected apps need a real provider registration, redirect URI, consent and connectivity even locally; Azure CLI login is not browser sign-in. No protected fake-user/unauthenticated mode is supplied |
+| Cloud administration | Separate approved target, subscription permissions and Azure/tool sign-in; local success or profile selection does not authorize it |
+
+The public-submission variant can run anonymous-only local submissions with no
+identity configuration, but owner reads remain unavailable until real provider
+setup and operator SQL enrollment. Anonymous writes do not enable anonymous reads.
+With no configured provider, safe scaffolding can continue; do not claim protected
+acceptance. This prerequisite model does not promise fully offline operation.
+
+Cloud work has separate
 [resource, cost and access gates](../skills/sql-apps/references/deployment.md).
 
 ## Project instructions and troubleshooting

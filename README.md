@@ -12,6 +12,12 @@ SQL Apps is a lightweight guidance plugin, not a hosting service or application
 runtime. No SQL Apps account or subscription is required; your app runs without it.
 Start locally and consider Azure only when requested.
 
+The supported scope is React/Vite and TypeScript with the selected DAB or
+Functions API and Azure SQL. For a new app, use an empty target and select a
+profile before customization. For an existing compatible app, inspect and edit
+in place; never overlay templates. Explain unsupported stacks and scope any
+migration separately. See the [project specification](./docs/project-spec.md).
+
 ## Get started
 
 ### 1. Install SQL Apps
@@ -41,7 +47,8 @@ Try saving a reservation, reloading it from SQL and rejecting a conflict.
 The [starter's local guide](./skills/sql-apps/templates/starter/README.md) covers
 explicit Build → Start, Test, acceptance and owned Stop. The default is
 TypeScript/React, DAB and Azure SQL; explicit Functions uses the same public
-start commands without DAB. Neither profile compiles secretly during Start/Test.
+start commands without DAB. Commands disclose their build and artifact contracts;
+Start uses an existing build, not a freshness check.
 
 ## Guides
 
@@ -50,28 +57,31 @@ start commands without DAB. Neither profile compiles secretly during Start/Test.
 | Missing tools/database access | [Prerequisites](./skills/sql-apps/references/prerequisites.md) |
 | Stack and durable project rules | [Constitution](./skills/sql-apps/references/constitution.md) |
 | UI conventions | [App design](./skills/sql-apps/references/app-design.md) |
-| Container Apps, F1 or Static Web Apps | [Profile differences](./skills/sql-apps/templates/starter/hosting.md) |
+| Container Apps, F1 or Static Web Apps | [Deployment shapes](./skills/sql-apps/references/deployment-shapes.md) |
 | Cloud review and operator steps | [Deployment policy](./skills/sql-apps/references/deployment.md) / [app-owned runbook](./skills/sql-apps/templates/starter/deployment.md) |
 | Version tags and naming | [Attribution](./skills/sql-apps/references/deployment-attribution.md) |
 | Package/release history and measured checks | [Release and verification](./docs/reference/releasing.md) |
 
 ## Preview and important limits
 
-**Preview: 0.3.0 release candidate, not proof of publication or certification.**
-Host loading, real-provider sign-in and complete cloud acceptance have remaining
-gates; historical results and exact boundaries belong in the release guide.
+Release status, exact runtime compatibility, preview constraints and measured
+host/profile evidence belong in the [release guide](./docs/reference/releasing.md).
+Release identity is not proof of publication or certification.
 
-The local Azure SQL Database container is **Private Preview**, separately licensed
-and not bundled. [Sign up for access](https://aka.ms/sqldbcontainerpreview-signup)
-and follow the [official quickstart](https://microsoft.github.io/azure-sql-database-container/getting-started.html).
+The local Azure SQL Database container is separately licensed and not bundled.
+Follow the [acquisition prerequisites](./docs/installation.md#application-prerequisites).
 Only that engine or Azure SQL Database cloud is supported, not on-premises SQL
 Server. Missing SQL/selected API leaves persistence unverified; no automatic cloud switch.
 
+With prerequisites already available, recurring local work needs no Azure CLI
+session or deployment. Protected apps still require application-user sign-in;
+image acquisition and provider setup are separate prerequisites, not offline
+capabilities.
+
 Review generated code, authorization, migrations and recovery before real or
-regulated data. Cloud writes need separate resource/access/spend approval.
-Allowances do not guarantee zero cost; budget alerts do not stop charges.
-You are responsible for costs. Tools, providers and Azure services have separate
-availability, licensing and pricing terms.
+regulated data. Read the [deployment approval and evidence rules](./skills/sql-apps/references/deployment.md#what-never-counts-as-approval-or-proof)
+before cloud writes. You are responsible for costs; tools, providers and Azure
+services have separate availability, licensing and pricing terms.
 
 No SLA or Microsoft support commitment is provided; Azure support follows your
 agreement. See [Support](./SUPPORT.md). Never commit credentials/private data;

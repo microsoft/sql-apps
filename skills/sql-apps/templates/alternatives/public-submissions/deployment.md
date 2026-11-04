@@ -16,7 +16,7 @@ target, approval and result record; the copied `README.md` owns local commands.
 
 1. Build and test the selected profile, then run `npm run deployment:prepare`.
    After every restage, reinstall API production dependencies as described in
-   [hosting.md](./hosting.md#static-web-apps-free--functions).
+   the copied app's README.
 2. Use the shared [SQL migration procedure](./deployment-migrations.md) to apply
    and verify **both** `001-initial.sql` and `002-public-submissions.sql` against
    the application database, in version order. Never start the API before migration
@@ -28,8 +28,7 @@ target, approval and result record; the copied `README.md` owns local commands.
    secure channels. Leave `ownerAuth` unset for anonymous-only operation; configure
    all five real owner identity values together only after identity-owner approval.
 5. Before publication, complete the publication gates in
-   [public-submissions.md](./public-submissions.md). Use only the approved target
-   and scope; a successful Bicep deployment is not acceptance.
+   [public-submissions.md](./public-submissions.md) and the approved target scope.
 6. After approved deployment, verify anonymous denials and allowed submissions,
    owner denial and allowed read, SQL limits/permissions, persistence, cost and
    actual ingress. Enroll the owner only through the reviewed SQL operator script.

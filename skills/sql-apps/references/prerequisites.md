@@ -13,9 +13,9 @@ default. Ask only for decisions that affect the next step.
 | Neither supported SQL target is ready | Continue safe UI/schema work and mark persistence unverified |
 | Existing on-premises SQL Server | Explain it is unsupported here; do not install, fall back or migrate without scope |
 
-Ask before changing host/system settings, signing in, accepting terms, provisioning
-resources, changing access or deleting data. Do not turn routine local builds or
-tests into a new onboarding questionnaire.
+Follow the [approval policy](./constitution.md#approval-policy) for setup and
+administrative actions. Do not turn routine in-scope edits, local builds or tests
+into a new onboarding questionnaire.
 
 ## SQL and API tools
 
@@ -40,7 +40,15 @@ users, use fake sign-in as acceptance, or claim persistence.
 
 ## Azure CLI
 
-Local-only work needs no Azure CLI, Azure sign-in or subscription. The bundled
+With tools and authorized cached images already available, recurring local work
+needs no Azure CLI session, subscription or cloud deployment. This does not cover
+initial preview/registry access, image acquisition, terms or application-user OIDC
+sign-in. Protected apps have no supplied fake-user or unauthenticated development
+mode and may need network access to the provider. Only the explicit public variant
+allows anonymous submissions, never anonymous owner reads. Missing provider setup
+leaves protected checks unverified.
+
+The bundled
 Container Apps recipe uses Azure CLI, Bicep, Docker Linux containers and an approved
 registry. Check whether these tools exist before proposing installation. Installing
 or changing host tools needs approval.

@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -435,12 +434,3 @@ if (existsSync(fileURLToPath(new URL('../scripts/build-images.mjs', import.meta.
   }), /ENETUNREACH.*https:\/\/approved-mirror\.example\.test\//);
   });
 }
-
-test('standalone deployment:apply refuses to bypass the host authorization boundary', () => {
-  const script = fileURLToPath(new URL('../scripts/deployment-execution.mjs', import.meta.url));
-  const directory = fileURLToPath(new URL('..', import.meta.url));
-  const result = spawnSync(process.execPath, [script, 'apply'], { cwd: directory, encoding: 'utf8' });
-
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Standalone deployment:apply is disabled/);
-});

@@ -65,3 +65,33 @@ The starter files are `001-initial.sql`; the public-inbox profile also requires
 transactional. Never edit an applied migration or reset the database to pass a
 check. Follow the selected profile's operator guide for identity bootstrap and
 permissions only after this step.
+
+## Existing databases and recovery
+
+This procedure and local startup are migration runners, not schema-baseline
+importers. An absent `dbo.SchemaVersions` is treated as no recorded migrations;
+`001-initial.sql` unconditionally creates its schema/tables/view/procedure.
+An existing application's objects are not inspected, reconciled or automatically
+marked applied. Do not run this against an arbitrary existing schema. Inspect
+schema, data, collation, ownership and migration provenance first, then separately
+review a compatible adoption/migration plan. Do not forge history to skip work.
+
+Checksums are SHA-256 of migration text with CRLF normalized to LF. If a recorded
+checksum differs, stop and inspect the shipped file and history without modifying
+either to suppress the error. Recover the exact applied file from its trusted
+revision and put intended schema changes in a new forward migration. Unknown,
+malformed or inconsistent history needs investigation, not deletion or reset.
+
+Recovery options are distinct:
+
+- **Forward fix:** add and test a new transactional migration after reconciling
+  the last committed version. Inspect SQL state after failure; do not assume all
+  external operations or arbitrary future migrations roll back automatically.
+- **Compatible app rollback:** deploy an older app/artifact only after proving it
+  works with the current schema and preserves data. This does not undo migrations.
+- **Database restore:** a separately approved operator procedure using actually
+  available backups/service capabilities and a reviewed recovery point/target.
+  The starter supplies no restore automation, backup guarantee or down-migrations.
+
+Preserve databases, volumes, credentials and evidence. Never delete or recreate
+them simply to obtain a passing build, migration or acceptance result.

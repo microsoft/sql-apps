@@ -22,14 +22,18 @@ test('web Docker build context contains the selected profile required by workspa
   assert.match(result.stdout, /Static DAB/);
 });
 
-test('image builder carries the host HTTPS registry into the web build without config files or tokens', async () => {
+test('image builder carries the explicitly approved HTTPS registry into the web build without config files or tokens', async () => {
   const { buildImages } = await import('../skills/sql-apps/templates/starter/scripts/build-images.mjs');
   const calls = [];
   const run = (command, args, options) => {
     calls.push({ command, args, options });
-    return { status: 0, stdout: command === 'docker' ? '' : 'https://packages.example.test/npm/approved/\n', stderr: '' };
+    return { status: 0, stdout: '', stderr: '' };
   };
-  await buildImages({ webImage: 'fixture-web:check', dabImage: 'fixture-dab:check', run });
+  await buildImages({
+    webImage: 'fixture-web:check', dabImage: 'fixture-dab:check',
+    npmRegistry: 'https://packages.example.test/npm/approved/', run,
+  });
+  assert.ok(calls.every(call => call.command === 'docker'));
   const builds = calls.filter(call => call.command === 'docker');
   assert.equal(builds.length, 2);
   assert.deepEqual(builds[0].args, [
@@ -47,6 +51,7 @@ for (const registry of ['http://packages.test/', 'https://user:secret@packages.t
     let built = false;
     assert.throws(() => buildImages({
       webImage: 'web:check', dabImage: 'dab:check',
+      npmRegistry: registry,
       run: (command) => {
         if (command === 'docker') built = true;
         return { status: 0, stdout: registry, stderr: '' };
@@ -56,18 +61,31 @@ for (const registry of ['http://packages.test/', 'https://user:secret@packages.t
   });
 }
 
-test('image builder stops on npm discovery or Docker failure without logging their possible secrets', async () => {
+test('image builder requires explicit registry approval before any Docker build', async () => {
   const { buildImages } = await import('../skills/sql-apps/templates/starter/scripts/build-images.mjs');
-  for (const failure of ['npm', 'docker']) {
+  let built = false;
+  assert.throws(() => buildImages({
+    webImage: 'web:check', dabImage: 'dab:check',
+    run: () => { built = true; return { status: 0 }; },
+  }), /explicitly approved.*registry/);
+  assert.equal(built, false);
+});
+
+test('image builder stops on Docker exit or spawn failure without exposing subprocess output', async () => {
+  const { buildImages } = await import('../skills/sql-apps/templates/starter/scripts/build-images.mjs');
+  for (const failure of [
+    { status: 1 },
+    { error: Object.assign(new Error('secret=never-print'), { code: 'ENETUNREACH' }) },
+  ]) {
     const builds = [];
     assert.throws(() => buildImages({
       webImage: 'web:check', dabImage: 'dab:check',
+      npmRegistry: 'https://packages.test/',
       run: command => {
-        if (command === 'docker') builds.push(command);
-        const failed = (command === 'docker') === (failure === 'docker');
-        return { status: failed ? 1 : 0, stdout: 'https://packages.test/', stderr: 'secret=never-print' };
+        builds.push(command);
+        return { ...failure, stdout: 'secret=never-print', stderr: 'secret=never-print' };
       },
     }), error => !error.message.includes('never-print') && /failed/.test(error.message));
-    assert.equal(builds.length, failure === 'npm' ? 0 : 1);
+    assert.deepEqual(builds, ['docker']);
   }
 });

@@ -153,7 +153,8 @@ permissions, browser sign-in, or deployed behavior.
 ## Cloud publication is blocked pending explicit review
 
 **Do not publish this public profile to the internet from the starter recipe.**
-Staging/build output is not approval. First record operator-approved abuse/bot and
+Follow the [deployment policy](./deployment.md#what-never-counts-as-approval-or-proof).
+First record operator-approved abuse/bot and
 ingress controls, privacy/notice and sensitive-data handling, cost ceilings,
 retention/purge/access rules, incident response and tested concurrency/permission
 results in the app-owned deployment record. Then adapt and verify the ingress and

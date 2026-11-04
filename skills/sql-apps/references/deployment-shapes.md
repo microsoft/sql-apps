@@ -1,49 +1,104 @@
-# Deployment shape catalog
+# Deployment shapes
 
-A deployment shape owns the hosting/API topology, resource and SKU declarations,
-runtime, packaging, identity and network boundaries, database bootstrap,
-supported application inputs, and verification requirements. Selecting a shape
-does not authorize provisioning, spend, publication, identity grants, network
-changes, or cleanup. Keep approvals and operator results in the copied app's
-`deployment.md`; see the [shared deployment policy](./deployment.md) and
-[hosting profiles](../templates/starter/hosting.md).
+A shape fixes the host, API, runtime, packaging, identity and network boundaries,
+SQL bootstrap, cost classes and acceptance checks. The starter maps the selected
+`hosting` and `api` pair to a versioned shape. See the [deployment policy](./deployment.md)
+for approvals and the [profile guide](../templates/alternatives/README.md) to
+choose an alternative before customizing a fresh starter.
 
-The starter resolves the existing validated `hosting`/`api` profile pair into
-one of these versioned catalog entries. All current entries are experimental:
-the repository has no qualifying immutable-revision live evidence for them.
-Catalog presence is not a recommendation or a verified compatibility claim.
+Current per-profile status and historical observations belong to the
+[release record](https://github.com/microsoft/sql-apps/blob/main/docs/reference/releasing.md#profile-status);
+the [evidence gates](./deployment.md#evidence-gates) define permitted claims.
+The release record is repository documentation, not a required copied-app file.
+Shape revisions below identify contracts, not proof of verification.
 
-| Shape | Revision | Existing profile | Resources and packaging | Identity and network boundary | Database and cost classification | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| `container-apps-dab` | `1.1.0` | `container-apps` / `dab` | Consumption managed environment; separate web and DAB container apps; user-assigned managed identity; app-owned, digest-pinned images. The template creates no registry. | Public HTTPS web ingress; internal DAB ingress; SQL public network access is enabled. DAB uses managed identity. Optional SQL operator IP and `allowAzureServices` rules are separate access decisions; the latter admits all Azure services. | Creates a serverless General Purpose SQL database configured for the free limit and `AutoPause`, subject to eligibility and quota. Container Apps Consumption grants are metered allowances, not a hard spend cap. Registry, image publication, network, and any unmodeled dependencies must be reviewed separately. | Experimental |
-| `app-service-f1-dab` | `1.1.0` | `app-service-f1` / `dab` | One Linux App Service F1 plan with separate web and DAB container sites; user-assigned managed identity; public-pull, digest-pinned app images. | Both web and DAB have public HTTPS endpoints; authorization must hold for direct and proxied DAB access. DAB uses managed identity. This template does not change SQL firewall rules. | Reuses an existing approved SQL database; this template creates no SQL resources. F1 is a free SKU with capacity and quota constraints, not a zero-cost guarantee for the topology. | Experimental; capacity and end-to-end gates remain open |
-| `static-web-apps-functions` | `1.1.0` | `static-web-apps` / `functions` | Static Web Apps Free site with managed Node.js 22 Functions; static frontend and Functions package, not DAB or container images. | Public static site and managed `/api` endpoint; Functions validates the configured identity claims. Browser sign-in remains external. Managed Functions has no managed identity; cloud SQL uses a separately approved service-principal credential reference. | Reuses an existing approved SQL database; this template creates no SQL resources. Static Web Apps Free is a free SKU; Functions and other dependencies remain subject to current tier quotas and cost review. Do not infer a zero-cost topology from the site SKU. | Experimental; SQL credential lifecycle and real-provider acceptance remain open |
+## Profile bundles and request boundaries
 
-## Bounded application inputs
+The default `container-apps` and explicit `app-service-f1` select DAB bundles.
+`static-web-apps` selects protected Functions. `static-web-apps-public` selects
+that same Functions hosting/API bundle with `access: public-submissions`;
+retain the identifier for installer compatibility.
 
-Shapes accept only the catalog's declared application parameters: application
-name; target tenant and subscription; approved hosting and SQL regions; owner
-identity; database/catalog; approved resource reuse; and bounded size/scaling
-settings. Schema and migrations, business code, and application data remain
-application-owned. Runtime versions, topology, SKU, identity model, packaging,
-and network boundaries are shape-owned; changes require a reviewed shape
-revision or a recorded, approved deviation.
+| API/access | Browser-to-SQL path | Enforcing boundary and alternate routes |
+| --- | --- | --- |
+| Protected DAB (both hosts) | Browser OIDC/PKCE access token -> same-origin web proxy -> DAB -> restricted SQL view/procedure | DAB validates issuer/audience/signature and authenticated permissions; session `oid` restricts SQL ownership and uniqueness. The web server has no SQL driver. Direct DAB access still requires JWT validation and the same SQL permissions; F1 exposes that endpoint publicly, Container Apps uses internal cloud ingress. Local DAB is loopback-accessible. |
+| Protected Functions | Browser OIDC/PKCE access token -> local SWA proxy or deployed `/api` -> Functions -> SQL | Functions validates tenant, issuer, audience, signature, expiry, user `oid` and delegated scope. A leased SQL transaction sets/clears owner context for the restricted view/procedure. Direct local Functions calls traverse the same handlers; SWA fake identity/principal headers do not bypass bearer validation. |
+| Public-submission Functions | Anonymous POST `/api/Submit` -> bounded SQL procedure; owner GET `/api/Submissions` -> real bearer validation -> tenant/owner SQL enrollment check | Anonymous writes never permit reads, ownership selection or enrollment. Unconfigured owner auth returns 503; configured missing/invalid identity is denied; valid unenrolled owners are denied by SQL. Legacy Items/CreateItem routes are disabled. Direct handler access has the same checks; CORS/origin controls are not authentication. |
 
-Plans may contain secret references through an approved secret channel, never
-secret values. Unknown resource ownership, unresolved cost exposure, unsupported
-profile pairs, or unverified deployment assumptions must be reported explicitly
-instead of receiving a success-shaped default.
+SQL credentials stay server-side; runtime grants deny base-table writes and owner
+enrollment. A privileged operator is a separate access boundary, not a supported
+browser bypass. Test direct and proxied requests and SQL grants for each profile.
 
-## Verification and promotion
+All local bundles require Node/npm and Docker with an authorized cached preview
+SQL image. DAB also needs its cached DAB image. Functions needs installed Core
+Tools/SWA CLI and loopback SQL; the deployed Functions package uses no container
+images. [Prerequisites](./prerequisites.md) distinguish acquisition, recurring
+local work, Azure CLI sign-in and application-user sign-in. Protected profiles
+have no supplied unauthenticated/test-identity mode. Public anonymous-only use
+needs no identity provider, but never proves protected owner access.
 
-An entry becomes verified only for an immutable shape and source revision backed
-by real-provider evidence. Promotion includes applicable allowed and denied
-access checks, real SQL save/reload, persistence after an owned runtime restart,
-actual settings and artifact digests, cost assumptions, and recorded limitations.
-Template validation, mocks, unit tests, local builds, and successful packaging
-are useful checks but are not cloud acceptance evidence.
+## Container Apps / DAB — revision 1.1.0
 
-Keep the `app-service-f1-dab` and `static-web-apps-functions` entries
-experimental until each is exercised independently. Do not silently substitute
-a paid App Service tier or another host. A free SKU or allowance never implies a
-zero-cost guarantee for the whole deployment.
+- **Resources:** Consumption environment; separate web and DAB container apps;
+  app-owned digest-pinned images; serverless General Purpose Azure SQL Database.
+  The template creates no image registry.
+- **Identity:** User-assigned managed identity for DAB-to-SQL access; separate
+  operator for migration and bootstrap.
+- **Network:** Public HTTPS web ingress; internal DAB ingress; SQL public TLS
+  endpoint. SQL firewall and operator access are separate decisions.
+- **Cost:** SQL is a **Free offer with enforced quota stop** only when eligible
+  and configured with `AutoPause`. Container Apps uses a **Metered allowance**;
+  registry, publication, network transfer and other dependencies need review.
+- **Open gates:** Live SQL provisioning eligibility, approved connectivity,
+  publication, real sign-in, allowed and denied API checks, browser save and reload,
+  concurrency and restart persistence.
+
+## App Service F1 / DAB — revision 1.1.0
+
+- **Resources:** One Linux F1 plan with separate web and DAB container sites;
+  public-pull digest-pinned app images; reuses an existing approved SQL database.
+- **Identity:** DAB uses managed identity for SQL. Preserve any existing
+  `app_runtime` binding.
+- **Network:** Both sites have public HTTPS endpoints. Protect direct and proxied
+  DAB access. The template does not change SQL firewall rules.
+- **Cost:** F1 is a **Free SKU** with shared CPU, memory and capacity limits.
+  SQL and network charges are reviewed separately.
+- **Open gates:** Regional capacity, combined plan headroom, public image pulls,
+  SQL access, real sign-in, sleep/wake, concurrency and restart persistence.
+
+## Static Web Apps / Functions — revision 1.1.0
+
+- **Resources:** Static Web Apps Free site with managed Node.js 22 Functions;
+  frontend and Functions package, not DAB or container images; reuses an existing
+  approved SQL database. Functions implements the starter API contract, not DAB's
+  general query language.
+- **Identity:** Browser OIDC/PKCE stays external. Functions validates Entra
+  issuer, audience and owner claims. Managed Functions has no managed identity;
+  SQL uses an approved service-principal credential reference.
+- **Network:** Public static site and managed `/api` endpoint. Keep SQL connectivity
+  and credentials separately approved.
+- **Cost:** Static Web Apps Free is a **Free SKU**. Functions uses a
+  **Metered allowance**; check current quotas and other dependency costs.
+- **Open gates:** Real provider sign-in, SQL ownership and pooling, credential
+  rotation, Node 22 publication, idle/resume, quota errors and persisted reload
+  after redeployment.
+
+## Bounded inputs
+
+Shapes accept only declared app parameters: application name, tenant, subscription,
+approved regions, owner identity, database, approved resource reuse and bounded
+scaling. Schema, migrations, business code and data remain app-owned. Runtime,
+topology, SKU, identity, packaging and network boundaries are shape-owned; review
+changes as a new shape revision or an approved deviation.
+
+Plans may contain secret references through an approved channel, never secret
+values. Report unknown ownership, cost exposure, unsupported profile pairs and
+unverified assumptions as open gates.
+
+## Verification
+
+Verify a shape only for an immutable shape and source revision with real-provider
+evidence: allowed and denied access, SQL save/reload, persistence after an owned
+runtime restart, actual settings, artifact digests, cost assumptions and
+limitations. Do not promote a profile until its own immutable revision is tested independently;
+record the outcome in the release record rather than duplicating mutable status.

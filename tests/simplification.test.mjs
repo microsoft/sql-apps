@@ -20,6 +20,37 @@ test('default starter has no Functions workspace or speculative Rayfin configura
   assert.equal(Object.keys(lock.packages).some(key => /functions|tedious|@azure\/identity/.test(key)), false);
 });
 
+test('deployment guidance uses one concise runbook and a separate canonical profile catalog', async () => {
+  const manifest = JSON.parse(await read('starter/package.json'));
+  const runbook = await read('starter/deployment.md');
+  const catalog = await read('../references/deployment-shapes.md');
+  const policy = await read('../references/deployment.md');
+
+  assert.equal(manifest.scripts['deployment:apply'], undefined);
+  assert.equal(manifest.scripts['deployment:status'], 'node scripts/deployment-execution.mjs status');
+  assert.equal(existsSync(new URL('starter/hosting.md', templates)), false);
+  assert.ok(runbook.trim().split(/\s+/).length < 1200);
+  assert.match(runbook, /## Stop and ask/);
+  assert.doesNotMatch(runbook, /F1 operator steps|Static Web Apps operator steps/);
+  assert.match(catalog, /## Container Apps \/ DAB/);
+  assert.match(catalog, /## App Service F1 \/ DAB/);
+  assert.match(catalog, /## Static Web Apps \/ Functions/);
+  assert.match(policy, /### What never counts as approval or proof/);
+  assert.match(policy, /Free SKU/);
+  assert.match(policy, /Free offer with enforced quota stop/);
+  assert.match(policy, /Metered allowance/);
+  assert.match(policy, /\*\*Paid:/);
+  assert.equal(existsSync(new URL('../references/deployment-shapes-implementation-plan.md', templates)), false);
+  for (const file of ['README.md', 'deployment.md', 'deployment-migrations.md']) {
+    const text = await read(`starter/${file}`);
+    for (const [, target] of text.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
+      if (/^(https:\/\/|mailto:|#)/.test(target)) continue;
+      assert.ok(existsSync(new URL(target.split('#')[0], new URL(`starter/${file}`, templates))),
+        `${file}: missing copied-starter link ${target}`);
+    }
+  }
+});
+
 test('alternative installer stages only an explicitly selected overlay without overwriting an app', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'sqlapps-alternative-'));
   try {
@@ -46,7 +77,7 @@ test('alternative installer stages only an explicitly selected overlay without o
     }
     assert.deepEqual(JSON.parse(await readFile(join(directory, 'tsconfig.backend.json'), 'utf8')).include,
       ['scripts/config.ts']);
-    for (const file of ['README.md', 'hosting.md', 'deployment.md', 'deployment-migrations.md']) {
+    for (const file of ['README.md', 'deployment.md', 'deployment-migrations.md']) {
       const document = await readFile(join(directory, file), 'utf8');
       for (const match of document.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
         const target = match[1];
@@ -58,7 +89,8 @@ test('alternative installer stages only an explicitly selected overlay without o
     assert.deepEqual(profile, { hosting: 'static-web-apps', api: 'functions' });
     assert.match(await readFile(join(directory, 'README.md'), 'utf8'), /Static Web Apps \/ Functions starter/);
     assert.doesNotMatch(await readFile(join(directory, 'README.md'), 'utf8'), /DAB_URL|DAB prerequisites/);
-    assert.doesNotMatch(await readFile(join(directory, 'README.md'), 'utf8'), /Identity decision comes first|ACCEPTANCE_TOKEN_A/);
+    assert.doesNotMatch(await readFile(join(directory, 'README.md'), 'utf8'), /Identity decision comes first/);
+    assert.match(await readFile(join(directory, 'README.md'), 'utf8'), /ACCEPTANCE_TOKEN_A.*ACCEPTANCE_TOKEN_B/);
     assert.match(await readFile(join(directory, 'deployment.md'), 'utf8'), /Static Web Apps operator steps/);
     await writeFile(join(directory, 'packages', 'functions', 'src', 'handlers.ts'), 'user change');
     assert.notEqual(run('static-web-apps').status, 0);

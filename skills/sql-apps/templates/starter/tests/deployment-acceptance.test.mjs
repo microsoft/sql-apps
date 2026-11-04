@@ -75,7 +75,7 @@ test('approval and sign-in wait intervals remain separate from wall-clock totals
   ]);
 });
 
-test("Leonard's recorded milestone arithmetic remains internally consistent", () => {
+test('recorded milestone arithmetic remains internally consistent', () => {
   const startUtc = Date.UTC(2026, 0, 1, 9);
   const timestamp = offset => new Date(startUtc + offset).toISOString();
   let log = recordBenchmarkEvent(undefined, start);

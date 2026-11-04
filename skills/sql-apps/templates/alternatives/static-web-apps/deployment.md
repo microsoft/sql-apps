@@ -7,7 +7,7 @@ Functions only; it does not use DAB or container images.
 | --- | --- |
 | Target and artifacts | Tenant, subscription, region, existing SQL database, source revision and staged content |
 | Identity and access | Functions service principal, SPA registration/consent, redirect URI, SQL operator and secret channels |
-| Cost and approvals | Hosting/SQL limits, network costs, resource/write scope and exceptions |
+| Cost and approvals | Hosting and SQL limits, network costs, resource and write scope, exceptions |
 | Evidence and remaining work | Actual settings, checks/results, failed or unrun acceptance, owner and next action |
 
 ## Static Web Apps operator steps
@@ -34,5 +34,4 @@ Functions only; it does not use DAB or container images.
    deployment token. Test direct and proxied allowed/denied requests, real
    sign-in, Functions-to-SQL ownership, persistence and restart.
 
-See [hosting.md](./hosting.md#static-web-apps-free--functions) for runtime
-boundaries. A local build or successful deployment is not end-to-end acceptance.
+Follow the shared SQL Apps acceptance checks before describing delivery as verified.

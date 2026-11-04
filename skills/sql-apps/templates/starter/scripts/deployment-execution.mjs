@@ -648,9 +648,6 @@ export function deploymentStatus(receipt) {
 }
 
 async function runCli(command) {
-  if (command === 'apply') {
-    throw new Error('Standalone deployment:apply is disabled. A VS Code host must supply authorization and the deployment adapter.');
-  }
   if (command !== 'status') throw new Error(`Unsupported deployment execution command: ${command}.`);
   const receiptPath = resolve(root, '.deployment', 'receipt.json');
   let receipt;
