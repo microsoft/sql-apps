@@ -1,5 +1,7 @@
 # SQL Apps
 
+<img src="content/icons/sql-apps.png" alt="SQL Apps icon: a blue database with a purple application ribbon" width="160">
+
 **Idea -> tested local app -> approved deployment.**
 SQL Apps guides your coding assistant; you own the source, migrations and tests.
 
