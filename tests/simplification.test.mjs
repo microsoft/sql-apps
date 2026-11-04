@@ -41,6 +41,11 @@ test('deployment guidance uses one concise runbook and a separate canonical prof
   assert.match(policy, /Metered allowance/);
   assert.match(policy, /\*\*Paid:/);
   assert.equal(existsSync(new URL('../references/deployment-shapes-implementation-plan.md', templates)), false);
+  for (const file of ['docs/project-spec.md', 'docs/plans/deployment-shapes-implementation-plan.md',
+    'skills/sql-apps/references/deployment-attribution.md']) {
+    assert.equal(existsSync(new URL(`../../../${file}`, templates)), false,
+      `Do not restore redundant guidance: ${file}`);
+  }
   for (const file of ['README.md', 'deployment.md', 'deployment-migrations.md']) {
     const text = await read(`starter/${file}`);
     for (const [, target] of text.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {

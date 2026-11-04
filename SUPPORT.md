@@ -1,29 +1,14 @@
 # Support
 
-SQL Apps is an early-preview assistant plugin. This repository provides no
-service-level agreement or Microsoft support commitment. Azure product support
-remains governed by your Azure agreement.
+SQL Apps is preview guidance with no SLA or Microsoft support commitment.
+Azure, SQL tooling and Docker retain their own support terms.
 
-For setup and known validation limits, start with the [README](./README.md).
-Use [repository issues](https://github.com/microsoft/sql-apps/issues) for non-security
-bugs and questions when your account is authorized. Check repository permissions
-and known enterprise policy before promising or attempting issue creation;
-GraphQL permission discovery can itself fail. [Enterprise Managed Users](https://docs.github.com/en/enterprise-cloud@latest/admin/managing-iam/understanding-iam-for-enterprises/abilities-and-restrictions-of-managed-user-accounts)
-cannot contribute to public repositories outside their enterprise. On denial, do
-not retry under another identity. Preserve sanitized feedback locally through a
-user-approved channel, or arrange a user-approved authorized-maintainer handoff.
-Include the plugin version, assistant/host version, relevant
-companion plugin versions, steps to reproduce, expected and actual behavior,
-and redacted diagnostic output.
+Report non-security bugs through [issues](https://github.com/microsoft/sql-apps/issues)
+with an authorized account. [Enterprise Managed Users](https://docs.github.com/en/enterprise-cloud@latest/admin/managing-iam/understanding-iam-for-enterprises/abilities-and-restrictions-of-managed-user-accounts)
+cannot contribute outside their enterprise. If denied, keep redacted feedback
+locally or arrange an approved handoff; never retry as another identity.
 
-Never post access tokens, connection secrets, or private user data. Report
-vulnerabilities privately as described in [SECURITY.md](./SECURITY.md).
+Include plugin/host/companion versions, reproduction steps, expected/actual
+behavior and redacted diagnostics.
 
-Microsoft SQL guidance and the Azure CLI, Docker, and Azure services have their
-own support and reporting channels. SQL Apps does not extend their support
-policies. Every deployment shape remains Experimental until it passes the shared live
-acceptance checks.
-
-See the [deployment shape catalog](./skills/sql-apps/references/deployment-shapes.md)
-for profile boundaries and open gates, and the
-[shared approval rules](./skills/sql-apps/references/deployment.md#what-never-counts-as-approval-or-proof).
+Never post secrets/private data. Report vulnerabilities through [Security](./SECURITY.md).

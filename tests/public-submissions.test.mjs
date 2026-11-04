@@ -39,11 +39,15 @@ test('public installer materializes immutable code selection and forward migrati
   assert.match(readme, /accepts anonymous/);
   assert.doesNotMatch(readme, /Identity decision comes first|ACCEPTANCE_TOKEN_A/);
   const deployment = await installed('deployment.md');
-  for (const document of [readme, deployment]) {
+  const publicGuide = await installed('public-submissions.md');
+  for (const document of [readme, deployment, publicGuide]) {
     for (const match of document.matchAll(/\[[^\]]+\]\(([^)]+)\)/g)) {
       if (/^(https:\/\/|mailto:|#)/.test(match[1])) continue;
       await installed(match[1].split('#')[0]);
     }
+    assert.match(publicGuide, /\[deployment record\]\(\.\/deployment\.md\)/);
+    assert.match(publicGuide, /RUN_PUBLIC_BUDGET_LIVE/);
+    await installed('tests/public-submissions-live.test.mjs');
   }
   assert.match(deployment, /002-public-submissions\.sql/);
   assert.match(await installed('deployment.md'), /Functions operator steps/);

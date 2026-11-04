@@ -1,41 +1,34 @@
 # App brief: <application name>
 
-## Outcome and first workflow
+## Outcome
 
-<Who uses this app, what useful task do they complete, and what is out of scope?>
+<Users, first useful workflow, and what is out of scope.>
 
-| Workflow | Acceptance check |
-| --- | --- |
-| <First useful action> | <Save, reload from SQL, and reject an invalid/conflicting action> |
+Acceptance: <Save/reload from SQL and reject an invalid/conflicting action.>
 
 ## Data and access rules
 
-<Entities, relationships, SQL-enforced business invariants, roles/ownership,
-and sensitive-data limits. Resolve consequential ambiguities before implementation.>
+<Entities, relationships, SQL invariants, roles/ownership and sensitive-data limits.>
 
 ## Accepted decisions
 
 - intent: poc
 - costPreference: free-first
-- Identity: <approved provider and ownership model; unresolved configuration is a blocker>
+- Identity: <approved provider, ownership model and configuration blockers>
 - UI direction: <audience, tone, typography, and one distinguishing detail>
-- Business constraints and exceptions: <availability, scale, compliance, privacy,
-  cost ceiling or explicit zero-azure-spend, and accepted scope>
+- Constraints: <availability, scale, compliance, privacy and cost ceiling
+  or explicit zero-azure-spend>
 - Runtime profile: `<application-owned deployment.json link>`
-- Cloud target, approvals and operator instructions: `<application-owned deployment.md link>`
-  <not requested / review pending / approved scope; no credentials>
-
-After copying this brief into the application, replace those placeholders with
-relative Markdown links to its actual `deployment.json` and `deployment.md`.
-Resolve paths from the copied brief and verify the files exist; these are app
-links, not links into the installed plugin/template directory.
+- Cloud approvals and operator steps: `<application-owned deployment.md link>`
 
 ## Delivery and open checks
 
 - Delivery: <local by default; cloud only when requested and separately approved>
-- Blockers and next useful action: <missing capabilities or decisions; no fake persistence>
-- Acceptance remaining: <readiness, authenticated API, browser, SQL concurrency, restart>
+- Acceptance targets: <public-local, if applicable; full authenticated-local;
+  deployed, only if requested. Name the workflows required for each.>
+- Blockers and next action: <missing decisions, setup or acceptance checks>
 
-Keep local commands/results in the app README and cloud decisions/results in
-`deployment.md`. The active host instructions own durable policy; this brief owns
-only app decisions, not deployment mechanics, approval records or repeated logs.
+Report targets as verified, blocked, unverified or not requested.
+A locked staff portal proves denial, not staff workflow acceptance.
+
+Keep local commands/results in the README; cloud approvals/results in `deployment.md`.

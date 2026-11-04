@@ -1,22 +1,11 @@
 # SQL Apps
 
-<img src="content/icons/sql-apps.png" alt="SQL Apps icon: a blue database with a purple application ribbon" width="160">
+**Idea -> tested local app -> approved deployment.**
+SQL Apps guides your coding assistant; you own the source, migrations and tests.
 
-**Your idea. Your assistant. Your app.**
-
-Build SQL-backed web applications with the coding assistant you already use.
-Describe a useful workflow, resolve its important rules, then build and verify
-screens backed by real data. Keep the source, migrations, tests and run instructions.
-
-SQL Apps is a lightweight guidance plugin, not a hosting service or application
-runtime. No SQL Apps account or subscription is required; your app runs without it.
-Start locally and consider Azure only when requested.
-
-The supported scope is React/Vite and TypeScript with the selected DAB or
-Functions API and Azure SQL. For a new app, use an empty target and select a
-profile before customization. For an existing compatible app, inspect and edit
-in place; never overlay templates. Explain unsupported stacks and scope any
-migration separately. See the [project specification](./docs/project-spec.md).
+**Stack:** React/Vite, TypeScript, Azure SQL and DAB by default; Functions is an
+explicit alternative. Start new apps in an empty directory; edit compatible
+existing apps in place.
 
 ## Get started
 
@@ -30,10 +19,7 @@ migration separately. See the [project specification](./docs/project-spec.md).
 | Gemini CLI | [Gemini extension](./docs/installation.md#gemini-cli) |
 | Cursor | [Team marketplace](./docs/installation.md#cursor) |
 
-The marketplace coordinate is **`sql-apps@sql-apps-skills`**. Follow your host's
-installation guide, check version/skill discovery, then start a fresh session.
-The assistant discovers required companion tools and helps with missing setup;
-installation does not grant database access or authorize cloud changes.
+Install **`sql-apps@sql-apps-skills`**.
 
 ### 2. Build your first workflow
 
@@ -43,51 +29,28 @@ Open the application directory and ask:
 > members reserve it; overlapping reservations must be rejected. Ask about
 > important missing rules, then build and verify one complete workflow locally.
 
-Try saving a reservation, reloading it from SQL and rejecting a conflict.
-The [starter's local guide](./skills/sql-apps/templates/starter/README.md) covers
-explicit Build → Start, Test, acceptance and owned Stop. The default is
-TypeScript/React, DAB and Azure SQL; explicit Functions uses the same public
-start commands without DAB. Commands disclose their build and artifact contracts;
-Start uses an existing build, not a freshness check.
+Follow the [local guide](./skills/sql-apps/templates/starter/README.md).
 
 ## Guides
 
 | Need | Guide |
 | --- | --- |
-| Missing tools/database access | [Prerequisites](./skills/sql-apps/references/prerequisites.md) |
-| Stack and durable project rules | [Constitution](./skills/sql-apps/references/constitution.md) |
-| UI conventions | [App design](./skills/sql-apps/references/app-design.md) |
-| Container Apps, F1 or Static Web Apps | [Deployment shapes](./skills/sql-apps/references/deployment-shapes.md) |
-| Cloud review and operator steps | [Deployment policy](./skills/sql-apps/references/deployment.md) / [app-owned runbook](./skills/sql-apps/templates/starter/deployment.md) |
-| Version tags and naming | [Attribution](./skills/sql-apps/references/deployment-attribution.md) |
-| Package/release history and measured checks | [Release and verification](./docs/reference/releasing.md) |
+| Missing tools, SQL or identity | [Prerequisites](./skills/sql-apps/references/prerequisites.md) |
+| Project rules | [Constitution](./skills/sql-apps/references/constitution.md) |
+| UI | [App design](./skills/sql-apps/references/app-design.md) |
+| Choose a cloud host | [Deployment shapes](./skills/sql-apps/references/deployment-shapes.md) |
+| Deploy | [Approval policy](./skills/sql-apps/references/deployment.md) / [operator runbook](./skills/sql-apps/templates/starter/deployment.md) |
+| Compatibility and tested limits | [Release record](./docs/reference/releasing.md) |
 
-## Preview and important limits
+## Preview limits
 
-Release status, exact runtime compatibility, preview constraints and measured
-host/profile evidence belong in the [release guide](./docs/reference/releasing.md).
-Release identity is not proof of publication or certification.
+Local Azure SQL requires [Private Preview access](./docs/installation.md#application-prerequisites);
+on-premises SQL Server is unsupported. Missing setup means unverified persistence,
+not automatic cloud deployment.
 
-The local Azure SQL Database container is separately licensed and not bundled.
-Follow the [acquisition prerequisites](./docs/installation.md#application-prerequisites).
-Only that engine or Azure SQL Database cloud is supported, not on-premises SQL
-Server. Missing SQL/selected API leaves persistence unverified; no automatic cloud switch.
+Review generated code before using real data. Cloud writes require
+[target, cost and access approval](./skills/sql-apps/references/deployment.md#what-never-counts-as-approval-or-proof);
+you are responsible for charges and provider terms.
 
-With prerequisites already available, recurring local work needs no Azure CLI
-session or deployment. Protected apps still require application-user sign-in;
-image acquisition and provider setup are separate prerequisites, not offline
-capabilities.
-
-Review generated code, authorization, migrations and recovery before real or
-regulated data. Read the [deployment approval and evidence rules](./skills/sql-apps/references/deployment.md#what-never-counts-as-approval-or-proof)
-before cloud writes. You are responsible for costs; tools, providers and Azure
-services have separate availability, licensing and pricing terms.
-
-No SLA or Microsoft support commitment is provided; Azure support follows your
-agreement. See [Support](./SUPPORT.md). Never commit credentials/private data;
-report vulnerabilities privately through [Security](./SECURITY.md).
-Follow the [Code of Conduct](./CODE_OF_CONDUCT.md) and applicable trademark/logo policies.
-
-## License
-
-[MIT License](./LICENSE), provided “as is” without warranty under its terms.
+See [Support](./SUPPORT.md), [Security](./SECURITY.md) and [Code of Conduct](./CODE_OF_CONDUCT.md).
+[MIT License](./LICENSE).

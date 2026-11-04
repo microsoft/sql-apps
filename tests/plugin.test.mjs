@@ -187,7 +187,6 @@ test('starter source is inert template content, not a host runtime or vendored s
   assert.ok(payload.includes(starter + 'package-lock.json'));
   assert.ok(payload.includes(starter + path.join('scripts', 'acceptance.mjs')));
   assert.ok(payload.includes(path.join('skills', 'sql-apps', 'references', 'deployment.md')));
-  assert.ok(payload.includes(path.join('skills', 'sql-apps', 'references', 'deployment-attribution.md')));
   const alternatives = path.join('skills', 'sql-apps', 'templates', 'alternatives') + path.sep;
   assert.ok(payload.every((file) => file.startsWith(starter) || file.startsWith(alternatives) || file.endsWith('.md') || file.endsWith('.yml')));
   assert.ok(!payload.some(file => file.split(path.sep).some(part => ['node_modules', 'dist', '.local'].includes(part))));

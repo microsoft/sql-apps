@@ -1,53 +1,53 @@
 # App design
 
-Use this guidance for new UI and material visual changes. It summarizes transferable principles from Rayfin's app-design and CRUD guidance; it does not vendor its component kits or require its hooks, SDK, authentication gate, or Fabric services.
-
-## Decide the visual direction first
-
-Record a short visual direction in the app brief: intended audience, tone, typography, and one distinguishing detail. Make the layout serve the primary workflow rather than defaulting to identical dashboard cards. Build a runnable shell early, but show honest loading states until real data is integrated.
+Follow the brief's UI direction; prioritize the primary workflow.
 
 ## Shared technology conventions
 
-- React with Vite and TypeScript.
-- Tailwind CSS v4 with semantic CSS custom-property tokens in `packages/frontend/src/global.css`. Define colors, typography, spacing, radii, and focus styles there before styling screens.
-- Radix primitives for complex interactive controls such as dialogs, menus, and tabs; ordinary semantic HTML for simple controls. Use only the primitives needed by the app.
-- Lucide React for UI icons. Decorative icons are hidden from assistive technology; icon-only actions have accessible names.
-- Add `clsx` and `tailwind-merge` only when conditional class merging is needed. Keep plain class strings otherwise; when merging, verify token-based size/color utilities do not conflict.
-- Vitest and React Testing Library for relevant UI behavior. Use the host's existing browser tooling for real workflow checks; do not add a separate runner merely to match a template.
+- Tailwind CSS v4: define semantic color, type, spacing, radius and focus tokens in `packages/frontend/src/global.css` before styling screens.
+- Radix for complex controls; semantic HTML for simple ones. Import only needed primitives.
+- Lucide React icons: hide decorative icons; name icon-only actions.
+- Vitest/React Testing Library for UI behavior; existing host browser tools for real workflows, not another runner.
 
-Select current mutually compatible stable versions through normal package tooling, not copied alpha versions from a Rayfin template. Do not import `@microsoft/rayfin-*` or copy Rayfin's build hooks. These libraries are generated-app dependencies, not dependencies of this plugin. Preserve an existing app's tooling unless a change is explicitly in scope.
+Preserve compatible existing tooling.
 
 ## Consistent, accessible screens
 
-- Keep surfaces, text, borders, controls, and status colors on semantic tokens. Use a consistent spacing/type scale; avoid repeated hard-coded component values.
-- Choose readable typography with a clear hierarchy. Prefer system or locally bundled licensed fonts; external font services require an explicit privacy/network decision. Do not make offline development depend on a CDN.
-- Support light and dark tokens, honoring the user's system preference with a usable override. Check contrast and focus visibility in both modes.
-- Use mobile-first layouts, readable content widths on wide screens, and an intentional density for tables and toolbars. Align mixed controls; avoid document-level horizontal overflow.
-- Give inputs visible labels, useful validation, and consistent typography/heights. Ensure keyboard operation, logical focus order, and focus return after dialogs close. Respect reduced-motion preferences.
-- Aim for WCAG 2.2 AA; report what was tested rather than claiming certification.
+- Prefer system/licensed local fonts; approve external font privacy/network use.
+- Support system light/dark preference and an override; check contrast/focus in both.
+- Use mobile-first layouts, bounded wide content, readable tables and aligned controls; avoid page overflow.
+- Label inputs; provide validation, keyboard operation, logical focus/return and reduced motion.
+- Target WCAG 2.2 AA; report tested checks, not certification.
 
 ## Honest data and mutation states
 
-Implement loading, empty, error, saving, success, and permission-denied states. Treat authorization/configuration failures as errors, not endless loading or empty-success results. Sanitize errors while preserving an actionable explanation.
+Show loading, empty, error, saving, success and permission-denied states.
+Sanitize errors without hiding actionable causes; auth/configuration failures are
+not empty results or endless loading.
 
-Validate against the selected API's permissions and SQL-enforced rules, not an assumed Express CRUD layer. Keep form values on failure, prevent duplicate submissions, and identify destructive targets in confirmation prompts. Use optimistic UI only with rollback and explicit failure handling. A fulfilled wrapper promise is not proof of a successful save; honor the operation's actual success contract. Show actionable unavailable/quota-exhausted states when a free PoC sleeps or reaches its limits; never silently upgrade resources.
+Match API permissions, SQL rules and save-success responses.
+Retain failed values, prevent duplicate submissions and confirm destructive targets.
+Optimistic UI needs rollback/error handling.
+Show unavailable/quota states; never silently upgrade a sleeping or exhausted PoC.
 
 ## Review the rendered result
 
-Exercise the primary workflow through the selected API backed by SQL; inspect desktop and narrow widths, keyboard interaction, both themes, empty/error states, and dense repeated elements. Build/type-check without suppressing TypeScript errors. Keep the app's design direction and relevant checks in the brief/run documentation, not another design-management system.
+Test the SQL-backed workflow at desktop/narrow widths: keyboard, both themes,
+dense content and empty/error states. Record results.
 
-A screenshot/canvas timeout is not evidence that the app is unready. After a
-bounded retry, mark screenshot capture unavailable separately from app readiness.
-DOM, navigation and save/reload checks remain useful behavioral evidence, not
-screenshot-based visual review. Do not bypass iframe restrictions or CSP to obtain
-an image; leave visual checks unverified when capture is unavailable.
+Retry capture timeout once; then mark visual review unavailable, not app unready.
+DOM checks prove behavior, not visual review. Never bypass CSP/iframe restrictions.
 
-## Upstream reference
+### When SQL or identity is blocked
 
-Reviewed Rayfin revision `0979439a7a0806abd0ee48c2619b37f297ae1324` on 2026-10-21:
+Use test-scoped interception or fixtures labeled **fixture-only visual review**:
+rendering, not authentication, authorization or persistence. No real customer data,
+shipped fake sign-in, production mock fallback or acceptance bypass.
 
-- [App design](https://github.com/microsoft/rayfin/blob/0979439a7a0806abd0ee48c2619b37f297ae1324/samples/universal-app/template/.agents/skills/app-design/SKILL.md)
-- [UI style recipes](https://github.com/microsoft/rayfin/blob/0979439a7a0806abd0ee48c2619b37f297ae1324/samples/universal-app/template/.agents/skills/app-design/references/ui-style-recipes.md)
-- [CRUD UI](https://github.com/microsoft/rayfin/blob/0979439a7a0806abd0ee48c2619b37f297ae1324/samples/universal-app/template/.agents/skills/crud-ui/SKILL.md)
+Inspect the actual viewport: readable labels, reachable primary/destructive actions,
+focus and scrolling. Compare DOM measurements if captures clip.
 
-Deliberate differences: no Rayfin-specific auth/theme hooks, SDK clients, mandatory CDN fonts, or copied component kit. Revisit version-matched upstream guidance during an actual migration.
+Record fixture views/blockers. Remove test interception before real-provider acceptance.
+
+Design source: [Rayfin app-design](https://github.com/microsoft/rayfin/blob/0979439a7a0806abd0ee48c2619b37f297ae1324/samples/universal-app/template/.agents/skills/app-design/SKILL.md),
+reviewed 2026-10-21.

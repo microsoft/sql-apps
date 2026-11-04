@@ -1,8 +1,5 @@
 # Static Web Apps / Functions deployment record
 
-Use this file as the app's single target, approval and result record. It covers
-Functions only; it does not use DAB or container images.
-
 | Decision | Record |
 | --- | --- |
 | Target and artifacts | Tenant, subscription, region, existing SQL database, source revision and staged content |
@@ -12,26 +9,20 @@ Functions only; it does not use DAB or container images.
 
 ## Static Web Apps operator steps
 
-1. Build and test the copied app. Run `npm run deployment:prepare`; after each
-   preparation, reinstall API production dependencies:
+1. Build/test, then `npm run deployment:prepare`. After every restage:
 
    ```powershell
    npm ci --omit=dev --ignore-scripts --prefix .deployment\static-web-apps\api
    ```
 
-2. Follow [shared SQL migration steps](./deployment-migrations.md) for
-   every migration and verify each recorded checksum before bootstrapping
-   `infra/functions-bootstrap.sql` with the approved Functions service-principal
-   client ID. Keep the runtime grants least-privilege.
+2. Apply/verify [SQL migrations](./deployment-migrations.md); then run
+   `infra/functions-bootstrap.sql` with the approved service-principal client ID.
+   Verify restricted runtime grants.
 3. Fill `infra/static-web-apps.bicepparam` with the approved target. Provide
    `SQL_CLIENT_SECRET` through a secure parameter channel; never put it in a file,
-   command, report or log. Register the exact output redirect URI with the identity
-   owner and obtain approved consent.
-4. Compile and preview the template; compare all changes with the recorded scope.
-   Deploy only after explicit resource, access and cost approval. The template
-   creates a site, not consent, SQL connectivity or app content.
+   command or log. Register exact redirect URI/consent with the identity owner.
+4. Compile/preview against approved resource/access/cost scope. Deploy the site;
+   consent, SQL connectivity and content are separate.
 5. Publish the staged web and API together using the approved SWA CLI and
    deployment token. Test direct and proxied allowed/denied requests, real
    sign-in, Functions-to-SQL ownership, persistence and restart.
-
-Follow the shared SQL Apps acceptance checks before describing delivery as verified.

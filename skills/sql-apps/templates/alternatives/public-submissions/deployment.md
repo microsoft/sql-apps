@@ -1,9 +1,7 @@
 # Public inbox deployment record
 
-Public cloud publication is **blocked until the operator approves and tests**
-abuse/ingress controls, privacy notice, retention, response, and cost exposure.
-Local submission tests are not publication approval. Keep this file as the sole
-target, approval and result record; the copied `README.md` owns local commands.
+**Block publication until approved/tested** abuse/ingress, privacy, retention,
+response and cost controls.
 
 | Decision | Record |
 | --- | --- |
@@ -14,25 +12,24 @@ target, approval and result record; the copied `README.md` owns local commands.
 
 ## Functions operator steps
 
-1. Build and test the selected profile, then run `npm run deployment:prepare`.
-   After every restage, reinstall API production dependencies as described in
-   the copied app's README.
-2. Use the shared [SQL migration procedure](./deployment-migrations.md) to apply
-   and verify **both** `001-initial.sql` and `002-public-submissions.sql` against
-   the application database, in version order. Never start the API before migration
-   history and both checksums are verified.
+1. Build/test, then `npm run deployment:prepare`. After every restage:
+
+   ```powershell
+   npm ci --omit=dev --ignore-scripts --prefix .deployment\static-web-apps\api
+   ```
+2. Apply/verify [SQL migrations](./deployment-migrations.md) `001-initial.sql` then
+   `002-public-submissions.sql` in the application database. Verify history/
+   checksums before API startup.
 3. Use `infra/functions-bootstrap.sql` with the approved Functions service
    principal, then verify its restricted grants. Do not grant table writes,
    `db_owner` or enrollment to the runtime identity.
-4. Configure the SWA template and SQL service-principal secret through approved
-   secure channels. Leave `ownerAuth` unset for anonymous-only operation; configure
-   all five real owner identity values together only after identity-owner approval.
+4. Configure SWA/SQL credentials through approved secret channels. Leave `ownerAuth`
+   unset for anonymous-only use; set all five real values together after owner approval.
 5. Before publication, complete the publication gates in
    [public-submissions.md](./public-submissions.md) and the approved target scope.
-6. After approved deployment, verify anonymous denials and allowed submissions,
+6. After approved deployment, verify denied anonymous reads and allowed submissions,
    owner denial and allowed read, SQL limits/permissions, persistence, cost and
    actual ingress. Enroll the owner only through the reviewed SQL operator script.
 
-Keep tokens and SQL secrets out of files, chat, shell history, command arguments,
-logs and public frontend settings. Reconcile a failed deployment before retrying;
-preserve submissions and migration history.
+No secrets in files/chat/history/arguments/logs/frontend.
+Reconcile failed writes before retry; preserve submissions/history.

@@ -1,11 +1,8 @@
 # Cloud SQL migration steps
 
-Use the approved Entra SQL operator, connect to the **application database** (not
-`master`), and keep encryption and certificate verification enabled. This procedure
-applies every numbered migration in order, including profile-specific migrations.
-Do not run a profile bootstrap until all applicable migrations are verified.
-
-From the app root:
+Use the approved Entra SQL operator and **application database**, not `master`,
+with encryption/certificate verification. Apply all numbered/profile migrations
+in order and verify them before identity bootstrap.
 
 ```powershell
 $sqlHost = '<approved-sql-hostname>'
@@ -60,38 +57,44 @@ for ($index = 0; $index -lt $migrations.Count; $index++) {
 }
 ```
 
-The starter files are `001-initial.sql`; the public-inbox profile also requires
-`002-public-submissions.sql`. Keep migrations consecutive, forward-only and
-transactional. Never edit an applied migration or reset the database to pass a
-check. Follow the selected profile's operator guide for identity bootstrap and
-permissions only after this step.
+Default: `001-initial.sql`; public adds `002-public-submissions.sql`.
+New versions must be consecutive, forward-only and transactional.
+
+## Authoring and first-run checks
+
+Filtered indexes, indexed views and indexed computed columns require:
+
+```sql
+SET ANSI_NULLS ON;
+SET ANSI_PADDING ON;
+SET ANSI_WARNINGS ON;
+SET ARITHABORT ON;
+SET CONCAT_NULL_YIELDS_NULL ON;
+SET QUOTED_IDENTIFIER ON;
+SET NUMERIC_ROUNDABORT OFF;
+```
+
+Preserve settings across `GO`. Module creation captures `QUOTED_IDENTIFIER`/
+`ANSI_NULLS`; inspect runtime write-session settings too.
+Test the actual selected migration runner and API on approved isolated SQL,
+including invalid/conflicting writes; text inspection is not execution evidence.
 
 ## Existing databases and recovery
 
-This procedure and local startup are migration runners, not schema-baseline
-importers. An absent `dbo.SchemaVersions` is treated as no recorded migrations;
-`001-initial.sql` unconditionally creates its schema/tables/view/procedure.
-An existing application's objects are not inspected, reconciled or automatically
-marked applied. Do not run this against an arbitrary existing schema. Inspect
-schema, data, collation, ownership and migration provenance first, then separately
-review a compatible adoption/migration plan. Do not forge history to skip work.
+After failure, inspect history/state before retry.
+Edit only confirmed unapplied, uncommitted migrations; otherwise add a forward fix.
+Do not change shipped or applied checksums or reset data/volumes for a passing run.
 
-Checksums are SHA-256 of migration text with CRLF normalized to LF. If a recorded
-checksum differs, stop and inspect the shipped file and history without modifying
-either to suppress the error. Recover the exact applied file from its trusted
-revision and put intended schema changes in a new forward migration. Unknown,
-malformed or inconsistent history needs investigation, not deletion or reset.
+No automatic baseline import: without `dbo.SchemaVersions`, migration 001 attempts
+unconditional object creation. Inspect schema/data/collation/ownership/provenance
+and review adoption separately; never forge history.
 
-Recovery options are distinct:
+Checksums use SHA-256 of CRLF-to-LF-normalized text.
+On mismatch, restore the trusted applied file; never reset history.
 
-- **Forward fix:** add and test a new transactional migration after reconciling
-  the last committed version. Inspect SQL state after failure; do not assume all
-  external operations or arbitrary future migrations roll back automatically.
-- **Compatible app rollback:** deploy an older app/artifact only after proving it
-  works with the current schema and preserves data. This does not undo migrations.
-- **Database restore:** a separately approved operator procedure using actually
-  available backups/service capabilities and a reviewed recovery point/target.
-  The starter supplies no restore automation, backup guarantee or down-migrations.
-
-Preserve databases, volumes, credentials and evidence. Never delete or recreate
-them simply to obtain a passing build, migration or acceptance result.
+- **Forward fix:** reconcile the last committed version; test a new transactional
+  migration. Do not assume external operations/future migrations roll back.
+- **Compatible app rollback:** prove the older artifact works with current schema
+  and data; migrations remain applied.
+- **Database restore:** separately approved operator plan with available backups
+  and reviewed recovery point/target. No bundled restore, backup guarantee or down-migrations.
