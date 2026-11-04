@@ -85,12 +85,12 @@ test('local release-check configuration is ignored without hiding public files',
 test('an independent package copy matches source metadata and every skill byte', (t) => {
   const roots = fixture(t);
   const result = verifyRelease(roots);
-  assert.equal(result.version, '0.3.0');
+  assert.equal(result.version, '0.3.1');
   assert.equal(result.skillFiles, payloadCount);
   assert.match(result.payloadDigest, /^[a-f0-9]{64}$/);
   const command = cli(['--source-root', roots.sourceRoot, '--installed-root', roots.installedRoot]);
   assert.equal(command.status, 0, command.stderr);
-  assert.match(command.stdout, /PASS sql-apps 0\.3\.0/);
+  assert.match(command.stdout, /PASS sql-apps 0\.3\.1/);
   assert.ok(command.stdout.includes(result.payloadDigest));
 });
 
@@ -113,7 +113,7 @@ test('the CLI verifies packages when launched through a linked script directory'
   symlinkSync(path.dirname(script), linkedScripts, process.platform === 'win32' ? 'junction' : 'dir');
   const linkedScript = path.join(linkedScripts, 'verify-release.mjs');
   for (const [name, args, status, output] of [
-    ['matching package', ['--source-root', roots.sourceRoot, '--installed-root', roots.installedRoot], 0, /PASS sql-apps 0\.3\.0/],
+    ['matching package', ['--source-root', roots.sourceRoot, '--installed-root', roots.installedRoot], 0, /PASS sql-apps 0\.3\.1/],
     ['missing package', ['--installed-root', path.join(roots.installedRoot, 'absent')], 1, /installed root: cannot read/],
     ['missing arguments', [], 2, /Usage:.*--installed-root/],
   ]) {
@@ -146,7 +146,7 @@ test('a stale installed version fails clearly', (t) => {
   editJSON(roots.installedRoot, 'plugin.json', (data) => { data.version = '0.1.0'; });
   const command = cli(['--source-root', roots.sourceRoot, '--installed-root', roots.installedRoot]);
   assert.equal(command.status, 1);
-  assert.match(command.stderr, /installed plugin\.json: version 0\.1\.0; expected 0\.3\.0/);
+  assert.match(command.stderr, /installed plugin\.json: version 0\.1\.0; expected 0\.3\.1/);
 });
 
 test('same-version changed skill bytes fail, including newline-only drift', (t) => {

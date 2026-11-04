@@ -23,6 +23,59 @@ async function unusedPort() {
 }
 const runtimeModule = () => import('../skills/sql-apps/templates/alternatives/static-web-apps/scripts/functions-local.mjs');
 
+test('Functions tool probes accept supported versions with a cold-start allowance', async () => {
+  const { checkFunctionsTools } = await runtimeModule();
+  const calls = [];
+  checkFunctionsTools(env, { run: (command, args, options) => {
+    calls.push({ command, args, options });
+    return { status: 0, stdout: calls.length === 1 ? '4.16.0' : '2.0.10', stderr: '' };
+  } });
+  assert.equal(calls.length, 2);
+  for (const { options } of calls) {
+    assert.equal(options.env, env);
+    assert.ok(options.timeout >= 60_000, 'Cold CLI startup must not use the former 15s limit.');
+  }
+});
+
+for (const tool of ['func', 'swa']) {
+  test(`${tool} timeout is not reported as a missing installation`, async () => {
+    const { checkFunctionsTools } = await runtimeModule();
+    let calls = 0;
+    assert.throws(() => checkFunctionsTools(env, { run: () => {
+      calls++;
+      return tool === 'swa' && calls === 1 ? { status: 0, stdout: '4.16.0', stderr: '' } :
+        { status: null, stdout: '', stderr: '', error: Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' }) };
+    } }), error => {
+      assert.match(error.message, new RegExp(`${tool} --version.*timed out.*60000`));
+      assert.doesNotMatch(error.message, /install|repair/i);
+      return true;
+    });
+    assert.equal(calls, tool === 'func' ? 1 : 2, 'Failed probes must stop without retries.');
+  });
+}
+
+for (const [result, expected] of [
+  [{ error: Object.assign(new Error('missing'), { code: 'ENOENT' }), status: null }, /not found.*approved setup/i],
+  [{ status: 127 }, /not found.*approved setup/i],
+  [{ status: 9009 }, /not found.*approved setup/i],
+  [{ status: 0, stdout: '3.9.0' }, /unsupported.*Core Tools 4/i],
+  [{ error: Object.assign(new Error('denied'), { code: 'EACCES' }), status: null }, /failed.*EACCES/],
+  [{ status: 1, stderr: 'private diagnostic' }, /failed.*exit 1/],
+  [{ status: null, signal: 'SIGTERM' }, /failed.*SIGTERM/],
+  [{ status: 0, stdout: 'unrecognized output' }, /unrecognized version/],
+]) {
+  test(`Functions tool probe distinguishes ${expected.source}`, async () => {
+    const { checkFunctionsTools } = await runtimeModule();
+    assert.throws(() => checkFunctionsTools(env, { run: () => result }), error => {
+      assert.match(error.message, expected);
+      assert.match(error.message, /func --version/);
+      assert.doesNotMatch(error.message, /private diagnostic/);
+      if (!/not found|unsupported/.test(error.message)) assert.doesNotMatch(error.message, /install|repair/i);
+      return true;
+    });
+  });
+}
+
 test('Functions maps only restricted local SQL credentials and rejects cloud-secret mixing', async () => {
   const { functionsEnvironment } = await runtimeModule();
   const mapped = functionsEnvironment({ ...env, APP_PORT: '5180', APP_ORIGIN: 'http://127.0.0.1:5180' });

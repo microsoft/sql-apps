@@ -31,7 +31,7 @@ test('manifest uses only supported Agent Plugins 1.0 fields', () => {
   assert.match(manifest.name, /^(?!.*(?:--|\.\.))[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/);
   assert.ok(manifest.name.length <= 64);
   assert.match(manifest.version, /^\d+\.\d+\.\d+$/);
-  assert.equal(manifest.version, '0.3.0', 'Keep the release candidate version explicit');
+  assert.equal(manifest.version, '0.3.1', 'Keep the release candidate version explicit');
   assert.equal(typeof manifest.description, 'string');
   assert.ok(manifest.description.length > 0);
   assert.equal(manifest.license, 'MIT');

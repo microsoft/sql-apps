@@ -15,6 +15,8 @@ Preserve compatible existing tooling.
 
 - Prefer system/licensed local fonts; approve external font privacy/network use.
 - Support system light/dark preference and an override; check contrast/focus in both.
+- Measure rendered text (4.5:1 normal, 3:1 large) and essential control boundaries
+  (3:1 against adjacent colors); use a separate control-border token from decorative rules.
 - Use mobile-first layouts, bounded wide content, readable tables and aligned controls; avoid page overflow.
 - Label inputs; provide validation, keyboard operation, logical focus/return and reduced motion.
 - Target WCAG 2.2 AA; report tested checks, not certification.

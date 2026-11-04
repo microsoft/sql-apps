@@ -24,6 +24,8 @@ The VS Code bundle needs `microsoft-azuresqldb-container` for container guidance
 the broad SQL bundle includes it.
 For DAB, use `dab-rest-and-graphql`, `azuresql-db-dab` or host tools such as `mssql_dab`.
 Functions needs Core Tools 4/SWA CLI 2, not DAB.
+Version probes allow 60 seconds; timeout means unknown availability, not missing
+tools. Inspect the reported command/error before proposing setup changes.
 
 Get real registration, redirect URI and consent from the identity owner.
 Missing SQL/identity permits scaffolding, not fake users or acceptance claims.

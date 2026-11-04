@@ -33,13 +33,26 @@ function invocation(tool, args) {
     [process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `${tool} ${args.join(' ')}`]] : [tool, args];
 }
 
-export function checkFunctionsTools(env) {
+export function checkFunctionsTools(env, { run = spawnSync } = {}) {
   for (const [tool, minimum] of [['func', 4], ['swa', 2]]) {
     const [command, args] = invocation(tool, ['--version']);
-    const result = spawnSync(command, args, { env, encoding: 'utf8', timeout: 15_000, windowsHide: true });
+    const timeout = 60_000;
+    const result = run(command, args, { env, encoding: 'utf8', timeout, windowsHide: true });
+    const probe = `${tool} --version`;
+    const setup = `${tool === 'func' ? 'Azure Functions Core Tools 4' : 'Static Web Apps CLI 2'} through your approved setup.`;
+    if (result.error?.code === 'ETIMEDOUT') {
+      throw new Error(`${probe} timed out after ${timeout} ms; tool availability is unknown. Inspect CLI startup before retrying.`);
+    }
+    if (result.error?.code === 'ENOENT' || (!result.error && [127, 9009].includes(result.status))) {
+      throw new Error(`${probe}: tool not found. Set up ${setup}`);
+    }
+    if (result.error || result.status !== 0) {
+      throw new Error(`${probe} failed (${result.error?.code || result.signal || `exit ${result.status}`}). Inspect the CLI/device policy; no tools were changed.`);
+    }
     const version = result.stdout?.match(/\b(\d+)\.\d+\.\d+\b/);
-    if (result.error || result.status !== 0 || !version || Number(version[1]) < minimum) {
-      throw new Error(`Install or repair ${tool === 'func' ? 'Azure Functions Core Tools 4' : 'Static Web Apps CLI 2'} through your approved setup. No tools were installed or services started.`);
+    if (!version) throw new Error(`${probe} returned an unrecognized version; inspect CLI output before changing tools.`);
+    if (Number(version[1]) < minimum) {
+      throw new Error(`${probe} returned unsupported version ${version[0]}. Set up ${setup}`);
     }
   }
 }

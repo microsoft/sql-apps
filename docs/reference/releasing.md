@@ -2,7 +2,7 @@
 
 ## Package and release identity
 
-**0.3.0 candidate**, starter baseline 0.1.0; publication/update unverified.
+**0.3.1 candidate**, starter baseline 0.1.0; publication/update unverified.
 
 [plugin.json](../../plugin.json) owns version; align host manifests/shared/Cursor
 catalogs (Codex reads plugin version). Changed published bytes require a new version,

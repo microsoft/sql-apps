@@ -76,7 +76,9 @@ SET NUMERIC_ROUNDABORT OFF;
 
 Preserve settings across `GO`. Module creation captures `QUOTED_IDENTIFIER`/
 `ANSI_NULLS`; inspect runtime write-session settings too.
-Test the actual selected migration runner and API on approved isolated SQL,
+When same-batch compilation rejects references to newly added columns, separate
+DDL and dependent statements with `GO`; retain the migration transaction.
+Test the actual selected migration runner and API early on approved isolated SQL,
 including invalid/conflicting writes; text inspection is not execution evidence.
 
 ## Existing databases and recovery
