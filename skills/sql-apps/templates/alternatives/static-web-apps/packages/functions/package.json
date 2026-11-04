@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@azure/functions": "4.17.0",
-    "@azure/identity": "4.13.0",
+    "@azure/identity": "4.14.1",
     "jose": "6.2.13",
     "tarn": "3.1.2",
     "tedious": "19.2.2"
